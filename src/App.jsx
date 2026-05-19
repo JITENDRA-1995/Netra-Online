@@ -1224,6 +1224,7 @@ function App() {
     e.preventDefault();
     const nameVal = document.getElementById('name').value;
     const emailVal = document.getElementById('email').value;
+    const phoneVal = document.getElementById('phone').value;
     const visionVal = document.getElementById('vision').value;
     const serviceVal = selectedProject || "General Inquiry";
 
@@ -1231,7 +1232,7 @@ function App() {
       await createInquiry({
         name: nameVal,
         email: emailVal,
-        phone: '', 
+        phone: phoneVal, 
         service: serviceVal,
         desc: visionVal,
         status: 'New Spark'
@@ -1508,6 +1509,11 @@ function App() {
                   <div className="form-group">
                     <input type="email" id="email" required placeholder=" " />
                     <label htmlFor="email">Email</label>
+                    <div className="input-line"></div>
+                  </div>
+                  <div className="form-group">
+                    <input type="tel" id="phone" required placeholder=" " />
+                    <label htmlFor="phone">Mobile / WhatsApp</label>
                     <div className="input-line"></div>
                   </div>
                   <div className="form-group custom-dropdown-wrapper" ref={dropdownRef}>
