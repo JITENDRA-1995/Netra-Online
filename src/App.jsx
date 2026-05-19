@@ -1128,12 +1128,16 @@ function App() {
       {!isCommandCenterActive && !isClientVaultActive && (
         <header className={`main-header ${headerVisible ? 'header-reveal' : 'header-hidden'}`}>
           <nav className="header-nav">
-            <div className="branding-container">
-              <div className="logo-asset-wrapper">
+            <div 
+              className={`branding-container ${(isVaultActive && !isContactActive && !isLoginActive) ? 'logo-middle' : ''}`}
+              onClick={goHome}
+            >
+              <motion.span layout className="branding-text word-netra">NETRA</motion.span>
+              <motion.div layout className="logo-asset-wrapper">
                 <img src="/logo.png" alt="Netra Logo" className="branding-logo" />
                 <div className="radiant-glow"></div>
-              </div>
-              <span className="branding-text">NETRA GRAPHICS</span>
+              </motion.div>
+              <motion.span layout className="branding-text word-graphics">GRAPHICS</motion.span>
             </div>
             <div className="menu-container">
               <a href="#" className="menu-link" onClick={(e) => { e.preventDefault(); goHome(); }}>HOME</a>
