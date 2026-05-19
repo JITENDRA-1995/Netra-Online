@@ -1,0 +1,263 @@
+import { supabase } from '../client';
+
+/* ==========================================================================
+   1. Projects Core (Ignition Queue / Flames)
+   ========================================================================== */
+
+/**
+ * Fetch all projects, optionally resolving nested milestones, logs, media, and client details
+ */
+export const getProjects = async () => {
+  const { data, error } = await supabase
+    .from('projects')
+    .select(`
+      *,
+      clients (*),
+      project_milestones (*),
+      project_activity_logs (*),
+      project_chats (*),
+      project_media (*)
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  
+  // Format to match the frontend expected nested state objects
+  return data.map(project => ({
+    id: project.id,
+    name: project.name,
+    service: project.service,
+    stage: project.stage,
+    status: project.status,
+    createdAt: new Date(project.created_at).getTime(),
+    deadline: project.deadline,
+    quote: parseFloat(project.quote),
+    discount: parseFloat(project.discount || 0),
+    discountValue: project.discount_value,
+    discountType: project.discount_type,
+    advanceAmount: parseFloat(project.advance_amount || 0),
+    paymentStatus: project.payment_status,
+    client: project.clients ? {
+      name: project.clients.name,
+      phone: project.clients.phone,
+      email: project.clients.email,
+      address: project.clients.address
+    } : null,
+    milestones: (project.project_milestones || [])
+      .sort((a, b) => a.position - b.position)
+      .map(m => ({ name: m.name, completed: m.completed })),
+    activityLog: (project.project_activity_logs || [])
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+      .map(l => ({ action: l.action, time: new Date(l.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) })),
+    collaborationStream: (project.project_chats || [])
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+      .map(c => ({ id: c.id, sender: c.sender, text: c.message, time: new Date(c.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) })),
+    mediaVault: (project.project_media || []).map(m => ({
+      id: m.id,
+      name: m.file_name,
+      url: m.file_url,
+      type: m.file_type,
+      time: new Date(m.uploaded_at).toLocaleDateString()
+    }))
+  }));
+};
+
+/**
+ * Ignites a new project with initial milestones and logs
+ */
+export const igniteProject = async (projectData) => {
+  // 1. Insert core project details
+  const { data: project, error: pError } = await supabase
+    .from('projects')
+    .insert([
+      {
+        name: projectData.name,
+        service: projectData.service,
+        stage: projectData.stage || 1,
+        status: projectData.status || 'Ongoing',
+        quote: projectData.quote,
+        discount: projectData.discount || 0,
+        discount_value: projectData.discountValue,
+        discount_type: projectData.discountType || 'rs',
+        advance_amount: projectData.advanceAmount || 0,
+        payment_status: projectData.paymentStatus || 'part',
+        deadline: projectData.deadline
+      }
+    ])
+    .select()
+    .single();
+
+  if (pError) throw pError;
+
+  // 2. Insert initial milestones
+  if (projectData.milestones && projectData.milestones.length > 0) {
+    const milestonesToInsert = projectData.milestones.map((m, idx) => ({
+      project_id: project.id,
+      name: m.name,
+      completed: m.completed || false,
+      position: idx
+    }));
+    const { error: mError } = await supabase
+      .from('project_milestones')
+      .insert(milestonesToInsert);
+      
+    if (mError) throw mError;
+  }
+
+  // 3. Insert initial activity log
+  const { error: lError } = await supabase
+    .from('project_activity_logs')
+    .insert([
+      { project_id: project.id, action: 'Project Ignited' }
+    ]);
+
+  if (lError) throw lError;
+
+  return project;
+};
+
+/**
+ * Update project state details (stage, financials, timeline)
+ */
+export const updateProjectState = async (projectId, updates) => {
+  const { data, error } = await supabase
+    .from('projects')
+    .update({
+      stage: updates.stage,
+      status: updates.status,
+      quote: updates.quote,
+      discount: updates.discount,
+      discount_value: updates.discountValue,
+      discount_type: updates.discountType,
+      advance_amount: updates.advanceAmount,
+      payment_status: updates.paymentStatus,
+      deadline: updates.deadline
+    })
+    .eq('id', projectId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+/* ==========================================================================
+   2. Project Sub-Resource Modifiers (Milestones, Activity Logs, Chat)
+   ========================================================================== */
+
+/**
+ * Toggle milestone status
+ */
+export const toggleMilestone = async (projectId, milestoneName, isCompleted) => {
+  const { data, error } = await supabase
+    .from('project_milestones')
+    .update({ completed: isCompleted })
+    .eq('project_id', projectId)
+    .eq('name', milestoneName)
+    .select();
+
+  if (error) throw error;
+  return data;
+};
+
+/**
+ * Log a new activity/event for the project
+ */
+export const addProjectActivityLog = async (projectId, action) => {
+  const { data, error } = await supabase
+    .from('project_activity_logs')
+    .insert([{ project_id: projectId, action }])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+/**
+ * Send custom message down the collaboration stream
+ */
+export const sendChatMessage = async (projectId, sender, messageText) => {
+  const { data, error } = await supabase
+    .from('project_chats')
+    .insert([{ project_id: projectId, sender, message: messageText }])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+/**
+ * Listen to real-time chat messages
+ */
+export const subscribeToChats = (projectId, onMessageReceived) => {
+  return supabase
+    .channel(`project-chat-${projectId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'project_chats',
+        filter: `project_id=eq.${projectId}`
+      },
+      (payload) => {
+        const msg = payload.new;
+        onMessageReceived({
+          id: msg.id,
+          sender: msg.sender,
+          text: msg.message,
+          time: new Date(msg.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+        });
+      }
+    )
+    .subscribe();
+};
+
+/* ==========================================================================
+   3. Media Vault Integrations (Storage)
+   ========================================================================== */
+
+/**
+ * Upload an asset to Supabase Storage and register the metadata in project_media
+ */
+export const uploadMediaVaultAsset = async (projectId, file, fileName) => {
+  const fileExt = file.name.split('.').pop();
+  const filePath = `projects/${projectId}/${Date.now()}_${fileName}.${fileExt}`;
+
+  // 1. Upload to Supabase Bucket 'studio-vault'
+  const { error: uploadError } = await supabase.storage
+    .from('studio-vault')
+    .upload(filePath, file);
+
+  if (uploadError) throw uploadError;
+
+  // 2. Retrieve Public Web URL
+  const { data: { publicUrl } } = supabase.storage
+    .from('studio-vault')
+    .getPublicUrl(filePath);
+
+  // 3. Insert record in project_media metadata table
+  const { data, error: dbError } = await supabase
+    .from('project_media')
+    .insert([
+      {
+        project_id: projectId,
+        file_name: fileName,
+        file_url: publicUrl,
+        file_type: file.type.split('/')[0] // 'image', 'video', 'application' etc.
+      }
+    ])
+    .select()
+    .single();
+
+  if (dbError) throw dbError;
+  return {
+    id: data.id,
+    name: data.file_name,
+    url: data.file_url,
+    type: data.file_type,
+    time: new Date(data.uploaded_at).toLocaleDateString()
+  };
+};

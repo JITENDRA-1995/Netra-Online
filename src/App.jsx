@@ -3,6 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import './App.css';
+import { supabase } from './supabase/client';
+import { 
+  getInquiries, createInquiry, updateInquiry, deleteInquiry,
+  getClients, createClientProfile, verifyClientVaultKey, updateClientProfile,
+  getProjects, igniteProject, updateProjectState, toggleMilestone, addProjectActivityLog, sendChatMessage, subscribeToChats, uploadMediaVaultAsset,
+  getInvoices, saveInvoice, deleteInvoice 
+} from './supabase/database';
+
 
 const services = [
   { id: 1, title: "Brand Identity (Logo)", desc: "Crafting the soul of your business through iconic marks.", icon: "🎨" },
@@ -310,6 +318,35 @@ function App() {
   const [ignitionClientType, setIgnitionClientType] = useState("NEW"); // NEW, EXISTING
   const [isProjectEditModalOpen, setIsProjectEditModalOpen] = useState(false);
 
+  useEffect(() => {
+    const loadSupabaseData = async () => {
+      try {
+        const dbClients = await getClients();
+        if (dbClients && dbClients.length > 0) {
+          setClients(dbClients);
+        }
+        
+        const dbInquiries = await getInquiries();
+        if (dbInquiries && dbInquiries.length > 0) {
+          setInquiries(dbInquiries);
+        }
+        
+        const dbProjects = await getProjects();
+        if (dbProjects && dbProjects.length > 0) {
+          setIgnitionQueue(dbProjects);
+        }
+        
+        const dbInvoices = await getInvoices();
+        if (dbInvoices && dbInvoices.length > 0) {
+          setInvoices(dbInvoices);
+        }
+      } catch (error) {
+        console.error("Failed to load data from Supabase:", error);
+      }
+    };
+    loadSupabaseData();
+  }, []);
+
   const triggerBellPulse = () => {
     setBellPulse(true);
     setTimeout(() => setBellPulse(false), 2000);
@@ -416,20 +453,33 @@ function App() {
     return client ? client.address : "Location N/A";
   };
 
-  const saveInvoiceToVault = (p, invNo) => {
+  const saveInvoiceToVault = async (p, invNo) => {
     if (invoices.find(i => i.invoiceNo === invNo)) return;
     
     const newInvoice = {
-      id: Date.now(),
       invoiceNo: invNo,
       clientName: p.name,
       projectService: p.service,
-      issueDate: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      issueDate: new Date().toISOString().split('T')[0],
       grandTotal: parseFloat(p.quote) - (parseFloat(p.advanceAmount) || 0) - (parseFloat(p.discount) || 0),
-      rawProject: p
+      projectId: p.id
     };
     
-    setInvoices(prev => [newInvoice, ...prev]);
+    try {
+      const savedInvoice = await saveInvoice(newInvoice);
+      const formattedInvoice = {
+        id: savedInvoice.id,
+        invoiceNo: savedInvoice.invoice_no,
+        clientName: savedInvoice.client_name,
+        projectService: savedInvoice.project_service,
+        issueDate: new Date(savedInvoice.issue_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        grandTotal: parseFloat(savedInvoice.grand_total),
+        rawProject: p
+      };
+      setInvoices(prev => [formattedInvoice, ...prev]);
+    } catch (err) {
+      console.error("Failed to save invoice to Supabase:", err);
+    }
   };
 
   const downloadInvoicePDF = async (p, invNo) => {
@@ -841,30 +891,38 @@ function App() {
     setIgnitionQueue(updatedQueue);
   };
 
-  const moveProjectStage = (projectId) => {
-    setIgnitionQueue(prev => prev.map(p => {
-      if (p.id === projectId && p.stage < 4) {
-        const nextStage = p.stage + 1;
-        let newStatus = p.status;
-        
-        // Financial Link: If moving to FINAL FLAME (stage 4)
-        if (nextStage === 4) {
-          console.log(`INVOICE GENERATED: Ready-to-Send for ${p.name} - ₹${p.quote}`);
-          newStatus = "Completed";
+  const moveProjectStage = async (projectId) => {
+    const project = ignitionQueue.find(p => p.id === projectId);
+    if (!project || project.stage >= 4) return;
+    
+    const nextStage = project.stage + 1;
+    let newStatus = project.status;
+    if (nextStage === 4) {
+      newStatus = "Completed";
+    }
+    
+    try {
+      await updateProjectState(projectId, nextStage, newStatus);
+      const actionMsg = `Transitioned to ${kanbanColumns[nextStage-1].title}`;
+      await addProjectActivityLog(projectId, actionMsg);
+      
+      setIgnitionQueue(prev => prev.map(p => {
+        if (p.id === projectId) {
+          return {
+            ...p,
+            stage: nextStage,
+            status: newStatus,
+            activityLog: [
+              { action: actionMsg, time: new Date().toLocaleTimeString() },
+              ...p.activityLog
+            ]
+          };
         }
-
-        return {
-          ...p,
-          stage: nextStage,
-          status: newStatus,
-          activityLog: [
-            { action: `Transitioned to ${kanbanColumns[nextStage-1].title}`, time: new Date().toLocaleTimeString() },
-            ...p.activityLog
-          ]
-        };
-      }
-      return p;
-    }));
+        return p;
+      }));
+    } catch (err) {
+      console.error("Failed to update project stage in Supabase:", err);
+    }
     
     triggerBellPulse();
     
@@ -880,93 +938,121 @@ function App() {
     });
   };
 
-  const updateProjectStatus = (projectId, newStatus) => {
-    setIgnitionQueue(prev => prev.map(p => {
-      if (p.id === projectId) {
-        return {
-          ...p,
-          status: newStatus,
-          activityLog: [
-            { action: `Status Updated to ${newStatus.toUpperCase()}`, time: new Date().toLocaleTimeString() },
-            ...p.activityLog
-          ]
-        };
-      }
-      return p;
-    }));
+  const updateProjectStatus = async (projectId, newStatus) => {
+    const project = ignitionQueue.find(p => p.id === projectId);
+    if (!project) return;
+    
+    try {
+      await updateProjectState(projectId, project.stage, newStatus);
+      const actionMsg = `Status Updated to ${newStatus.toUpperCase()}`;
+      await addProjectActivityLog(projectId, actionMsg);
+      
+      setIgnitionQueue(prev => prev.map(p => {
+        if (p.id === projectId) {
+          return {
+            ...p,
+            status: newStatus,
+            activityLog: [
+              { action: actionMsg, time: new Date().toLocaleTimeString() },
+              ...p.activityLog
+            ]
+          };
+        }
+        return p;
+      }));
+    } catch (err) {
+      console.error("Failed to update project status in Supabase:", err);
+    }
+    
     setSelectedKanbanProject(prev => prev ? { ...prev, status: newStatus } : null);
     triggerBellPulse();
   };
 
-  const handleIgniteProject = (e) => {
+  const handleIgniteProject = async (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
+    const form = e.target;
+    const formData = new FormData(form);
     const serviceId = formData.get('service');
     const serviceName = services.find(s => s.id === parseInt(serviceId))?.title || "Custom Service";
     
-    let clientInfo;
-    if (ignitionClientType === "EXISTING") {
-      const clientId = formData.get('existingClientId');
-      const existingClient = clients.find(c => c.id === parseInt(clientId));
-      if (!existingClient) return alert("Please select a valid visionary.");
-      clientInfo = {
-        name: existingClient.name,
-        phone: existingClient.phone,
-        email: existingClient.email,
-        address: existingClient.address
-      };
-    } else {
-      clientInfo = {
-        name: formData.get('clientName'),
-        phone: formData.get('whatsapp'),
-        email: formData.get('email'),
-        address: formData.get('address')
-      };
-      // Register new client automatically
-      setClients(prev => [...prev, { 
-        ...clientInfo, 
-        id: Date.now(), 
-        status: 'Active', 
-        joinedDate: new Date().toLocaleDateString() 
-      }]);
-    }
-    
-    const newProject = {
-      id: Date.now(),
-      name: clientInfo.name,
-      service: serviceName,
-      stage: 1, 
-      status: "Ongoing",
-      deadline: formData.get('deadline'),
-      isManual: true,
-      client: clientInfo,
-      milestones: [
-        { name: "Discovery", completed: true },
-        { name: "Moodboard", completed: false },
-        { name: "Sketching", completed: false },
-        { name: "Final Flame", completed: false }
-      ],
-      activityLog: [
-        { action: "Manual Project Ignition Initiated", time: new Date().toLocaleTimeString() }
-      ],
-      quote: parseInt(formData.get('quote')) || 15000,
-      discountValue: formData.get('discount') || '0',
-      discountType: 'rs',
-      discountPercent: ((parseFloat(formData.get('discount'))||0) / (parseInt(formData.get('quote'))||15000) * 100).toFixed(2),
-      discount: parseInt(formData.get('discount')) || 0,
-      mediaVault: [],
-      collaborationStream: [
-        { id: 1, sender: "SYSTEM", text: "Project Ignited", time: new Date().toLocaleTimeString() }
-      ]
-    };
-
-    setIgnitionQueue(prev => [...prev, newProject]);
-    triggerBellPulse();
-    
-    const btn = e.target.querySelector('.ignite-submit-btn');
+    const btn = form.querySelector('.ignite-submit-btn');
     btn.innerText = "IGNITING...";
     
-    setTimeout(() => {
+    try {
+      let clientInfo;
+      let clientDbId = null;
+      
+      if (ignitionClientType === "EXISTING") {
+        const clientId = formData.get('existingClientId');
+        const existingClient = clients.find(c => c.id === parseInt(clientId));
+        if (!existingClient) return alert("Please select a valid visionary.");
+        clientInfo = {
+          name: existingClient.name,
+          phone: existingClient.phone,
+          email: existingClient.email,
+          address: existingClient.address
+        };
+        clientDbId = existingClient.id;
+      } else {
+        clientInfo = {
+          name: formData.get('clientName'),
+          phone: formData.get('whatsapp'),
+          email: formData.get('email'),
+          address: formData.get('address')
+        };
+        
+        // Register new client with access key passcode
+        const randomAccessKey = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const newClient = await createClientProfile({
+          ...clientInfo,
+          accessKey: randomAccessKey,
+          status: 'Active'
+        });
+        
+        clientDbId = newClient.id;
+        setClients(prev => [...prev, newClient]);
+      }
+      
+      const milestoneNames = ["Discovery", "Moodboard", "Sketching", "Final Flame"];
+      const quoteVal = parseInt(formData.get('quote')) || 15000;
+      const discountVal = parseInt(formData.get('discount')) || 0;
+      const discountPct = ((discountVal / quoteVal) * 100).toFixed(2);
+      
+      const projectPayload = {
+        name: clientInfo.name,
+        service: serviceName,
+        stage: 1,
+        status: "Ongoing",
+        deadline: formData.get('deadline'),
+        isManual: true,
+        client: clientInfo,
+        milestones: milestoneNames.map((name, idx) => ({ name, completed: name === "Discovery" })),
+        quote: quoteVal,
+        discountValue: discountVal.toString(),
+        discountType: 'rs',
+        discountPercent: discountPct,
+        discount: discountVal,
+        advanceAmount: 0,
+        paymentStatus: 'part',
+        mediaVault: [],
+        collaborationStream: [
+          { id: 1, sender: "SYSTEM", text: "Project Ignited", time: new Date().toLocaleTimeString() }
+        ]
+      };
+      
+      const savedProjCore = await igniteProject({
+        ...projectPayload,
+        client_id: clientDbId
+      });
+      
+      const newProject = {
+        ...projectPayload,
+        id: savedProjCore.id
+      };
+      
+      setIgnitionQueue(prev => [...prev, newProject]);
+      triggerBellPulse();
+      
       btn.innerText = "MISSION START";
       setTimeout(() => {
         setIsIgnitionModalOpen(false);
@@ -974,13 +1060,25 @@ function App() {
         setActiveAdminModule("PROJECTS");
         setSelectedProjectTab(newProject.id);
       }, 1000);
-    }, 1500);
+      
+    } catch (err) {
+      console.error("Failed to ignite project:", err);
+      btn.innerText = "ERROR - RETRY";
+      alert("Failed to ignite project in database.");
+    }
   };
 
-  const deleteProject = (id) => {
+  const deleteProject = async (id) => {
     if (window.confirm("ARE YOU SURE YOU WANT TO TERMINATE THIS MISSION? ALL DATA FOR THIS PROJECT WILL BE PURGED.")) {
-      setIgnitionQueue(prev => prev.filter(p => p.id !== id));
-      setSelectedProjectTab(null);
+      try {
+        const { error } = await supabase.from('projects').delete().eq('id', id);
+        if (error) throw error;
+        setIgnitionQueue(prev => prev.filter(p => p.id !== id));
+        setSelectedProjectTab(null);
+      } catch (err) {
+        console.error("Failed to delete project from Supabase:", err);
+        alert("Failed to terminate project database record.");
+      }
     }
   };
 
@@ -1041,37 +1139,78 @@ function App() {
     setSelectedCashbookEntry(null);
   };
 
-  const handleAddClient = (e) => {
+  const handleAddClient = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    const clientData = {
-      id: selectedClient ? selectedClient.id : Date.now(),
-      name: formData.get('name'),
-      email: formData.get('email'),
-      phone: formData.get('phone'),
-      address: formData.get('address'),
-      status: selectedClient ? selectedClient.status : 'Active',
-      joinedDate: selectedClient ? selectedClient.joinedDate : new Date().toLocaleDateString()
-    };
     
-    if (selectedClient) {
-      setClients(prev => prev.map(c => c.id === selectedClient.id ? clientData : c));
-    } else {
-      setClients(prev => [...prev, clientData]);
+    try {
+      if (selectedClient) {
+        const clientData = {
+          name: formData.get('name'),
+          email: formData.get('email'),
+          phone: formData.get('phone'),
+          address: formData.get('address'),
+          status: selectedClient.status || 'Active'
+        };
+        const updatedClient = await updateClientProfile(selectedClient.id, clientData);
+        setClients(prev => prev.map(c => c.id === selectedClient.id ? updatedClient : c));
+      } else {
+        const randomAccessKey = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const clientData = {
+          name: formData.get('name'),
+          email: formData.get('email'),
+          phone: formData.get('phone'),
+          address: formData.get('address'),
+          status: 'Active',
+          accessKey: randomAccessKey
+        };
+        const newClient = await createClientProfile(clientData);
+        setClients(prev => [...prev, newClient]);
+      }
+    } catch (err) {
+      console.error("Failed to save client to Supabase:", err);
+      alert("Failed to save client record in database.");
     }
     
     setIsClientModalOpen(false);
     setSelectedClient(null);
   };
 
-  const deleteClient = (id) => {
+  const deleteClient = async (id) => {
     if (window.confirm("ARE YOU SURE YOU WANT TO EXTINGUISH THIS CLIENT RECORD?")) {
-      setClients(prev => prev.filter(c => c.id !== id));
+      try {
+        const { error } = await supabase.from('clients').delete().eq('id', id);
+        if (error) throw error;
+        setClients(prev => prev.filter(c => c.id !== id));
+      } catch (err) {
+        console.error("Failed to delete client from Supabase:", err);
+        alert("Failed to delete client record from database.");
+      }
     }
   };
 
-  const handleSendSpark = (e) => {
+  const handleSendSpark = async (e) => {
     e.preventDefault();
+    const nameVal = document.getElementById('name').value;
+    const emailVal = document.getElementById('email').value;
+    const visionVal = document.getElementById('vision').value;
+    const serviceVal = selectedProject || "General Inquiry";
+
+    try {
+      await createInquiry({
+        name: nameVal,
+        email: emailVal,
+        phone: '', 
+        service: serviceVal,
+        desc: visionVal,
+        status: 'New Spark'
+      });
+      const dbInquiries = await getInquiries();
+      setInquiries(dbInquiries);
+    } catch (err) {
+      console.error("Error creating inquiry spark:", err);
+    }
+
     setIsSuccess(true);
     setTimeout(() => {
       goHome();
