@@ -307,6 +307,7 @@ function App() {
   const [remarkText, setRemarkText] = useState("");
   const [isReviewDrawerOpen, setIsReviewDrawerOpen] = useState(false);
   const [selectedInquiry, setSelectedInquiry] = useState(null);
+  const [prefillData, setPrefillData] = useState(null);
   const [passphrase, setPassphrase] = useState("");
   const [showPassphrase, setShowPassphrase] = useState(false);
   const [activeAdminModule, setActiveAdminModule] = useState("DASHBOARD");
@@ -968,6 +969,24 @@ function App() {
     triggerBellPulse();
   };
 
+  const handleIgniteFromInquiry = (inq) => {
+    const serviceMatch = services.find(s => 
+      s.title.toLowerCase().includes(inq.service.toLowerCase()) || 
+      inq.service.toLowerCase().includes(s.title.toLowerCase())
+    );
+    setPrefillData({
+      inquiryId: inq.id,
+      clientName: inq.name,
+      email: inq.email,
+      phone: inq.phone || '',
+      address: inq.location || '',
+      serviceId: serviceMatch ? serviceMatch.id : ''
+    });
+    setIgnitionClientType("NEW");
+    setIsReviewDrawerOpen(false);
+    setIsIgnitionModalOpen(true);
+  };
+
   const handleIgniteProject = async (e) => {
     e.preventDefault();
     const form = e.target;
@@ -1052,6 +1071,18 @@ function App() {
       
       setIgnitionQueue(prev => [...prev, newProject]);
       triggerBellPulse();
+
+      if (prefillData && prefillData.inquiryId) {
+        try {
+          await updateInquiry(prefillData.inquiryId, { status: 'Ignited', remarks: 'Automatically ignited into active project mission.' });
+          const dbInquiries = await getInquiries();
+          if (dbInquiries && dbInquiries.length > 0) {
+            setInquiries(dbInquiries);
+          }
+        } catch (e) {
+          console.error("Failed to update inquiry status on auto-ignition:", e);
+        }
+      }
       
       btn.innerText = "MISSION START";
       setTimeout(() => {
@@ -2299,6 +2330,18 @@ function App() {
                                     <label>Message</label>
                                     <p className="dim-text">Interested in a premium {selectedInquiry?.service} for my new project in {selectedInquiry?.location}. Please provide availability.</p>
                                   </div>
+                                  {selectedInquiry?.status !== 'Ignited' && (
+                                    <div className="detail-item" style={{ marginTop: '30px' }}>
+                                      <button 
+                                        type="button" 
+                                        className="ignite-submit-btn" 
+                                        style={{ width: '100%', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', textShadow: '0 0 10px rgba(0,229,255,0.5)', cursor: 'pointer' }}
+                                        onClick={() => handleIgniteFromInquiry(selectedInquiry)}
+                                      >
+                                        🚀 AUTO-IGNITE PROJECT
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               </motion.div>
                             </div>
@@ -2975,7 +3018,7 @@ function App() {
                       <motion.button 
                         className="ignition-fab"
                         whileHover={{ width: '260px' }}
-                        onClick={() => setIsIgnitionModalOpen(true)}
+                        onClick={() => { setPrefillData(null); setIsIgnitionModalOpen(true); }}
                       >
                         <span className="fab-icon">+</span>
                         <span className="fab-text">START NEW IGNITION</span>
@@ -3006,7 +3049,7 @@ function App() {
                             <p>Calibrating a new visual revolution</p>
                           </div>
                           
-                          <form className="ignition-form" onSubmit={handleIgniteProject}>
+                          <form className="ignition-form" onSubmit={handleIgniteProject} key={prefillData ? prefillData.inquiryId || 'spark' : 'manual'}>
                             <div className="client-type-selector">
                               <button 
                                 type="button" 
@@ -3040,22 +3083,22 @@ function App() {
                                 <div className="form-row">
                                   <div className="input-group">
                                     <label>Client Name</label>
-                                    <input type="text" name="clientName" placeholder="Identity of the visionary" required />
+                                    <input type="text" name="clientName" defaultValue={prefillData?.clientName || ''} placeholder="Identity of the visionary" required />
                                   </div>
                                   <div className="input-group">
                                     <label>Client Email</label>
-                                    <input type="email" name="email" placeholder="Direct digital link" required />
+                                    <input type="email" name="email" defaultValue={prefillData?.email || ''} placeholder="Direct digital link" required />
                                   </div>
                                 </div>
 
                                 <div className="form-row">
                                   <div className="input-group">
                                     <label>Client Mobile</label>
-                                    <input type="tel" name="whatsapp" placeholder="+91 XXXXX XXXXX" required />
+                                    <input type="tel" name="whatsapp" defaultValue={prefillData?.phone || ''} placeholder="+91 XXXXX XXXXX" required />
                                   </div>
                                   <div className="input-group">
                                     <label>Client Billing Address</label>
-                                    <input type="text" name="address" placeholder="Official registered address" required />
+                                    <input type="text" name="address" defaultValue={prefillData?.address || ''} placeholder="Official registered address" required />
                                   </div>
                                 </div>
                               </>
@@ -3064,7 +3107,7 @@ function App() {
                             <div className="form-row">
                               <div className="input-group">
                                 <label>Select Service Calibration</label>
-                                <select name="service" required>
+                                <select name="service" required defaultValue={prefillData?.serviceId || ''}>
                                   <option value="">Choose service...</option>
                                   {services.map(s => (
                                     <option key={s.id} value={s.id}>{s.title}</option>
