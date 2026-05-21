@@ -713,6 +713,7 @@ function App() {
   const containerRef = useRef(null);
   const vaultRef = useRef(null);
   const dropdownRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     // Splash & Hero Timings
@@ -1110,6 +1111,57 @@ function App() {
         console.error("Failed to delete project from Supabase:", err);
         alert("Failed to terminate project database record.");
       }
+    }
+  };
+
+  // Real-time Chat Subscription Effect
+  useEffect(() => {
+    if (!selectedProjectTab) return;
+    
+    const subscription = subscribeToChats(selectedProjectTab, (newMsg) => {
+      setIgnitionQueue(prevQueue => prevQueue.map(proj => {
+        if (proj.id === selectedProjectTab) {
+          const exists = (proj.collaborationStream || []).some(msg => msg.id === newMsg.id);
+          if (exists) return proj;
+          return {
+            ...proj,
+            collaborationStream: [...(proj.collaborationStream || []), newMsg]
+          };
+        }
+        return proj;
+      }));
+    });
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
+  }, [selectedProjectTab]);
+
+  // Media Vault File Upload Handler
+  const handleVaultFileUpload = async (e, projectId) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    alert(`Uploading ${file.name} to secure studio vault...\nSize: ${(file.size / 1024).toFixed(1)} KB`);
+    
+    try {
+      const uploadedAsset = await uploadMediaVaultAsset(projectId, file, file.name);
+      
+      setIgnitionQueue(prevQueue => prevQueue.map(proj => {
+        if (proj.id === projectId) {
+          return {
+            ...proj,
+            mediaVault: [...(proj.mediaVault || []), uploadedAsset]
+          };
+        }
+        return proj;
+      }));
+      alert(`Successfully uploaded and shared: ${file.name}`);
+    } catch (err) {
+      console.error("Vault asset upload failed:", err);
+      alert("Failed to upload file to Supabase Storage.");
     }
   };
 
@@ -2047,7 +2099,13 @@ function App() {
                                       </div>
                                     </div>
                                     <div className="workspace-actions">
-                                      <button className="action-btn" onClick={() => alert("Simulating Media Upload Integration...")}>
+                                      <input 
+                                        type="file" 
+                                        ref={fileInputRef} 
+                                        style={{ display: 'none' }} 
+                                        onChange={(e) => handleVaultFileUpload(e, p.id)} 
+                                      />
+                                      <button className="action-btn" onClick={() => fileInputRef.current && fileInputRef.current.click()}>
                                         <span className="btn-icon">📁</span> SHARE ASSET
                                       </button>
                                       <button className="action-btn" onClick={() => setIsProjectEditModalOpen(true)}>
@@ -2084,7 +2142,7 @@ function App() {
                                             </div>
                                           </div>
                                         ))}
-                                        <div className="media-card add-more" onClick={() => alert("Integration point for drag-and-drop")}>
+                                        <div className="media-card add-more" onClick={() => fileInputRef.current && fileInputRef.current.click()}>
                                           <div className="add-icon">+</div>
                                           <span>ADD ASSET</span>
                                         </div>
@@ -2116,20 +2174,32 @@ function App() {
                                           onChange={(e) => setChatMessage(e.target.value)}
                                           onKeyPress={(e) => {
                                             if (e.key === 'Enter' && chatMessage.trim()) {
-                                              const updatedQueue = ignitionQueue.map(proj => {
-                                                if (proj.id === p.id) {
-                                                  return {
-                                                    ...proj,
-                                                    collaborationStream: [
-                                                      ...proj.collaborationStream,
-                                                      { id: Date.now(), sender: "ADMIN", text: chatMessage, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
-                                                    ]
-                                                  };
-                                                }
-                                                return proj;
-                                              });
-                                              setIgnitionQueue(updatedQueue);
+                                              const text = chatMessage.trim();
                                               setChatMessage("");
+                                              
+                                              sendChatMessage(p.id, "ADMIN", text).then((savedMsg) => {
+                                                const formattedMsg = {
+                                                  id: savedMsg.id,
+                                                  sender: savedMsg.sender,
+                                                  text: savedMsg.message,
+                                                  time: new Date(savedMsg.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                                                };
+                                                
+                                                setIgnitionQueue(prevQueue => prevQueue.map(proj => {
+                                                  if (proj.id === p.id) {
+                                                    const exists = (proj.collaborationStream || []).some(msg => msg.id === formattedMsg.id);
+                                                    if (exists) return proj;
+                                                    return {
+                                                      ...proj,
+                                                      collaborationStream: [...(proj.collaborationStream || []), formattedMsg]
+                                                    };
+                                                  }
+                                                  return proj;
+                                                }));
+                                              }).catch((err) => {
+                                                console.error("Failed to send database chat:", err);
+                                                alert("Failed to deliver message to cloud database.");
+                                              });
                                             }
                                           }}
                                         />
@@ -2152,19 +2222,36 @@ function App() {
                                             <div className="node-content">
                                               <span className="n-name">{m.name}</span>
                                               <button 
-                                                className="n-toggle"
-                                                onClick={() => {
-                                                  const updatedQueue = ignitionQueue.map(proj => {
-                                                    if (proj.id === p.id) {
-                                                      const updatedMilestones = [...proj.milestones];
-                                                      updatedMilestones[idx].completed = !updatedMilestones[idx].completed;
-                                                      return { ...proj, milestones: updatedMilestones };
-                                                    }
-                                                    return proj;
-                                                  });
-                                                  setIgnitionQueue(updatedQueue);
-                                                }}
-                                              >
+                                                 className="n-toggle"
+                                                 onClick={async () => {
+                                                   const targetStatus = !m.completed;
+                                                   try {
+                                                     await toggleMilestone(p.id, m.name, targetStatus);
+                                                     const logAction = `${m.name} Milestone marked as ${targetStatus ? 'Completed' : 'Pending'}`;
+                                                     await addProjectActivityLog(p.id, logAction);
+                                                     
+                                                     setIgnitionQueue(prevQueue => prevQueue.map(proj => {
+                                                       if (proj.id === p.id) {
+                                                         const updatedMilestones = [...proj.milestones];
+                                                         updatedMilestones[idx].completed = targetStatus;
+                                                         const updatedLogs = [
+                                                           ...(proj.activityLog || []),
+                                                           { action: logAction, time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) }
+                                                         ];
+                                                         return { 
+                                                           ...proj, 
+                                                           milestones: updatedMilestones,
+                                                           activityLog: updatedLogs 
+                                                         };
+                                                       }
+                                                       return proj;
+                                                     }));
+                                                   } catch (err) {
+                                                     console.error("Failed to update milestone in database:", err);
+                                                     alert("Failed to sync milestone update with cloud database.");
+                                                   }
+                                                 }}
+                                               >
                                                 {m.completed ? 'DONE' : 'PENDING'}
                                               </button>
                                             </div>
