@@ -168,6 +168,18 @@ function App() {
   const [loginError, setLoginError] = useState("");
   const loginContainerRef = useRef(null);
 
+  const loginParticles = useMemo(() => {
+    return [...Array(20)].map((_, i) => ({
+      id: i,
+      size: Math.random() * 4 + 1,
+      top: Math.random() * 100,
+      left: Math.random() * 100,
+      targetX: (Math.random() - 0.5) * 50,
+      duration: Math.random() * 5 + 5,
+      delay: Math.random() * 2
+    }));
+  }, []);
+
   const [isCommandCenterActive, setIsCommandCenterActive] = useState(false);
   const [isClientVaultActive, setIsClientVaultActive] = useState(false);
   const [isIgnitionModalOpen, setIsIgnitionModalOpen] = useState(false);
@@ -1681,32 +1693,31 @@ function App() {
           <div className={`cyber-grid ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`} />
           
           {/* Floating Particles */}
-          {[...Array(20)].map((_, i) => {
-            const size = Math.random() * 4 + 1;
-            return (
-              <motion.div
-                key={i}
-                className={`absolute rounded-full ${!isAdminSelected ? 'bg-[#08d9d6]' : 'bg-[#ff2e63]'}`}
-                style={{
-                  width: `${size}px`,
-                  height: `${size}px`,
-                  top: `${Math.random() * 100}%`,
-                  left: `${Math.random() * 100}%`,
-                  opacity: Math.random() * 0.5 + 0.1,
-                }}
-                animate={{
-                  y: [0, -100],
-                  x: [0, (Math.random() - 0.5) * 50],
-                  opacity: [0, 0.8, 0],
-                }}
-                transition={{
-                  duration: Math.random() * 5 + 5,
-                  repeat: Infinity,
-                  ease: "linear",
-                }}
-              />
-            );
-          })}
+          {loginParticles.map((p) => (
+            <motion.div
+              key={p.id}
+              className={`absolute rounded-full ${!isAdminSelected ? 'bg-[#08d9d6]' : 'bg-[#ff2e63]'}`}
+              style={{
+                width: `${p.size}px`,
+                height: `${p.size}px`,
+                position: 'absolute',
+                top: `${p.top}%`,
+                left: `${p.left}%`,
+                opacity: 0.25,
+              }}
+              animate={{
+                y: [0, -120],
+                x: [0, p.targetX],
+                opacity: [0, 0.7, 0],
+              }}
+              transition={{
+                duration: p.duration,
+                repeat: Infinity,
+                ease: "linear",
+                delay: p.delay,
+              }}
+            />
+          ))}
 
           {/* Main Container */}
           <motion.div 
