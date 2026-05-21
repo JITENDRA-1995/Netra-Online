@@ -158,6 +158,7 @@ function App() {
   const [isVaultActive, setIsVaultActive] = useState(false);
   const [isContactActive, setIsContactActive] = useState(false);
   const [showConstruction, setShowConstruction] = useState(false);
+  const [selectedService, setSelectedService] = useState(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState("");
@@ -847,6 +848,8 @@ function App() {
     setIsClientVaultActive(false);
     setIsAdminGridActive(false);
     setIsSuccess(false);
+    setShowConstruction(false);
+    setSelectedService(null);
     resetForm();
   };
 
@@ -1469,7 +1472,10 @@ function App() {
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1, duration: 0.5 }}
-                  onClick={() => setShowConstruction(true)}
+                  onClick={() => {
+                    setSelectedService(service);
+                    setShowConstruction(true);
+                  }}
                 >
                   <div className="card-visual">{service.icon}</div>
                   <div className="card-info">
@@ -1489,24 +1495,69 @@ function App() {
 
         {/* Vision in Progress Overlay (Maintenance State) */}
         <AnimatePresence>
-          {showConstruction && (
+          {showConstruction && selectedService && (
             <motion.div 
               className="vision-overlay"
-              initial={{ opacity: 0, scale: 1.2 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 1.2 }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setShowConstruction(false);
+                setSelectedService(null);
+              }}
             >
-              <div className="vision-module">
+              <motion.div 
+                className="vision-module-popup"
+                initial={{ opacity: 0, scale: 0.8, y: 50 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8, y: 50 }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                onClick={(e) => e.stopPropagation()}
+                onMouseLeave={() => {
+                  setShowConstruction(false);
+                  setSelectedService(null);
+                }}
+              >
+                {/* Tech corner accents */}
+                <div className="cyber-corner top-left"></div>
+                <div className="cyber-corner top-right"></div>
+                <div className="cyber-corner bottom-left"></div>
+                <div className="cyber-corner bottom-right"></div>
+
                 <div className="vision-phoenix-wrapper">
-                  <img src="/image_0.png" alt="Phoenix" className="breathing-phoenix" />
+                  <div className="popup-service-icon-glowing">
+                    {selectedService.icon}
+                  </div>
                 </div>
-                <h2 className="vision-title">ARCHITECTING THE REVOLUTION</h2>
-                <p className="vision-subtitle">This service is currently being calibrated for excellence. Stay tuned.</p>
-                <button className="vision-back-btn" onClick={() => setShowConstruction(false)}>
-                  BACK TO SERVICES
+
+                <h2 className="vision-title-popup">{selectedService.title}</h2>
+                <p className="vision-desc-popup">{selectedService.desc}</p>
+                
+                <div className="cyber-stats-panel">
+                  <div className="stat-line">
+                    <span className="stat-label">SYSTEM CLASSIFICATION:</span>
+                    <span className="stat-value text-glow">PREMIUM GRAPHICS FRAMEWORK</span>
+                  </div>
+                  <div className="stat-line">
+                    <span className="stat-label">OPERATIONAL STATE:</span>
+                    <span className="stat-value text-cyan blink">CALIBRATING SYSTEM</span>
+                  </div>
+                  <div className="stat-line">
+                    <span className="stat-label">COMPLEXITY FACTOR:</span>
+                    <span className="stat-value">LEVEL 10 (MAXIMUM EXCELLENCE)</span>
+                  </div>
+                </div>
+
+                <button 
+                  className="vision-back-btn highlight" 
+                  onClick={() => {
+                    setShowConstruction(false);
+                    setSelectedService(null);
+                  }}
+                >
+                  RETURN TO VAULT
                 </button>
-              </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
