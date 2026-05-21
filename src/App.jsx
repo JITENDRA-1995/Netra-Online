@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import './App.css';
+import './Login.css';
+import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ShieldAlert } from 'lucide-react';
 import { supabase } from './supabase/client';
 import { 
   getInquiries, createInquiry, updateInquiry, deleteInquiry,
@@ -163,6 +165,29 @@ function App() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isLoginActive, setIsLoginActive] = useState(false);
   const [isAdminSelected, setIsAdminSelected] = useState(false);
+  const [loginError, setLoginError] = useState("");
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const loginContainerRef = useRef(null);
+
+  useEffect(() => {
+    if (!isLoginActive) return;
+    const handleMouseMove = (e) => {
+      if (loginContainerRef.current) {
+        const { clientX, clientY } = e;
+        const { innerWidth, innerHeight } = window;
+        const x = (clientX / innerWidth - 0.5) * 10; // max 10px shift
+        const y = (clientY / innerHeight - 0.5) * 10;
+        setMousePosition({ x, y });
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      setMousePosition({ x: 0, y: 0 });
+    };
+  }, [isLoginActive]);
+
   const [isCommandCenterActive, setIsCommandCenterActive] = useState(false);
   const [isClientVaultActive, setIsClientVaultActive] = useState(false);
   const [isIgnitionModalOpen, setIsIgnitionModalOpen] = useState(false);
@@ -853,10 +878,12 @@ function App() {
     setIsLoginActive(true);
     setAccessKey("");
     setPassphrase("");
+    setLoginError("");
   });
 
   const handleLogin = (e) => {
     e.preventDefault();
+    setLoginError("");
     if (isAdminSelected) {
       if (accessKey === "savan@netra.com" && passphrase === "revolution2026") {
         triggerInstantTransition(() => {
@@ -865,7 +892,7 @@ function App() {
           setShowSparkToast(unreadSparksCount > 0);
         });
       } else {
-        alert("ACCESS DENIED: Credentials do not match the Architect's records.");
+        setLoginError("ACCESS DENIED: Credentials do not match the Architect's records.");
       }
     } else {
       // Client Access
@@ -875,7 +902,7 @@ function App() {
           setIsClientVaultActive(true);
         });
       } else {
-        alert("Please enter your Client Access Key and Passphrase.");
+        setLoginError("Please enter your Client Access Key and Passphrase.");
       }
     }
   };
@@ -1348,7 +1375,7 @@ function App() {
       )}
 
       {/* Fixed Public Header */}
-      {!isCommandCenterActive && !isClientVaultActive && (
+      {!isCommandCenterActive && !isClientVaultActive && !isLoginActive && (
         <header className={`main-header ${headerVisible ? 'header-reveal' : 'header-hidden'}`}>
           <nav className="header-nav">
             <div 
@@ -1666,101 +1693,166 @@ function App() {
 
       {/* Login Module Page */}
       <section className={`login-page ${isLoginActive ? 'active' : ''}`}>
-        <div className="login-background">
-          <div className="blurred-hero-bg">
-            <div className="fluid-background dark-version">
-              <div className="gradient-sphere sphere-1"></div>
-              <div className="gradient-sphere sphere-2"></div>
-              <div className="grid-texture"></div>
-            </div>
-          </div>
-          {/* Cyberpunk ambient glows tailored to Netra colors */}
-          <div className="login-ambient-glow glow-cyan"></div>
-          <div className="login-ambient-glow glow-orange"></div>
-        </div>
+        <div 
+          ref={loginContainerRef}
+          className="netra-bg"
+        >
+          {/* Background Effects */}
+          <div className={`cyber-grid ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`} />
+          
+          {/* Floating Particles */}
+          {[...Array(20)].map((_, i) => {
+            const size = Math.random() * 4 + 1;
+            return (
+              <motion.div
+                key={i}
+                className={`absolute rounded-full ${!isAdminSelected ? 'bg-[#08d9d6]' : 'bg-[#ff2e63]'}`}
+                style={{
+                  width: `${size}px`,
+                  height: `${size}px`,
+                  top: `${Math.random() * 100}%`,
+                  left: `${Math.random() * 100}%`,
+                  opacity: Math.random() * 0.5 + 0.1,
+                }}
+                animate={{
+                  y: [0, -100],
+                  x: [0, (Math.random() - 0.5) * 50],
+                  opacity: [0, 0.8, 0],
+                }}
+                transition={{
+                  duration: Math.random() * 5 + 5,
+                  repeat: Infinity,
+                  ease: "linear",
+                }}
+              />
+            );
+          })}
 
-        <div className="login-container">
+          {/* Main Container */}
           <motion.div 
-            className="frosted-login-module"
-            initial={{ opacity: 0, y: 40, scale: 0.95 }}
-            animate={isLoginActive ? { opacity: 1, y: 0, scale: 1 } : {}}
-            transition={{ type: "spring", stiffness: 100, damping: 15 }}
+            className="perspective-container"
+            animate={{
+              rotateX: mousePosition.y * 0.15,
+              rotateY: -mousePosition.x * 0.15,
+            }}
+            transition={{ type: "spring", stiffness: 80, damping: 40 }}
           >
-            <div className="login-header">
-              <div className="login-logo-wrapper">
-                <img src="/logo.png" alt="Netra Graphics" className="login-logo" />
-              </div>
-              <p className="login-subtitle">AUTHORIZED COGNITIVE TERMINAL</p>
-            </div>
-
-            <form className="login-form" onSubmit={handleLogin}>
-              <div className="login-form-group has-icon">
-                <span className="input-icon">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                    <polyline points="22,6 12,13 2,6" />
-                  </svg>
-                </span>
-                <input 
-                  type="email" 
-                  id="accessKey" 
-                  required 
-                  placeholder=" " 
-                  value={accessKey}
-                  onChange={(e) => setAccessKey(e.target.value)}
-                />
-                <label htmlFor="accessKey">Access Key</label>
-                <div className="login-input-line"></div>
-              </div>
-
-               <div className="login-form-group has-icon">
-                <span className="input-icon">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
-                </span>
-                <input 
-                  type={showPassphrase ? "text" : "password"} 
-                  id="passphrase" 
-                  required 
-                  placeholder=" " 
-                  value={passphrase}
-                  onChange={(e) => setPassphrase(e.target.value)}
-                />
-                <label htmlFor="passphrase">Passphrase</label>
-                <div className="login-input-line"></div>
-                <button 
-                  type="button" 
-                  className="passphrase-toggle"
-                  onClick={() => setShowPassphrase(!showPassphrase)}
+            <motion.div 
+              className={`glass-panel ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}
+              layout
+            >
+              {/* Card Scan Overlay */}
+              <div className={`scan-line-overlay ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`} />
+              
+              {/* Header */}
+              <div className="login-header-group">
+                <motion.div 
+                  className="login-header-icon-wrapper"
+                  animate={{ 
+                    boxShadow: !isAdminSelected 
+                      ? ['0 0 0px #08d9d6', '0 0 20px #08d9d6', '0 0 0px #08d9d6']
+                      : ['0 0 0px #ff2e63', '0 0 20px #ff2e63', '0 0 0px #ff2e63']
+                  }}
+                  transition={{ duration: 2, repeat: Infinity }}
                 >
-                  {showPassphrase ? "HIDE" : "SHOW"}
+                  {!isAdminSelected ? <Sparkles className="w-8 h-8 text-[#08d9d6]" /> : <Terminal className="w-8 h-8 text-[#ff2e63]" />}
+                </motion.div>
+                <h1 className="login-header-title">
+                  NETRA GRAPHICS
+                </h1>
+                <p className={`login-header-subtitle ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}>
+                  {!isAdminSelected ? 'CLIENT PORTAL' : 'SECURE ADMIN ACCESS'}
+                </p>
+              </div>
+
+              {/* Mode Switcher */}
+              <div className="login-mode-switcher">
+                <motion.div 
+                  className="login-mode-indicator"
+                  style={{
+                    backgroundColor: !isAdminSelected ? 'rgba(8, 217, 214, 0.2)' : 'rgba(255, 46, 99, 0.2)'
+                  }}
+                  animate={{ x: !isAdminSelected ? '100%' : '0%' }}
+                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                />
+                
+                <button
+                  type="button"
+                  onClick={() => setIsAdminSelected(true)}
+                  className="login-mode-btn"
+                  style={{ color: isAdminSelected ? '#ff2e63' : 'rgba(255, 255, 255, 0.5)' }}
+                >
+                  Admin
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAdminSelected(false)}
+                  className="login-mode-btn"
+                  style={{ color: !isAdminSelected ? '#08d9d6' : 'rgba(255, 255, 255, 0.5)' }}
+                >
+                  Client
                 </button>
               </div>
 
-              <div className="access-switch-container">
-                <span className={`switch-label ${!isAdminSelected ? 'active' : ''}`}>Client</span>
-                <div 
-                  className={`access-switch ${isAdminSelected ? 'admin' : 'client'}`}
-                  onClick={() => setIsAdminSelected(!isAdminSelected)}
-                >
-                  <div className="switch-toggle"></div>
+              {/* Form */}
+              <form onSubmit={handleLogin} className="login-form-fields">
+                <div className="netra-input-wrapper">
+                  <User className="w-4 h-4 input-icon" />
+                  <input
+                    type="email"
+                    placeholder="Identification (Email)"
+                    value={accessKey}
+                    onChange={(e) => setAccessKey(e.target.value)}
+                    className={`netra-input ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}
+                    spellCheck={false}
+                    required
+                  />
                 </div>
-                <span className={`switch-label ${isAdminSelected ? 'active' : ''}`}>Admin</span>
-              </div>
+                
+                <div className="netra-input-wrapper">
+                  <Lock className="w-4 h-4 input-icon" />
+                  <input
+                    type={showPassphrase ? 'text' : 'password'}
+                    placeholder="Passcode"
+                    value={passphrase}
+                    onChange={(e) => setPassphrase(e.target.value)}
+                    className={`netra-input ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassphrase(!showPassphrase)}
+                    className="passphrase-toggle-btn"
+                  >
+                    {showPassphrase ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
 
-              <button type="submit" className="revolution-button">
-                ENTER THE REVOLUTION
-              </button>
+                <AnimatePresence>
+                  {loginError && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0, y: -10 }}
+                      animate={{ opacity: 1, height: 'auto', y: 0 }}
+                      exit={{ opacity: 0, height: 0, y: -10 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="login-inline-error">
+                        <ShieldAlert className="w-3 h-3 flex-shrink-0" />
+                        <span>{loginError}</span>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
-              <div className="security-badge">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
-                SECURE CORE INTERACTION
-              </div>
-            </form>
+                <button
+                  type="submit"
+                  className={`cyber-button ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}
+                >
+                  <span>Initialize Access</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </form>
+            </motion.div>
           </motion.div>
         </div>
       </section>

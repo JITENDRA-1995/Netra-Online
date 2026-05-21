@@ -1,0 +1,326 @@
+/* Custom Semantic Styles for Netra Premium Login */
+.netra-bg {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  font-family: 'Montserrat', sans-serif;
+  background: radial-gradient(circle at 50% 50%, #0d0d1a 0%, #020205 100%);
+  color: white;
+  box-sizing: border-box;
+}
+
+.perspective-container {
+  perspective: 1000px;
+  width: 100%;
+  max-width: 440px;
+  padding: 0 1.5rem;
+  z-index: 10;
+  box-sizing: border-box;
+}
+
+.glass-panel {
+  background: rgba(15, 15, 30, 0.45);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 30px 60px rgba(0, 0, 0, 0.6), 
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 1rem;
+  padding: 3rem 2.5rem;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.glass-panel.mode-admin {
+  border-color: rgba(255, 46, 99, 0.3);
+  box-shadow: 0 0 80px rgba(255, 46, 99, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.glass-panel.mode-client {
+  border-color: rgba(8, 217, 214, 0.3);
+  box-shadow: 0 0 80px rgba(8, 217, 214, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Header Area */
+.login-header-group {
+  text-align: center;
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.login-header-icon-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  margin-bottom: 1.2rem;
+  transition: all 0.4s ease;
+}
+
+.login-header-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 0;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.login-header-subtitle {
+  font-size: 0.75rem;
+  letter-spacing: 0.22em;
+  margin-top: 0.6rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  transition: color 0.3s ease;
+}
+
+.login-header-subtitle.mode-admin {
+  color: #ff2e63;
+  text-shadow: 0 0 15px rgba(255, 46, 99, 0.4);
+}
+
+.login-header-subtitle.mode-client {
+  color: #08d9d6;
+  text-shadow: 0 0 15px rgba(8, 217, 214, 0.4);
+}
+
+/* Mode Switcher Tab System */
+.login-mode-switcher {
+  display: flex;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 0.5rem;
+  padding: 4px;
+  margin-bottom: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.login-mode-indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 6px);
+  border-radius: 0.375rem;
+  z-index: 0;
+  transition: background-color 0.3s ease;
+}
+
+.login-mode-btn {
+  flex: 1;
+  padding: 0.65rem 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  z-index: 10;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+/* Form Styles */
+.login-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.netra-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.netra-input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: white;
+  padding: 0.9rem 1rem 0.9rem 2.8rem;
+  border-radius: 0.5rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: 'Space Mono', monospace;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+}
+
+.netra-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.netra-input:focus {
+  outline: none;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.netra-input.mode-admin:focus {
+  border-color: rgba(255, 46, 99, 0.85);
+  box-shadow: 0 0 20px rgba(255, 46, 99, 0.25);
+}
+
+.netra-input.mode-client:focus {
+  border-color: rgba(8, 217, 214, 0.85);
+  box-shadow: 0 0 20px rgba(8, 217, 214, 0.25);
+}
+
+.input-icon {
+  position: absolute;
+  left: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.4);
+  transition: color 0.3s ease;
+  pointer-events: none;
+}
+
+.passphrase-toggle-btn {
+  position: absolute;
+  right: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.3s ease;
+  padding: 0;
+}
+
+.passphrase-toggle-btn:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Custom Inline Alerts */
+.login-inline-error {
+  font-size: 0.75rem;
+  font-family: 'Space Mono', monospace;
+  padding: 0.65rem 0.9rem;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background-color: rgba(255, 46, 99, 0.1);
+  border: 1px solid rgba(255, 46, 99, 0.25);
+  color: #ff5e84;
+  box-sizing: border-box;
+}
+
+/* Premium Buttons */
+.cyber-button {
+  width: 100%;
+  padding: 0.9rem;
+  margin-top: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.85rem;
+}
+
+.cyber-button.mode-admin {
+  background: linear-gradient(90deg, #ff2e63, #e5003f);
+  box-shadow: 0 0 20px rgba(255, 46, 99, 0.45);
+  color: #ffffff;
+}
+
+.cyber-button.mode-admin:hover {
+  box-shadow: 0 0 35px rgba(255, 46, 99, 0.8);
+  transform: translateY(-2px);
+}
+
+.cyber-button.mode-client {
+  background: linear-gradient(90deg, #08d9d6, #00b3b0);
+  box-shadow: 0 0 20px rgba(8, 217, 214, 0.45);
+  color: #000000;
+}
+
+.cyber-button.mode-client:hover {
+  box-shadow: 0 0 35px rgba(8, 217, 214, 0.8);
+  transform: translateY(-2px);
+}
+
+/* Card Scan Animation */
+@keyframes scan-line {
+  0% { transform: translateY(-100%); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(100%); opacity: 0; }
+}
+
+.scan-line-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  animation: scan-line 3s linear infinite;
+  pointer-events: none;
+}
+
+.scan-line-overlay.mode-admin { 
+  background: rgba(255, 46, 99, 0.8); 
+  box-shadow: 0 0 10px #ff2e63; 
+}
+
+.scan-line-overlay.mode-client { 
+  background: rgba(8, 217, 214, 0.8); 
+  box-shadow: 0 0 10px #08d9d6; 
+}
+
+/* Cyber grid dynamic floor */
+.cyber-grid {
+  position: absolute;
+  bottom: 0;
+  left: -50%;
+  width: 200%;
+  height: 100vh;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to top, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+  transform: rotateX(75deg);
+  transform-origin: center bottom;
+  pointer-events: none;
+  mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+  -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+}
+
+.cyber-grid.mode-admin {
+  background-image: 
+    linear-gradient(to right, rgba(255, 46, 99, 0.1) 1px, transparent 1px),
+    linear-gradient(to top, rgba(255, 46, 99, 0.1) 1px, transparent 1px);
+}
+
+.cyber-grid.mode-client {
+  background-image: 
+    linear-gradient(to right, rgba(8, 217, 214, 0.1) 1px, transparent 1px),
+    linear-gradient(to top, rgba(8, 217, 214, 0.1) 1px, transparent 1px);
+}

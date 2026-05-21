@@ -1091,12 +1091,14 @@ input[type="number"] {
   z-index: 50;
   display: flex;
   justify-content: center;
-  align-items: flex-start; /* Explicit top alignment to prevent overlaps on short viewports */
+  align-items: center; /* Center vertically on the page */
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1);
   overflow-y: auto; /* Enable smooth scrolling if card overflows viewport height */
   scrollbar-width: none; /* Hide default scrollbars for premium seamless appearance */
+  padding: 2rem 0;
+  box-sizing: border-box;
 }
 
 .login-page::-webkit-scrollbar {
