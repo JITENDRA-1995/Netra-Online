@@ -15,26 +15,306 @@ import {
 
 
 const services = [
-  { id: 1, title: "Brand Identity (Logo)", desc: "Crafting the soul of your business through iconic marks.", icon: "🎨" },
-  { id: 2, title: "Premium Brochures", desc: "Tangible narratives that tell your brand story in print.", icon: "📖" },
-  { id: 3, title: "Digital Interactive Brochures", desc: "Immersive, clickable experiences for the modern era.", icon: "🖱️" },
-  { id: 4, title: "Corporate Profiles", desc: "Building authority through professional structural design.", icon: "🏢" },
-  { id: 5, title: "Social Storytelling", desc: "High-impact graphics designed for digital engagement.", icon: "📱" },
-  { id: 6, title: "Large Format Media", desc: "Bold visual statements for hoardings and wall graphics.", icon: "🏙️" },
-  { id: 7, title: "Cinematic Video Packages", desc: "Motion design and production for a visual revolution.", icon: "🎥" },
-  { id: 8, title: "Digital Invitations", desc: "Modern, elegant WhatsApp-ready invites for every event.", icon: "✉️" },
-  { id: 9, title: "Editorial Design", desc: "Professional layouts for magazines and corporate newsletters.", icon: "📰" },
-  { id: 10, title: "Print Masterpieces (Posters)", desc: "High-resolution visual art for physical spaces.", icon: "🖼️" },
-  { id: 11, title: "Marketing Flyers", desc: "Strategic designs to spark immediate consumer interest.", icon: "🚀" },
-  { id: 12, title: "Custom Calendars", desc: "365 days of your brand presence on every desk.", icon: "📅" },
-  { id: 13, title: "Prestige Certificates", desc: "Designing excellence for your milestones and awards.", icon: "🏆" },
-  { id: 14, title: "Culinary Menus", desc: "Visual appetizing designs for restaurants and cafes.", icon: "🍴" },
-  { id: 15, title: "Festival Greetings", desc: "Cultural heritage meets high-tech celebratory art.", icon: "✨" },
-  { id: 16, title: "Event Stationery", desc: "Bespoke invitation cards for every significant gathering.", icon: "🎫" },
-  { id: 17, title: "Legacy Wedding Albums", desc: "Transforming your most precious memories into a visual epic.", icon: "💍" },
-  { id: 18, title: "Photography", desc: "Capturing moments with cinematic precision and artistic flair.", icon: "📸" },
-  { id: 19, title: "Printing Jobwork", desc: "Precision engineering for all your commercial printing needs.", icon: "🖨️" },
-  { id: 20, title: "Typing Jobwork", desc: "Professional documentation and data services with meticulous accuracy.", icon: "⌨️" }
+  { 
+    id: 1, 
+    title: "Brand Identity (Logo)", 
+    desc: "Crafting the soul of your business through iconic marks.", 
+    icon: "🎨",
+    tag: "BRANDING",
+    price: "$299",
+    delivery: "5 days",
+    features: [
+      "3 Unique Design Concepts",
+      "Vector Source Files (AI, SVG, PDF)",
+      "Comprehensive Brand Style Guide",
+      "Unlimited Revision Rounds"
+    ]
+  },
+  { 
+    id: 2, 
+    title: "Premium Brochures", 
+    desc: "Tangible narratives that tell your brand story in print.", 
+    icon: "📖",
+    tag: "PRINT",
+    price: "$149",
+    delivery: "4 days",
+    features: [
+      "Bi-fold or tri-fold layouts",
+      "Print-ready CMYK files",
+      "Unlimited pages option",
+      "Stock Imagery Included"
+    ]
+  },
+  { 
+    id: 3, 
+    title: "Digital Interactive Brochures", 
+    desc: "Immersive, clickable experiences for the modern era.", 
+    icon: "🖱️",
+    tag: "DIGITAL",
+    price: "$199",
+    delivery: "5 days",
+    features: [
+      "Immersive Clickable Layouts",
+      "Embedded Rich Media Support",
+      "Cross-Platform PDF & Web Formats",
+      "SEO Optimized Digital Output"
+    ]
+  },
+  { 
+    id: 4, 
+    title: "Corporate Profiles", 
+    desc: "Building authority through professional structural design.", 
+    icon: "🏢",
+    tag: "BRANDING",
+    price: "$249",
+    delivery: "6 days",
+    features: [
+      "Professional Structured Design",
+      "Corporate Color Coordination",
+      "Premium Editorial Layout",
+      "High-Resolution Output Ready"
+    ]
+  },
+  { 
+    id: 5, 
+    title: "Social Storytelling", 
+    desc: "High-impact graphics designed for digital engagement.", 
+    icon: "📱",
+    tag: "DIGITAL",
+    price: "$99",
+    delivery: "3 days",
+    features: [
+      "High-Impact Social Graphics",
+      "Custom Brand Color Theme",
+      "Instagram, LinkedIn & FB Formats",
+      "Source Files & Assets Included"
+    ]
+  },
+  { 
+    id: 6, 
+    title: "Large Format Media", 
+    desc: "Bold visual statements for hoardings and wall graphics.", 
+    icon: "🏙️",
+    tag: "PRINT",
+    price: "$399",
+    delivery: "7 days",
+    features: [
+      "Hoardings & Wall Graphics Layouts",
+      "Ultra-High Resolution Formats",
+      "Custom Vector Scale Support",
+      "Print Partner Coordination Prep"
+    ]
+  },
+  { 
+    id: 7, 
+    title: "Cinematic Video Packages", 
+    desc: "Motion design and production for a visual revolution.", 
+    icon: "🎥",
+    tag: "VIDEO",
+    price: "$499",
+    delivery: "10 days",
+    features: [
+      "3D Motion Graphics & Animation",
+      "High-Fidelity Audio Integration",
+      "Premium Color Grading & Effects",
+      "Full 4K Ultra-HD Output"
+    ]
+  },
+  { 
+    id: 8, 
+    title: "Digital Invitations", 
+    desc: "Modern, elegant WhatsApp-ready invites for every event.", 
+    icon: "✉️",
+    tag: "DIGITAL",
+    price: "$79",
+    delivery: "2 days",
+    features: [
+      "Elegant Modern Art Styles",
+      "WhatsApp & Social-Ready Formats",
+      "Interactive Action Links Option",
+      "Express Delivery Available"
+    ]
+  },
+  { 
+    id: 9, 
+    title: "Editorial Design", 
+    desc: "Professional layouts for magazines and corporate newsletters.", 
+    icon: "📰",
+    tag: "PRINT",
+    price: "$279",
+    delivery: "6 days",
+    features: [
+      "Magazine & Newsletter Layouts",
+      "Advanced Typography Grid System",
+      "Sleek Modern Image Wrapping",
+      "Print & Web Ready Formats"
+    ]
+  },
+  { 
+    id: 10, 
+    title: "Print Masterpieces (Posters)", 
+    desc: "High-resolution visual art for physical spaces.", 
+    icon: "🖼️",
+    tag: "PRINT",
+    price: "$119",
+    delivery: "3 days",
+    features: [
+      "High-Resolution Gallery Art Quality",
+      "Cyberpunk, Modern, or Classic Themes",
+      "Custom Typography Treatments",
+      "Ready for Canvas or Paper Print"
+    ]
+  },
+  { 
+    id: 11, 
+    title: "Marketing Flyers", 
+    desc: "Strategic designs to spark immediate consumer interest.", 
+    icon: "🚀",
+    tag: "PRINT",
+    price: "$89",
+    delivery: "2 days",
+    features: [
+      "Conversion-Optimized Layouts",
+      "Bold Call-to-Actions (CTAs)",
+      "Double-sided Artwork Support",
+      "High-speed Single Day Prep option"
+    ]
+  },
+  { 
+    id: 12, 
+    title: "Custom Calendars", 
+    desc: "365 days of your brand presence on every desk.", 
+    icon: "📅",
+    tag: "PRINT",
+    price: "$179",
+    delivery: "5 days",
+    features: [
+      "12 Months of Custom Visual Themes",
+      "Coordinated Brand Layout Grid",
+      "Pre-marked Holidays & Events",
+      "High-Res Desk & Wall Ready Sizes"
+    ]
+  },
+  { 
+    id: 13, 
+    title: "Prestige Certificates", 
+    desc: "Designing excellence for your milestones and awards.", 
+    icon: "🏆",
+    tag: "BRANDING",
+    price: "$69",
+    delivery: "2 days",
+    features: [
+      "Elegant Vectors & Border Layouts",
+      "Anti-forgery Micro-texture Details",
+      "Bulk Dynamic Printing Prep",
+      "Premium Typography Selection"
+    ]
+  },
+  { 
+    id: 14, 
+    title: "Culinary Menus", 
+    desc: "Visual appetizing designs for restaurants and cafes.", 
+    icon: "🍴",
+    tag: "PRINT",
+    price: "$159",
+    delivery: "4 days",
+    features: [
+      "Appetizing & Clear Visual Layouts",
+      "Coordinated Cuisine Styling",
+      "Highly Legible Typography Selection",
+      "Water-Resistant Material Prep Guide"
+    ]
+  },
+  { 
+    id: 15, 
+    title: "Festival Greetings", 
+    desc: "Cultural heritage meets high-tech celebratory art.", 
+    icon: "✨",
+    tag: "DIGITAL",
+    price: "$59",
+    delivery: "2 days",
+    features: [
+      "Cultural Heritage Meets Tech",
+      "Premium Animation Effects Support",
+      "Direct Client Greeting Personalization",
+      "Social Media Broadcast Ready"
+    ]
+  },
+  { 
+    id: 16, 
+    title: "Event Stationery", 
+    desc: "Bespoke invitation cards for every significant gathering.", 
+    icon: "🎫",
+    tag: "EVENT",
+    price: "$139",
+    delivery: "4 days",
+    features: [
+      "Coordinated Bespoke Invitations",
+      "Seating Charts & Place Cards Theme",
+      "Premium RSVP Cards Artwork",
+      "Unified Event Visual Identity"
+    ]
+  },
+  { 
+    id: 17, 
+    title: "Legacy Wedding Albums", 
+    desc: "Transforming your most precious memories into a visual epic.", 
+    icon: "💍",
+    tag: "EVENT",
+    price: "$349",
+    delivery: "8 days",
+    features: [
+      "Premium Cinematic Story Telling Layouts",
+      "Advanced Professional Photo Retouching",
+      "Heavy-Duty Layflat Binding Templates",
+      "Timeless Editorial Text Alignments"
+    ]
+  },
+  { 
+    id: 18, 
+    title: "Photography", 
+    desc: "Capturing moments with cinematic precision and artistic flair.", 
+    icon: "📸",
+    tag: "DIGITAL",
+    price: "$299",
+    delivery: "5 days",
+    features: [
+      "Cinematic Camera Precision Hooks",
+      "Premium Post-processing Styling",
+      "Professional Lighting Coordination",
+      "Digital High-Res Photo Delivery"
+    ]
+  },
+  { 
+    id: 19, 
+    title: "Printing Jobwork", 
+    desc: "Precision engineering for all your commercial printing needs.", 
+    icon: "🖨️",
+    tag: "COMMERCIAL",
+    price: "$199",
+    delivery: "4 days",
+    features: [
+      "Precision Engineering Output Specs",
+      "Industrial High-Volume Processing Prep",
+      "Paper, Vinyl & Fabric Substrate Setup",
+      "Exact Spot Color (Pantone) Alignments"
+    ]
+  },
+  { 
+    id: 20, 
+    title: "Typing Jobwork", 
+    desc: "Professional documentation and data services with meticulous accuracy.", 
+    icon: "⌨️",
+    tag: "COMMERCIAL",
+    price: "$49",
+    delivery: "2 days",
+    features: [
+      "Meticulous Data Entry Accuracy Check",
+      "Professional Multi-format Documentation",
+      "Fast High-Speed Transcriptions",
+      "Secure Information Confidentiality"
+    ]
+  }
 ];
 
 function App() {
@@ -1507,55 +1787,80 @@ function App() {
               }}
             >
               <motion.div 
-                className="vision-module-popup"
-                initial={{ opacity: 0, scale: 0.8, y: 50 }}
+                className="service-detail-popup"
+                initial={{ opacity: 0, scale: 0.9, y: 30 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.8, y: 50 }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                exit={{ opacity: 0, scale: 0.9, y: 30 }}
+                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                 onClick={(e) => e.stopPropagation()}
                 onMouseLeave={() => {
                   setShowConstruction(false);
                   setSelectedService(null);
                 }}
               >
-                {/* Tech corner accents */}
-                <div className="cyber-corner top-left"></div>
-                <div className="cyber-corner top-right"></div>
-                <div className="cyber-corner bottom-left"></div>
-                <div className="cyber-corner bottom-right"></div>
-
-                <div className="vision-phoenix-wrapper">
-                  <div className="popup-service-icon-glowing">
-                    {selectedService.icon}
-                  </div>
-                </div>
-
-                <h2 className="vision-title-popup">{selectedService.title}</h2>
-                <p className="vision-desc-popup">{selectedService.desc}</p>
-                
-                <div className="cyber-stats-panel">
-                  <div className="stat-line">
-                    <span className="stat-label">SYSTEM CLASSIFICATION:</span>
-                    <span className="stat-value text-glow">PREMIUM GRAPHICS FRAMEWORK</span>
-                  </div>
-                  <div className="stat-line">
-                    <span className="stat-label">OPERATIONAL STATE:</span>
-                    <span className="stat-value text-cyan blink">CALIBRATING SYSTEM</span>
-                  </div>
-                  <div className="stat-line">
-                    <span className="stat-label">COMPLEXITY FACTOR:</span>
-                    <span className="stat-value">LEVEL 10 (MAXIMUM EXCELLENCE)</span>
-                  </div>
-                </div>
-
+                {/* Close Button */}
                 <button 
-                  className="vision-back-btn highlight" 
+                  className="popup-close-btn"
                   onClick={() => {
                     setShowConstruction(false);
                     setSelectedService(null);
                   }}
+                  aria-label="Close details"
                 >
-                  RETURN TO VAULT
+                  &times;
+                </button>
+
+                {/* Top Row: Icon and Tag */}
+                <div className="popup-header-row">
+                  <div className="popup-icon-container">
+                    <span className="popup-service-icon">{selectedService.icon}</span>
+                  </div>
+                  {selectedService.tag && (
+                    <span className="popup-service-tag">{selectedService.tag}</span>
+                  )}
+                </div>
+
+                {/* Title and Description */}
+                <h2 className="popup-service-title">{selectedService.title}</h2>
+                <p className="popup-service-desc">{selectedService.desc}</p>
+
+                {/* Features List */}
+                <ul className="popup-features-list">
+                  {selectedService.features && selectedService.features.map((feature, i) => (
+                    <li key={i} className="popup-feature-item">
+                      <span className="cyan-bullet-ring">
+                        <span className="cyan-bullet-dot"></span>
+                      </span>
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Divider */}
+                <div className="popup-divider"></div>
+
+                {/* Footer Pricing / Delivery details */}
+                <div className="popup-footer-row">
+                  <div className="popup-footer-col">
+                    <span className="popup-footer-label">STARTING AT</span>
+                    <span className="popup-footer-value price">{selectedService.price}</span>
+                  </div>
+                  <div className="popup-footer-col text-right">
+                    <span className="popup-footer-label">DELIVERY</span>
+                    <span className="popup-footer-value">{selectedService.delivery}</span>
+                  </div>
+                </div>
+
+                {/* Get Started Button */}
+                <button 
+                  className="popup-cta-btn" 
+                  onClick={() => {
+                    setShowConstruction(false);
+                    setSelectedService(null);
+                    goToContact();
+                  }}
+                >
+                  Get Started
                 </button>
               </motion.div>
             </motion.div>
