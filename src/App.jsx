@@ -21,7 +21,7 @@ const services = [
     desc: "Crafting the soul of your business through iconic marks.", 
     icon: "🎨",
     tag: "BRANDING",
-    price: "$299",
+    price: "₹24,999",
     delivery: "5 days",
     features: [
       "3 Unique Design Concepts",
@@ -36,7 +36,7 @@ const services = [
     desc: "Tangible narratives that tell your brand story in print.", 
     icon: "📖",
     tag: "PRINT",
-    price: "$149",
+    price: "₹11,999",
     delivery: "4 days",
     features: [
       "Bi-fold or tri-fold layouts",
@@ -51,7 +51,7 @@ const services = [
     desc: "Immersive, clickable experiences for the modern era.", 
     icon: "🖱️",
     tag: "DIGITAL",
-    price: "$199",
+    price: "₹15,999",
     delivery: "5 days",
     features: [
       "Immersive Clickable Layouts",
@@ -66,7 +66,7 @@ const services = [
     desc: "Building authority through professional structural design.", 
     icon: "🏢",
     tag: "BRANDING",
-    price: "$249",
+    price: "₹19,999",
     delivery: "6 days",
     features: [
       "Professional Structured Design",
@@ -81,7 +81,7 @@ const services = [
     desc: "High-impact graphics designed for digital engagement.", 
     icon: "📱",
     tag: "DIGITAL",
-    price: "$99",
+    price: "₹7,999",
     delivery: "3 days",
     features: [
       "High-Impact Social Graphics",
@@ -96,7 +96,7 @@ const services = [
     desc: "Bold visual statements for hoardings and wall graphics.", 
     icon: "🏙️",
     tag: "PRINT",
-    price: "$399",
+    price: "₹31,999",
     delivery: "7 days",
     features: [
       "Hoardings & Wall Graphics Layouts",
@@ -111,7 +111,7 @@ const services = [
     desc: "Motion design and production for a visual revolution.", 
     icon: "🎥",
     tag: "VIDEO",
-    price: "$499",
+    price: "₹39,999",
     delivery: "10 days",
     features: [
       "3D Motion Graphics & Animation",
@@ -126,7 +126,7 @@ const services = [
     desc: "Modern, elegant WhatsApp-ready invites for every event.", 
     icon: "✉️",
     tag: "DIGITAL",
-    price: "$79",
+    price: "₹5,999",
     delivery: "2 days",
     features: [
       "Elegant Modern Art Styles",
@@ -141,7 +141,7 @@ const services = [
     desc: "Professional layouts for magazines and corporate newsletters.", 
     icon: "📰",
     tag: "PRINT",
-    price: "$279",
+    price: "₹21,999",
     delivery: "6 days",
     features: [
       "Magazine & Newsletter Layouts",
@@ -156,7 +156,7 @@ const services = [
     desc: "High-resolution visual art for physical spaces.", 
     icon: "🖼️",
     tag: "PRINT",
-    price: "$119",
+    price: "₹9,999",
     delivery: "3 days",
     features: [
       "High-Resolution Gallery Art Quality",
@@ -171,7 +171,7 @@ const services = [
     desc: "Strategic designs to spark immediate consumer interest.", 
     icon: "🚀",
     tag: "PRINT",
-    price: "$89",
+    price: "₹6,999",
     delivery: "2 days",
     features: [
       "Conversion-Optimized Layouts",
@@ -186,7 +186,7 @@ const services = [
     desc: "365 days of your brand presence on every desk.", 
     icon: "📅",
     tag: "PRINT",
-    price: "$179",
+    price: "₹13,999",
     delivery: "5 days",
     features: [
       "12 Months of Custom Visual Themes",
@@ -201,7 +201,7 @@ const services = [
     desc: "Designing excellence for your milestones and awards.", 
     icon: "🏆",
     tag: "BRANDING",
-    price: "$69",
+    price: "₹4,999",
     delivery: "2 days",
     features: [
       "Elegant Vectors & Border Layouts",
@@ -216,7 +216,7 @@ const services = [
     desc: "Visual appetizing designs for restaurants and cafes.", 
     icon: "🍴",
     tag: "PRINT",
-    price: "$159",
+    price: "₹12,999",
     delivery: "4 days",
     features: [
       "Appetizing & Clear Visual Layouts",
@@ -231,7 +231,7 @@ const services = [
     desc: "Cultural heritage meets high-tech celebratory art.", 
     icon: "✨",
     tag: "DIGITAL",
-    price: "$59",
+    price: "₹4,999",
     delivery: "2 days",
     features: [
       "Cultural Heritage Meets Tech",
@@ -246,7 +246,7 @@ const services = [
     desc: "Bespoke invitation cards for every significant gathering.", 
     icon: "🎫",
     tag: "EVENT",
-    price: "$139",
+    price: "₹10,999",
     delivery: "4 days",
     features: [
       "Coordinated Bespoke Invitations",
@@ -261,7 +261,7 @@ const services = [
     desc: "Transforming your most precious memories into a visual epic.", 
     icon: "💍",
     tag: "EVENT",
-    price: "$349",
+    price: "₹27,999",
     delivery: "8 days",
     features: [
       "Premium Cinematic Story Telling Layouts",
@@ -276,7 +276,7 @@ const services = [
     desc: "Capturing moments with cinematic precision and artistic flair.", 
     icon: "📸",
     tag: "DIGITAL",
-    price: "$299",
+    price: "₹23,999",
     delivery: "5 days",
     features: [
       "Cinematic Camera Precision Hooks",
@@ -291,7 +291,7 @@ const services = [
     desc: "Precision engineering for all your commercial printing needs.", 
     icon: "🖨️",
     tag: "COMMERCIAL",
-    price: "$199",
+    price: "₹15,999",
     delivery: "4 days",
     features: [
       "Precision Engineering Output Specs",
@@ -306,7 +306,7 @@ const services = [
     desc: "Professional documentation and data services with meticulous accuracy.", 
     icon: "⌨️",
     tag: "COMMERCIAL",
-    price: "$49",
+    price: "₹3,999",
     delivery: "2 days",
     features: [
       "Meticulous Data Entry Accuracy Check",
