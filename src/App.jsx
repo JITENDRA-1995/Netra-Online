@@ -319,7 +319,7 @@ const services = [
 
 function App() {
   const audioRef = useRef(null);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
     // Initialize standard Audio stream pointing to our high-fidelity, local loop MP3
@@ -328,7 +328,8 @@ function App() {
     audio.volume = 0.2; // Warm, peaceful background volume level
     audioRef.current = audio;
 
-    // Autoplay attempt immediately on mount
+    // Autoplay has been paused/disabled as requested by the user until further notice
+    /*
     const startPlay = () => {
       audio.play()
         .then(() => {
@@ -358,6 +359,7 @@ function App() {
       window.removeEventListener('scroll', handleFirstInteraction);
       window.removeEventListener('touchstart', handleFirstInteraction);
     };
+    */
 
     // Setup global UI click sound effect handler
     const handleGlobalClick = (e) => {
@@ -374,20 +376,24 @@ function App() {
       }
     };
 
+    /*
     window.addEventListener('click', handleFirstInteraction);
     window.addEventListener('keydown', handleFirstInteraction);
     window.addEventListener('scroll', handleFirstInteraction);
     window.addEventListener('touchstart', handleFirstInteraction);
+    */
     window.addEventListener('click', handleGlobalClick);
 
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
       }
+      /*
       window.removeEventListener('click', handleFirstInteraction);
       window.removeEventListener('keydown', handleFirstInteraction);
       window.removeEventListener('scroll', handleFirstInteraction);
       window.removeEventListener('touchstart', handleFirstInteraction);
+      */
       window.removeEventListener('click', handleGlobalClick);
     };
   }, []);
