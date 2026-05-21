@@ -1772,101 +1772,101 @@ function App() {
             </AnimatePresence>
           </div>
         </div>
+      </section>
 
-        {/* Vision in Progress Overlay (Maintenance State) */}
-        <AnimatePresence>
-          {showConstruction && selectedService && (
+      {/* Vision in Progress Overlay (Maintenance State) */}
+      <AnimatePresence>
+        {showConstruction && selectedService && (
+          <motion.div 
+            className="vision-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => {
+              setShowConstruction(false);
+              setSelectedService(null);
+            }}
+          >
             <motion.div 
-              className="vision-overlay"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => {
+              className="service-detail-popup"
+              initial={{ opacity: 0, scale: 0.9, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 30 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(e) => e.stopPropagation()}
+              onMouseLeave={() => {
                 setShowConstruction(false);
                 setSelectedService(null);
               }}
             >
-              <motion.div 
-                className="service-detail-popup"
-                initial={{ opacity: 0, scale: 0.9, y: 30 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 30 }}
-                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                onClick={(e) => e.stopPropagation()}
-                onMouseLeave={() => {
+              {/* Close Button */}
+              <button 
+                className="popup-close-btn"
+                onClick={() => {
                   setShowConstruction(false);
                   setSelectedService(null);
                 }}
+                aria-label="Close details"
               >
-                {/* Close Button */}
-                <button 
-                  className="popup-close-btn"
-                  onClick={() => {
-                    setShowConstruction(false);
-                    setSelectedService(null);
-                  }}
-                  aria-label="Close details"
-                >
-                  &times;
-                </button>
+                &times;
+              </button>
 
-                {/* Top Row: Icon and Tag */}
-                <div className="popup-header-row">
-                  <div className="popup-icon-container">
-                    <span className="popup-service-icon">{selectedService.icon}</span>
-                  </div>
-                  {selectedService.tag && (
-                    <span className="popup-service-tag">{selectedService.tag}</span>
-                  )}
+              {/* Top Row: Icon and Tag */}
+              <div className="popup-header-row">
+                <div className="popup-icon-container">
+                  <span className="popup-service-icon">{selectedService.icon}</span>
                 </div>
+                {selectedService.tag && (
+                  <span className="popup-service-tag">{selectedService.tag}</span>
+                )}
+              </div>
 
-                {/* Title and Description */}
-                <h2 className="popup-service-title">{selectedService.title}</h2>
-                <p className="popup-service-desc">{selectedService.desc}</p>
+              {/* Title and Description */}
+              <h2 className="popup-service-title">{selectedService.title}</h2>
+              <p className="popup-service-desc">{selectedService.desc}</p>
 
-                {/* Features List */}
-                <ul className="popup-features-list">
-                  {selectedService.features && selectedService.features.map((feature, i) => (
-                    <li key={i} className="popup-feature-item">
-                      <span className="cyan-bullet-ring">
-                        <span className="cyan-bullet-dot"></span>
-                      </span>
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
+              {/* Features List */}
+              <ul className="popup-features-list">
+                {selectedService.features && selectedService.features.map((feature, i) => (
+                  <li key={i} className="popup-feature-item">
+                    <span className="cyan-bullet-ring">
+                      <span className="cyan-bullet-dot"></span>
+                    </span>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
 
-                {/* Divider */}
-                <div className="popup-divider"></div>
+              {/* Divider */}
+              <div className="popup-divider"></div>
 
-                {/* Footer Pricing / Delivery details */}
-                <div className="popup-footer-row">
-                  <div className="popup-footer-col">
-                    <span className="popup-footer-label">STARTING AT</span>
-                    <span className="popup-footer-value price">{selectedService.price}</span>
-                  </div>
-                  <div className="popup-footer-col text-right">
-                    <span className="popup-footer-label">DELIVERY</span>
-                    <span className="popup-footer-value">{selectedService.delivery}</span>
-                  </div>
+              {/* Footer Pricing / Delivery details */}
+              <div className="popup-footer-row">
+                <div className="popup-footer-col">
+                  <span className="popup-footer-label">STARTING AT</span>
+                  <span className="popup-footer-value price">{selectedService.price}</span>
                 </div>
+                <div className="popup-footer-col text-right">
+                  <span className="popup-footer-label">DELIVERY</span>
+                  <span className="popup-footer-value">{selectedService.delivery}</span>
+                </div>
+              </div>
 
-                {/* Get Started Button */}
-                <button 
-                  className="popup-cta-btn" 
-                  onClick={() => {
-                    setShowConstruction(false);
-                    setSelectedService(null);
-                    goToContact();
-                  }}
-                >
-                  Get Started
-                </button>
-              </motion.div>
+              {/* Get Started Button */}
+              <button 
+                className="popup-cta-btn" 
+                onClick={() => {
+                  setShowConstruction(false);
+                  setSelectedService(null);
+                  goToContact();
+                }}
+              >
+                Get Started
+              </button>
             </motion.div>
-          )}
-        </AnimatePresence>
-      </section>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Contact Portal Page */}
       <section className={`contact-page ${isContactActive ? 'active' : ''}`}>
