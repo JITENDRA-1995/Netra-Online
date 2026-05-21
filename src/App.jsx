@@ -4,7 +4,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import './App.css';
 import './Login.css';
-import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ShieldAlert } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { supabase } from './supabase/client';
 import { 
   getInquiries, createInquiry, updateInquiry, deleteInquiry,
@@ -166,27 +166,7 @@ function App() {
   const [isLoginActive, setIsLoginActive] = useState(false);
   const [isAdminSelected, setIsAdminSelected] = useState(false);
   const [loginError, setLoginError] = useState("");
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const loginContainerRef = useRef(null);
-
-  useEffect(() => {
-    if (!isLoginActive) return;
-    const handleMouseMove = (e) => {
-      if (loginContainerRef.current) {
-        const { clientX, clientY } = e;
-        const { innerWidth, innerHeight } = window;
-        const x = (clientX / innerWidth - 0.5) * 10; // max 10px shift
-        const y = (clientY / innerHeight - 0.5) * 10;
-        setMousePosition({ x, y });
-      }
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      setMousePosition({ x: 0, y: 0 });
-    };
-  }, [isLoginActive]);
 
   const [isCommandCenterActive, setIsCommandCenterActive] = useState(false);
   const [isClientVaultActive, setIsClientVaultActive] = useState(false);
@@ -1731,11 +1711,9 @@ function App() {
           {/* Main Container */}
           <motion.div 
             className="perspective-container"
-            animate={{
-              rotateX: mousePosition.y * 0.15,
-              rotateY: -mousePosition.x * 0.15,
-            }}
-            transition={{ type: "spring", stiffness: 80, damping: 40 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
           >
             <motion.div 
               className={`glass-panel ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}
@@ -1852,6 +1830,18 @@ function App() {
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </form>
+
+              {/* Return to Home Option */}
+              <div className="login-back-to-home-container">
+                <button 
+                  type="button" 
+                  onClick={goHome} 
+                  className={`login-back-home-btn ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Return to Main Frame</span>
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         </div>
