@@ -14,7 +14,7 @@ import {
 } from './supabase/database';
 
 
-const services = [
+const defaultServices = [
   { 
     id: 1, 
     title: "Brand Identity (Logo)", 
@@ -318,6 +318,25 @@ const services = [
 ];
 
 function App() {
+  const [servicesList, setServicesList] = useState(() => {
+    const saved = localStorage.getItem('netra_services');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved services:", e);
+      }
+    }
+    return defaultServices;
+  });
+  const services = servicesList;
+
+  const [editingService, setEditingService] = useState(null);
+  const [settingsSearch, setSettingsSearch] = useState("");
+  const [settingsCategory, setSettingsCategory] = useState("ALL");
+  const [calibrationSuccess, setCalibrationSuccess] = useState(false);
+  const [calibratingForm, setCalibratingForm] = useState(null);
+
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -915,7 +934,7 @@ function App() {
         online: s.id !== 19 && s.id !== 20 // Simulate some offline/calibrating services
       };
     });
-  }, [inquiries, ignitionQueue]);
+  }, [inquiries, ignitionQueue, servicesList]);
 
   // --- FINANCIAL CALIBRATION ---
   const [monthlyTarget, setMonthlyTarget] = useState(150000);
@@ -3545,17 +3564,258 @@ function App() {
 
                     {activeAdminModule === "SETTINGS" && (
                       <div className="service-editor">
-                        <div className="editor-grid">
-                          {services.slice(0, 6).map(s => (
-                            <div key={s.id} className="editor-item">
-                              <span>{s.title}</span>
-                              <button className="edit-btn">CALIBRATE</button>
+                        {/* Calibration Header with Search & Filter Tabs */}
+                        <div className="calibration-header-container">
+                          <div className="calibration-title-row">
+                            <h3>NETRA SERVICE <span>CALIBRATION PORTAL</span></h3>
+                            {calibrationSuccess && (
+                              <div className="calibration-success-banner">
+                                <span>✓ SERVICE CALIBRATED & Persisted Locally!</span>
+                                <button style={{ background: 'transparent', border: 'none', color: '#00E5FF', marginLeft: '1rem', cursor: 'pointer', fontWeight: 'bold' }} onClick={() => setCalibrationSuccess(false)}>✕</button>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="settings-controls">
+                            <input 
+                              type="text" 
+                              className="settings-search-input" 
+                              value={settingsSearch} 
+                              onChange={e => setSettingsSearch(e.target.value)} 
+                              placeholder="SEARCH SERVICE CARDS BY TITLE OR DESCRIPTION..."
+                            />
+                            
+                            <div className="settings-category-tabs">
+                              {["ALL", "BRANDING", "PRINT", "DIGITAL", "COMMERCIAL"].map(cat => (
+                                <button 
+                                  key={cat} 
+                                  className={`settings-tab-btn ${settingsCategory === cat ? 'active' : ''}`}
+                                  onClick={() => setSettingsCategory(cat)}
+                                >
+                                  {cat}
+                                </button>
+                              ))}
                             </div>
-                          ))}
-                          <div className="editor-item more">
-                            <span>+ 14 More Services</span>
                           </div>
                         </div>
+
+                        {/* Service Cards Grid */}
+                        <div className="settings-services-grid">
+                          {services
+                            .filter(s => {
+                              const matchSearch = s.title.toLowerCase().includes(settingsSearch.toLowerCase()) || 
+                                                  s.desc.toLowerCase().includes(settingsSearch.toLowerCase());
+                              const matchCat = settingsCategory === "ALL" || s.tag.toUpperCase() === settingsCategory;
+                              return matchSearch && matchCat;
+                            })
+                            .map(s => (
+                              <div key={s.id} className="settings-service-card">
+                                <div>
+                                  <div className="settings-card-header">
+                                    <span className="settings-card-icon">{s.icon}</span>
+                                    <span className={`settings-card-tag tag-${(s.tag || 'branding').toLowerCase()}`}>{s.tag}</span>
+                                  </div>
+                                  <h4 className="settings-card-title">{s.title}</h4>
+                                  <p className="settings-card-desc">{s.desc}</p>
+                                </div>
+
+                                <div>
+                                  <div className="settings-card-meta">
+                                    <span className="settings-meta-price">{s.price}</span>
+                                    <span className="settings-meta-delivery">{s.delivery}</span>
+                                    <span className="settings-meta-features">{s.features?.length || 0} features</span>
+                                  </div>
+                                  <div className="settings-card-action">
+                                    <button 
+                                      className="settings-calibrate-btn" 
+                                      onClick={() => {
+                                        setEditingService(s);
+                                        setCalibratingForm({
+                                          ...s,
+                                          features: s.features ? [...s.features] : []
+                                        });
+                                      }}
+                                    >
+                                      ⚡ CALIBRATE SERVICE
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          }
+                          {services.filter(s => {
+                            const matchSearch = s.title.toLowerCase().includes(settingsSearch.toLowerCase()) || 
+                                                s.desc.toLowerCase().includes(settingsSearch.toLowerCase());
+                            const matchCat = settingsCategory === "ALL" || s.tag.toUpperCase() === settingsCategory;
+                            return matchSearch && matchCat;
+                          }).length === 0 && (
+                            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', color: '#606060', fontFamily: 'Poppins', letterSpacing: '1px' }}>
+                              NO SERVICE CARDS MATCHED YOUR CALIBRATION CRITERIA
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Calibration Modal */}
+                        {calibratingForm && (
+                          <div className="calibration-modal-overlay">
+                            <div className="calibration-editor-modal">
+                              <div className="calibration-modal-header">
+                                <h2>CALIBRATE: <span>{calibratingForm.title}</span></h2>
+                                <p>System ID: SC-{calibratingForm.id.toString().padStart(3, '0')} | Modify parameters for local persistent storage</p>
+                              </div>
+                              
+                              <div className="calibration-modal-body">
+                                <div className="calibration-form-grid">
+                                  <div className="calibration-form-row">
+                                    <div className="calibration-input-group">
+                                      <label>Card Title</label>
+                                      <input 
+                                        type="text" 
+                                        value={calibratingForm.title} 
+                                        onChange={e => setCalibratingForm({ ...calibratingForm, title: e.target.value })} 
+                                        placeholder="Service title"
+                                        required
+                                      />
+                                    </div>
+                                    <div className="calibration-input-group">
+                                      <label>Icon / Emoji</label>
+                                      <input 
+                                        type="text" 
+                                        value={calibratingForm.icon} 
+                                        onChange={e => setCalibratingForm({ ...calibratingForm, icon: e.target.value })} 
+                                        placeholder="🎨, 📖, etc."
+                                        required
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="calibration-form-row">
+                                    <div className="calibration-input-group">
+                                      <label>Tag / Category</label>
+                                      <select 
+                                        value={calibratingForm.tag} 
+                                        onChange={e => setCalibratingForm({ ...calibratingForm, tag: e.target.value })}
+                                        required
+                                      >
+                                        <option value="BRANDING">BRANDING</option>
+                                        <option value="PRINT">PRINT</option>
+                                        <option value="DIGITAL">DIGITAL</option>
+                                        <option value="COMMERCIAL">COMMERCIAL</option>
+                                      </select>
+                                    </div>
+                                    <div className="calibration-form-row" style={{ gap: '0.5rem', gridTemplateColumns: '1fr 1fr' }}>
+                                      <div className="calibration-input-group">
+                                        <label>Price</label>
+                                        <input 
+                                          type="text" 
+                                          value={calibratingForm.price} 
+                                          onChange={e => setCalibratingForm({ ...calibratingForm, price: e.target.value })} 
+                                          placeholder="₹ Price"
+                                          required
+                                        />
+                                      </div>
+                                      <div className="calibration-input-group">
+                                        <label>Delivery Time</label>
+                                        <input 
+                                          type="text" 
+                                          value={calibratingForm.delivery} 
+                                          onChange={e => setCalibratingForm({ ...calibratingForm, delivery: e.target.value })} 
+                                          placeholder="e.g. 5 days"
+                                          required
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="calibration-input-group">
+                                    <label>Card Description</label>
+                                    <textarea 
+                                      value={calibratingForm.desc} 
+                                      onChange={e => setCalibratingForm({ ...calibratingForm, desc: e.target.value })} 
+                                      placeholder="Brief marketing narrative for this card"
+                                      required
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <div className="features-title-row">
+                                      <label>Deliverable Features List</label>
+                                      <button 
+                                        type="button" 
+                                        className="add-feature-inline-btn"
+                                        onClick={() => setCalibratingForm({
+                                          ...calibratingForm,
+                                          features: [...(calibratingForm.features || []), ""]
+                                        })}
+                                      >
+                                        + ADD FEATURE ROW
+                                      </button>
+                                    </div>
+                                    
+                                    <div className="features-editor-list">
+                                      {(calibratingForm.features || []).map((feat, index) => (
+                                        <div key={index} className="feature-input-row">
+                                          <input 
+                                            type="text" 
+                                            value={feat} 
+                                            onChange={e => {
+                                              const newFeats = [...calibratingForm.features];
+                                              newFeats[index] = e.target.value;
+                                              setCalibratingForm({ ...calibratingForm, features: newFeats });
+                                            }} 
+                                            placeholder={`Feature line #${index + 1}`}
+                                            required
+                                          />
+                                          <button 
+                                            type="button" 
+                                            className="delete-feature-btn"
+                                            onClick={() => {
+                                              const newFeats = calibratingForm.features.filter((_, idx) => idx !== index);
+                                              setCalibratingForm({ ...calibratingForm, features: newFeats });
+                                            }}
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+                                      ))}
+                                      {(!calibratingForm.features || calibratingForm.features.length === 0) && (
+                                        <p style={{ margin: '1rem 0', color: '#606060', fontSize: '0.8rem', textAlign: 'center', fontFamily: 'Poppins' }}>No features defined. Click add feature row above.</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="calibration-modal-footer">
+                                <button 
+                                  type="button" 
+                                  className="calibration-btn-secondary"
+                                  onClick={() => {
+                                    setCalibratingForm(null);
+                                    setEditingService(null);
+                                  }}
+                                >
+                                  DISCARD
+                                </button>
+                                <button 
+                                  type="button" 
+                                  className="calibration-btn-primary"
+                                  onClick={() => {
+                                    const nextList = servicesList.map(s => s.id === calibratingForm.id ? calibratingForm : s);
+                                    setServicesList(nextList);
+                                    localStorage.setItem('netra_services', JSON.stringify(nextList));
+                                    setCalibratingForm(null);
+                                    setEditingService(null);
+                                    setCalibrationSuccess(true);
+                                    setTimeout(() => setCalibrationSuccess(false), 5000);
+                                  }}
+                                >
+                                  IGNITE CALIBRATION
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
