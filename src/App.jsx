@@ -1819,10 +1819,6 @@ function App() {
               exit={{ opacity: 0, scale: 0.9, y: 30 }}
               transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
               onClick={(e) => e.stopPropagation()}
-              onMouseLeave={() => {
-                setShowConstruction(false);
-                setSelectedService(null);
-              }}
             >
               {/* Close Button */}
               <button 
