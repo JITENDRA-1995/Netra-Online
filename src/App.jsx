@@ -4,7 +4,14 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import './App.css';
 import './Login.css';
-import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ShieldAlert, ArrowLeft } from 'lucide-react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import Dashboard from '@/pages/dashboard';
+import Projects from '@/pages/projects';
+import Clients from '@/pages/clients';
+import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut } from 'lucide-react';
+
+const queryClient = new QueryClient();
 import { supabase } from './supabase/client';
 import { 
   getInquiries, createInquiry, updateInquiry, deleteInquiry,
@@ -1629,49 +1636,76 @@ function App() {
   };
 
   return (
-    <div className="app-container" ref={containerRef}>
-      {/* Global Admin Header (Only shown when a module is open) */}
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <div className="app-container" ref={containerRef}>
+      {/* Side-aligned Sidebar (Only shown when a module is open) */}
       {isCommandCenterActive && isAdminGridActive && (
-        <header className="admin-header header-reveal">
-          <nav className="admin-nav">
-            <div className="admin-branding">
-              <img src="/logo.png" alt="Netra Logo" className="admin-logo-img" />
-              <span className="admin-branding-text">NETRA GRAPHICS</span>
-            </div>
-            <div className="admin-menu">
-              {["DASHBOARD", "PROJECTS", "INQUIRIES", "CLIENTS", "FINANCIALS", "SETTINGS"].map((module) => (
+        <aside className="admin-sidebar">
+          <div className="sidebar-branding">
+            <img src="/logo.png" alt="Netra Logo" className="sidebar-logo-img" />
+            <span className="sidebar-branding-text">NETRA</span>
+          </div>
+          
+          <nav className="sidebar-menu">
+            {[
+              { id: "DASHBOARD", label: "Dashboard", icon: LayoutDashboard },
+              { id: "PROJECTS", label: "Projects", icon: Folder },
+              { id: "INQUIRIES", label: "Inquiries", icon: Inbox, badge: showInquiryBadge },
+              { id: "CLIENTS", label: "Clients", icon: Users },
+              { id: "FINANCIALS", label: "Financials", icon: FileText },
+              { id: "SETTINGS", label: "Settings", icon: Settings }
+            ].map((link) => {
+              const isActive = activeAdminModule === link.id;
+              const Icon = link.icon;
+              return (
                 <a 
-                  key={module}
+                  key={link.id}
                   href="#" 
-                  className={`admin-menu-link ${activeAdminModule === module ? 'active' : ''}`}
+                  className={`sidebar-menu-link ${isActive ? 'active' : ''}`}
                   onClick={(e) => { 
                     e.preventDefault(); 
-                    setActiveAdminModule(module); 
+                    setActiveAdminModule(link.id); 
                     setIsAdminGridActive(true); 
                     setIsIgnitionModalOpen(false); // Auto-close modal on navigation
-                    if (module === "INQUIRIES") setShowInquiryBadge(false);
+                    if (link.id === "INQUIRIES") setShowInquiryBadge(false);
                   }}
+                  data-testid={`link-sidebar-${link.label.toLowerCase()}`}
                 >
-                  {module}
-                  {module === "INQUIRIES" && (
-                    <span className={`notification-badge ${showInquiryBadge ? 'visible' : 'fade-out'}`}></span>
+                  <Icon className={`sidebar-link-icon ${isActive ? 'text-[#00E5FF]' : ''}`} />
+                  <span className="sidebar-link-label">{link.label}</span>
+                  {link.badge && (
+                    <span className="sidebar-notification-dot"></span>
                   )}
                 </a>
-              ))}
-              <div className="admin-actions">
-                <div className={`notification-bell-wrapper ${ ((sparks.length + flames.length) > 0 || bellPulse) ? 'has-alerts' : ''}`} onClick={() => setIsNotificationOpen(true)}>
-                  <svg className="bell-icon" viewBox="0 0 24 24" width="24" height="24">
-                    <path fill="currentColor" d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
-                  </svg>
-                  {(sparks.length + flames.length) > 0 && (
-                    <span className="bell-badge">{sparks.length + flames.length}</span>
-                  )}
-                </div>
-                <a href="#" className="admin-menu-link logout-link" onClick={handleLogout}>LOGOUT</a>
-              </div>
-            </div>
+              );
+            })}
           </nav>
-        </header>
+
+          <div className="sidebar-footer">
+            <div className="sidebar-notifications-trigger" onClick={() => setIsNotificationOpen(true)}>
+              <div className={`notification-bell-wrapper ${ ((sparks.length + flames.length) > 0 || bellPulse) ? 'has-alerts' : ''}`}>
+                <svg className="bell-icon" viewBox="0 0 24 24" width="20" height="20">
+                  <path fill="currentColor" d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                </svg>
+                {(sparks.length + flames.length) > 0 && (
+                  <span className="bell-badge">{sparks.length + flames.length}</span>
+                )}
+              </div>
+              <span className="notifications-label">SYSTEM ALERTS</span>
+            </div>
+
+            <a href="#" className="sidebar-logout-btn" onClick={handleLogout}>
+              <LogOut className="w-4 h-4" />
+              <span>LOGOUT</span>
+            </a>
+
+            <div className="sidebar-version-tag">
+              <p className="v-title">Netra OS v2.4</p>
+              <p className="v-status">Systems online.</p>
+            </div>
+          </div>
+        </aside>
       )}
 
       {/* Fixed Public Header */}
@@ -2305,7 +2339,7 @@ function App() {
               /* Administrative Modules (Command Grid) */
               <motion.div 
                 key="grid"
-                className="admin-grid-screen"
+                className="admin-grid-screen sidebar-active"
                 initial={{ opacity: 0, x: 100 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 100 }}
@@ -2328,429 +2362,11 @@ function App() {
                   
                   <div className="module-content-area">
                     {activeAdminModule === "DASHBOARD" && (
-                      <div className="command-center-dashboard">
-                        {/* Global Metrics Row */}
-                        <div className="metrics-row">
-                          <motion.div className="metric-tile float-module" initial={{opacity:0, y:20}} animate={{opacity:1, y:0}} transition={{delay:0.1}}>
-                            <span className="tile-label">Active Revolutions</span>
-                            <span className="tile-value cyan-glow">{ignitionQueue.filter(p => p.status === 'Ongoing').length}</span>
-                          </motion.div>
-                          <motion.div className="metric-tile float-module" initial={{opacity:0, y:20}} animate={{opacity:1, y:0}} transition={{delay:0.2}}>
-                            <span className="tile-label">Total Ignitions</span>
-                            <span className="tile-value white-glow">{ignitionQueue.length}</span>
-                          </motion.div>
-                          <motion.div className="metric-tile float-module" initial={{opacity:0, y:20}} animate={{opacity:1, y:0}} transition={{delay:0.3}}>
-                            <span className="tile-label">New Sparks</span>
-                            <span className="tile-value orange-glow">{inquiries.filter(i => i.status === 'New Spark').length}</span>
-                          </motion.div>
-                          <motion.div className="metric-tile float-module chart-tile" initial={{opacity:0, y:20}} animate={{opacity:1, y:0}} transition={{delay:0.4}}>
-                            <span className="tile-label">Revenue Growth</span>
-                            <div className="mini-line-chart">
-                              <svg viewBox="0 0 100 30" preserveAspectRatio="none">
-                                <path d="M0,25 Q15,20 30,22 T60,10 T100,5" fill="none" stroke="#00E5FF" strokeWidth="1.5" />
-                              </svg>
-                            </div>
-                          </motion.div>
-                        </div>
-
-                        {/* Center Grid: Ignition Queue & Revenue Breakdown */}
-                        <div className="center-grid">
-                          <motion.div className="dashboard-module ignition-queue float-module" initial={{opacity:0, x:-20}} animate={{opacity:1, x:0}} transition={{delay:0.5}}>
-                            <div className="module-header"><h3>IGNITION QUEUE</h3></div>
-                            <table className="kanban-table">
-                              <thead>
-                                <tr><th>Client</th><th>Service</th><th>Progress</th></tr>
-                              </thead>
-                              <tbody>
-                                {ignitionQueue.map((row, i) => (
-                                  <tr key={i}>
-                                    <td>{row.name}</td>
-                                    <td className="dim-text">{row.service}</td>
-                                    <td>
-                                      <div className="progress-tracker">
-                                        <span 
-                                          className={`node ${row.stage >= 1 ? 'active' : ''}`} 
-                                          onClick={() => updateIgnitionStatus(i, 1)}
-                                          title="Concept Stage"
-                                        >C</span>
-                                        <div className={`line ${row.stage >= 2 ? 'active' : ''}`}></div>
-                                        <span 
-                                          className={`node ${row.stage >= 2 ? 'active' : ''}`} 
-                                          onClick={() => updateIgnitionStatus(i, 2)}
-                                          title="Design Stage"
-                                        >D</span>
-                                        <div className={`line ${row.stage >= 3 ? 'active' : ''}`}></div>
-                                        <span 
-                                          className={`node ${row.stage >= 3 ? 'active' : ''}`} 
-                                          onClick={() => updateIgnitionStatus(i, 3)}
-                                          title="Execution Stage"
-                                        >E</span>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </motion.div>
-
-                          <div className="breakdown-column">
-                            <motion.div className="dashboard-module sleek-chart float-module" initial={{opacity:0, x:20}} animate={{opacity:1, x:0}} transition={{delay:0.6}}>
-                              <div className="module-header"><h3>SERVICE PERFORMANCE</h3></div>
-                              <div className="column-chart">
-                                {[85, 65, 90, 45, 75].map((h, i) => (
-                                  <div key={i} className="chart-bar" style={{height: `${h}%`}}></div>
-                                ))}
-                              </div>
-                            </motion.div>
-                            <motion.div className="dashboard-module pending-list float-module" initial={{opacity:0, x:20}} animate={{opacity:1, x:0}} transition={{delay:0.7}}>
-                              <div className="module-header"><h3>PENDING INVOICES</h3></div>
-                              <div className="invoice-rows">
-                                {ignitionQueue.filter(p => p.status !== "Completed").length > 0 ? (
-                                  ignitionQueue.filter(p => p.status !== "Completed").slice(0, 5).map(p => (
-                                    <div key={p.id} className="invoice-row" onClick={() => { setActiveAdminModule("FINANCIALS"); }}>
-                                      <span>{p.client?.name || p.name}</span> 
-                                      <span className="value orange-glow">₹{p.quote?.toLocaleString()}</span>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div className="empty-notif" style={{ padding: '1rem', color: '#808080', fontSize: '0.7rem', textAlign: 'center' }}>
-                                    ALL INVOICES SETTLED ✧
-                                  </div>
-                                )}
-                              </div>
-                            </motion.div>
-                          </div>
-                        </div>
-
-                        <motion.div className="dashboard-module service-status-tracker float-module" initial={{opacity:0, y:20}} animate={{opacity:1, y:0}} transition={{delay:0.8}}>
-                          <div className="module-header"><h3>SERVICE STATUS TRACKER</h3></div>
-                          <div className="status-grid-scroll">
-                            {services.map((s, idx) => {
-                              const stats = serviceStats[idx];
-                              return (
-                                <div key={s.id} className="status-item">
-                                  <span className="s-name">{s.title}</span>
-                                  <div className="status-controls">
-                                    <span className="vol-text">+{stats.growth}% MoM</span>
-                                    <div className={`status-toggle ${stats.online ? 'active' : ''}`}>
-                                      {stats.online ? 'ONLINE' : 'CALIBRATING'}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </motion.div>
-                      </div>
+                      <Dashboard />
                     )}
 
                     {activeAdminModule === "PROJECTS" && (
-                      <div className="project-command-terminal">
-                        {/* Left Sidebar: Active Projects Selection */}
-                        <div className="terminal-sidebar">
-                          <div className="sidebar-header">
-                            <h3>PROJECT REVOLUTIONS</h3>
-                            <div className="filter-dropdown">
-                              <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
-                                <option value="Ongoing">ONGOING</option>
-                                <option value="Completed">COMPLETED</option>
-                                <option value="Closed">CLOSED</option>
-                              </select>
-                            </div>
-                          </div>
-                          <div className="sidebar-project-list">
-                            {(() => {
-                              const filtered = ignitionQueue.filter(p => p.status === projectFilter);
-                              const grouped = {};
-                              filtered.forEach(p => {
-                                if (!grouped[p.name]) grouped[p.name] = [];
-                                grouped[p.name].push(p);
-                              });
-                              
-                              return Object.entries(grouped).map(([clientName, projects]) => {
-                                if (projects.length === 1) {
-                                  const p = projects[0];
-                                  return (
-                                    <div 
-                                      key={p.id} 
-                                      className={`sidebar-project-item ${selectedProjectTab === p.id ? 'active' : ''}`}
-                                      onClick={() => setSelectedProjectTab(p.id)}
-                                    >
-                                      <div className="p-icon">{p.name.charAt(0)}</div>
-                                      <div className="p-info">
-                                        <span className="p-name">{p.name}</span>
-                                        <span className="p-service">{p.service} &bull; DUE: {new Date(p.deadline).toLocaleDateString()}</span>
-                                      </div>
-                                      {calculateDaysRemaining(p.deadline) <= 1 && p.status === 'Ongoing' && (
-                                        <div className="p-alert-dot"></div>
-                                      )}
-                                    </div>
-                                  );
-                                } else {
-                                  const isExpanded = expandedClientRev === clientName;
-                                  return (
-                                    <div key={clientName} style={{marginBottom: '0.5rem'}}>
-                                      <div 
-                                        className={`sidebar-project-item client-group ${projects.some(p => p.id === selectedProjectTab) ? 'active' : ''}`}
-                                        onClick={() => setExpandedClientRev(isExpanded ? null : clientName)}
-                                        style={{ borderLeft: projects.some(p => p.id === selectedProjectTab) ? '3px solid #00E5FF' : 'none' }}
-                                      >
-                                        <div className="p-icon" style={{background: 'rgba(0, 229, 255, 0.1)'}}>{clientName.charAt(0)}</div>
-                                        <div className="p-info">
-                                          <span className="p-name">{clientName}</span>
-                                          <span className="p-service">{projects.length} Active Projects</span>
-                                        </div>
-                                        <div style={{marginLeft: 'auto', color: '#00e5ff', fontSize: '0.8rem', fontWeight: 'bold'}}>
-                                          {isExpanded ? '▲' : '▼'}
-                                        </div>
-                                      </div>
-                                      
-                                      {isExpanded && (
-                                        <div className="client-projects-sublist" style={{ marginLeft: '1rem', borderLeft: '1px solid rgba(255,255,255,0.1)', paddingLeft: '0.5rem', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                                          {projects.map(p => (
-                                            <div 
-                                              key={p.id}
-                                              className={`sidebar-project-item sub-item ${selectedProjectTab === p.id ? 'active' : ''}`}
-                                              onClick={() => setSelectedProjectTab(p.id)}
-                                              style={{ 
-                                                padding: '0.8rem', 
-                                                background: selectedProjectTab === p.id ? 'rgba(0, 229, 255, 0.05)' : 'transparent', 
-                                                borderLeft: selectedProjectTab === p.id ? '2px solid #00E5FF' : '2px solid transparent',
-                                                display: 'flex', 
-                                                justifyContent: 'space-between',
-                                                alignItems: 'center',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.3s ease',
-                                                borderRadius: '0 4px 4px 0',
-                                                marginBottom: 0
-                                              }}
-                                            >
-                                              <span style={{fontSize: '0.75rem', fontFamily: 'Poppins', color: selectedProjectTab === p.id ? '#00e5ff' : '#fff'}}>{p.service}</span>
-                                              <span style={{fontSize: '0.65rem', color: '#808080'}}>{new Date(p.deadline).toLocaleDateString()}</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                }
-                              });
-                            })()}
-                          </div>
-                        </div>
-
-                        {/* Main Workspace: Media Vault & Collaboration */}
-                        <div className="terminal-workspace">
-                          {ignitionQueue.find(p => p.id === selectedProjectTab) ? (
-                            (() => {
-                              const p = ignitionQueue.find(proj => proj.id === selectedProjectTab);
-                              return (
-                                <>
-                                  <div className="workspace-header">
-                                    <div className="project-meta">
-                                      <h2>{p.name} <small>— {p.service}</small></h2>
-                                      <div className="meta-data-blocks">
-                                        <div className="data-block">
-                                          <span className="db-label">STATUS</span>
-                                          <span className="db-value meta-badge">{p.status.toUpperCase()}</span>
-                                        </div>
-                                        <div className="data-block">
-                                          <span className="db-label">VISIONARY</span>
-                                          <span className="db-value">{p.client.name}</span>
-                                        </div>
-                                        <div className="data-block">
-                                          <span className="db-label">TARGET DELIVERY</span>
-                                          <span className="db-value">{new Date(p.deadline).toLocaleDateString()}</span>
-                                        </div>
-                                        <div className="data-block">
-                                          <span className="db-label">BUSINESS ADDRESS</span>
-                                          <span className="db-value">{p.client.address || "N/A"}</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="workspace-actions">
-                                      <input 
-                                        type="file" 
-                                        ref={fileInputRef} 
-                                        style={{ display: 'none' }} 
-                                        onChange={(e) => handleVaultFileUpload(e, p.id)} 
-                                      />
-                                      <button className="action-btn" onClick={() => fileInputRef.current && fileInputRef.current.click()}>
-                                        <span className="btn-icon">📁</span> SHARE ASSET
-                                      </button>
-                                      <button className="action-btn" onClick={() => setIsProjectEditModalOpen(true)}>
-                                        <span className="btn-icon">✎</span> EDIT MISSION
-                                      </button>
-                                      <button className="action-btn terminate-btn" onClick={() => deleteProject(p.id)}>
-                                        <span className="btn-icon">×</span> TERMINATE
-                                      </button>
-                                      <button className="action-btn" onClick={() => updateProjectStatus(p.id, p.status === "Ongoing" ? "Completed" : "Ongoing")}>
-                                        {p.status === "Ongoing" ? "MARK FINALIZED" : "RESTORE PROJECT"}
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  <div className="workspace-grid">
-                                    {/* Column 1: Media Vault */}
-                                    <div className="workspace-column media-vault-column">
-                                      <div className="column-header-bar">
-                                        <h3>MEDIA VAULT</h3>
-                                        <span className="vault-count">{p.mediaVault?.length || 0} ASSETS</span>
-                                      </div>
-                                      <div className="media-grid">
-                                        {p.mediaVault?.map(m => (
-                                          <div key={m.id} className="media-card">
-                                            <div className={`media-preview ${m.type}`}>
-                                              {m.type === 'image' ? <img src={m.url} alt={m.name} /> : <div className="file-placeholder">{m.type.toUpperCase()}</div>}
-                                              <div className="media-overlay">
-                                                <button onClick={() => window.open(m.url, '_blank')}>VIEW</button>
-                                              </div>
-                                            </div>
-                                            <div className="media-info">
-                                              <span className="m-name">{m.name}</span>
-                                              <span className="m-size">{m.size}</span>
-                                            </div>
-                                          </div>
-                                        ))}
-                                        <div className="media-card add-more" onClick={() => fileInputRef.current && fileInputRef.current.click()}>
-                                          <div className="add-icon">+</div>
-                                          <span>ADD ASSET</span>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Column 2: Collaboration Pulse */}
-                                    <div className="workspace-column collaboration-column">
-                                      <div className="column-header-bar">
-                                        <h3>COLLABORATION PULSE</h3>
-                                        <span className="pulse-indicator">LIVE</span>
-                                      </div>
-                                      <div className="interaction-stream">
-                                        {p.collaborationStream?.map(msg => (
-                                          <div key={msg.id} className={`stream-message ${msg.sender.toLowerCase()}`}>
-                                            <div className="msg-meta">
-                                              <span className="msg-sender">{msg.sender}</span>
-                                              <span className="msg-time">{msg.time}</span>
-                                            </div>
-                                            <p className="msg-text">{msg.text}</p>
-                                          </div>
-                                        ))}
-                                      </div>
-                                      <div className="message-input-area">
-                                        <input 
-                                          type="text" 
-                                          placeholder="Type a message to the visionary..." 
-                                          value={chatMessage}
-                                          onChange={(e) => setChatMessage(e.target.value)}
-                                          onKeyPress={(e) => {
-                                            if (e.key === 'Enter' && chatMessage.trim()) {
-                                              const text = chatMessage.trim();
-                                              setChatMessage("");
-                                              
-                                              sendChatMessage(p.id, "ADMIN", text).then((savedMsg) => {
-                                                const formattedMsg = {
-                                                  id: savedMsg.id,
-                                                  sender: savedMsg.sender,
-                                                  text: savedMsg.message,
-                                                  time: new Date(savedMsg.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-                                                };
-                                                
-                                                setIgnitionQueue(prevQueue => prevQueue.map(proj => {
-                                                  if (proj.id === p.id) {
-                                                    const exists = (proj.collaborationStream || []).some(msg => msg.id === formattedMsg.id);
-                                                    if (exists) return proj;
-                                                    return {
-                                                      ...proj,
-                                                      collaborationStream: [...(proj.collaborationStream || []), formattedMsg]
-                                                    };
-                                                  }
-                                                  return proj;
-                                                }));
-                                              }).catch((err) => {
-                                                console.error("Failed to send database chat:", err);
-                                                alert("Failed to deliver message to cloud database.");
-                                              });
-                                            }
-                                          }}
-                                        />
-                                        <button className="send-msg-btn">➤</button>
-                                      </div>
-                                    </div>
-
-                                    {/* Column 3: Roadmap & Activity */}
-                                    <div className="workspace-column roadmap-column">
-                                      <div className="column-header-bar">
-                                        <h3>REVOLUTION ROADMAP</h3>
-                                      </div>
-                                      <div className="roadmap-stepper">
-                                        {p.milestones.map((m, idx) => {
-                                          const activeIndex = p.milestones.findIndex(mile => !mile.completed);
-                                          const isActive = idx === activeIndex;
-                                          return (
-                                            <div key={idx} className={`roadmap-node ${m.completed ? 'done' : ''} ${isActive ? 'active-stage' : ''}`}>
-                                              <div className="node-marker"></div>
-                                            <div className="node-content">
-                                              <span className="n-name">{m.name}</span>
-                                              <button 
-                                                 className="n-toggle"
-                                                 onClick={async () => {
-                                                   const targetStatus = !m.completed;
-                                                   try {
-                                                     await toggleMilestone(p.id, m.name, targetStatus);
-                                                     const logAction = `${m.name} Milestone marked as ${targetStatus ? 'Completed' : 'Pending'}`;
-                                                     await addProjectActivityLog(p.id, logAction);
-                                                     
-                                                     setIgnitionQueue(prevQueue => prevQueue.map(proj => {
-                                                       if (proj.id === p.id) {
-                                                         const updatedMilestones = [...proj.milestones];
-                                                         updatedMilestones[idx].completed = targetStatus;
-                                                         const updatedLogs = [
-                                                           ...(proj.activityLog || []),
-                                                           { action: logAction, time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) }
-                                                         ];
-                                                         return { 
-                                                           ...proj, 
-                                                           milestones: updatedMilestones,
-                                                           activityLog: updatedLogs 
-                                                         };
-                                                       }
-                                                       return proj;
-                                                     }));
-                                                   } catch (err) {
-                                                     console.error("Failed to update milestone in database:", err);
-                                                     alert("Failed to sync milestone update with cloud database.");
-                                                   }
-                                                 }}
-                                               >
-                                                {m.completed ? 'DONE' : 'PENDING'}
-                                              </button>
-                                            </div>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                      <div className="activity-mini-log">
-                                        <h4>RECENT ACTIVITY</h4>
-                                        {p.activityLog.slice(0, 3).map((log, i) => (
-                                          <div key={i} className="mini-log-item">
-                                            <span className="l-time">{log.time}</span>
-                                            <span className="l-action">{log.action}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </>
-                              );
-                            })()
-                          ) : (
-                            <div className="empty-workspace">
-                              <div className="empty-visual">✧</div>
-                              <p>SELECT A PROJECT TO BEGIN COLLABORATION</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                      <Projects />
                     )}
 
                     {activeAdminModule === "INQUIRIES" && (
@@ -2914,82 +2530,7 @@ function App() {
                     )}
 
                     {activeAdminModule === "CLIENTS" && (
-                      <div className="crm-module">
-                        <div className="crm-header-actions">
-                          <button className="add-client-btn" onClick={() => { setClientViewMode("LIST"); setIsClientModalOpen(true); setSelectedClient(null); }}>
-                            + ADD NEW CLIENT
-                          </button>
-                        </div>
-                        
-                        {clientViewMode === "LIST" ? (
-                          <div className="crm-table-container">
-                            <table className="crm-table">
-                              <thead>
-                                <tr><th>Client Name</th><th>Contact Details</th><th>Status</th><th>Actions</th></tr>
-                              </thead>
-                              <tbody>
-                                {clients.length > 0 ? clients.map(client => (
-                                  <tr key={client.id}>
-                                    <td className="bold-text">{client.name}</td>
-                                    <td>
-                                      <div className="contact-mini">
-                                        <span>{client.phone}</span>
-                                        <span className="dim-text">{client.email}</span>
-                                      </div>
-                                    </td>
-                                    <td><span className="status-badge ignited">Active</span></td>
-                                    <td className="actions-cell">
-                                      <div className="action-icons">
-                                        <button className="a-btn review" title="View Details" onClick={() => { setSelectedClient(client); setClientViewMode("VIEW"); }}>👁</button>
-                                        <button className="a-btn" title="Edit Profile" onClick={() => { setSelectedClient(client); setIsClientModalOpen(true); }}>✎</button>
-                                        <button className="a-btn accept" title="Work History" onClick={() => { 
-                                          setSelectedClient(client);
-                                          setClientViewMode("VIEW");
-                                        }}>📁</button>
-                                        <button className="a-btn reject" title="Delete" onClick={() => deleteClient(client.id)}>×</button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                )) : (
-                                  <tr><td colSpan="4" className="empty-row">NO CLIENTS REGISTERED IN THE NETRA NETWORK</td></tr>
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        ) : (
-                          /* Client Detailed View / Work History */
-                          <div className="client-detailed-view">
-                            <div className="view-header">
-                              <button className="back-link" onClick={() => setClientViewMode("LIST")}>← BACK TO NETWORK</button>
-                              <h2>{selectedClient?.name} <small>— CLIENT PROFILE</small></h2>
-                            </div>
-                            <div className="detail-grid">
-                              <div className="detail-card">
-                                <h3>CONTACT PROFILE</h3>
-                                <div className="info-item"><label>PHONE</label><p>{selectedClient?.phone}</p></div>
-                                <div className="info-item"><label>EMAIL</label><p>{selectedClient?.email}</p></div>
-                                <div className="info-item"><label>ADDRESS</label><p>{selectedClient?.address}</p></div>
-                              </div>
-                              <div className="detail-card history-card">
-                                <h3>WORK HISTORY</h3>
-                                <div className="history-list">
-                                  {ignitionQueue.filter(p => p.name === selectedClient?.name).length > 0 ? (
-                                    ignitionQueue.filter(p => p.name === selectedClient?.name).map(p => (
-                                      <div key={p.id} className="history-item">
-                                        <span className="h-service">{p.service}</span>
-                                        <span className="h-status">{p.status}</span>
-                                        <span className="h-date">{new Date(p.deadline).toLocaleDateString()}</span>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <p className="dim-text">No previous missions recorded for this visionary.</p>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      <Clients />
                     )}
 
                     {activeAdminModule === "FINANCIALS" && (
@@ -4798,6 +4339,8 @@ function App() {
         )}
       </AnimatePresence>
     </div>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 
