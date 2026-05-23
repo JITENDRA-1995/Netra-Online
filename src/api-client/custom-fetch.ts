@@ -692,6 +692,26 @@ export async function customFetch<T = unknown>(
   options: CustomFetchOptions = {},
 ): Promise<T> {
   const urlStr = resolveUrl(input);
+
+  // 1. Detect if we are in production (e.g. Vercel) and the request is to a relative API path.
+  // In production, there is no hosted Express API, so relative fetches to /api will fail or hang.
+  // We instantly bypass fetch and use the client-side localStorage mock database.
+  const isLocalhost = typeof window !== "undefined" && (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname === "[::1]" ||
+    window.location.hostname === ""
+  );
+  const isRelativeApi = urlStr.startsWith("/api") || urlStr.startsWith("/");
+
+  if (typeof window !== "undefined" && !isLocalhost && isRelativeApi) {
+    console.info("Production environment (Vercel) detected. Intercepting and serving instantly via client-side database mock:", urlStr);
+    const mockRes = await handleMockRequest(urlStr, options);
+    if (mockRes !== null) {
+      return mockRes as T;
+    }
+  }
+
   try {
     const targetInput = applyBaseUrl(input);
     const { responseType = "auto", headers: headersInit, ...init } = options;
@@ -725,7 +745,21 @@ export async function customFetch<T = unknown>(
 
     const requestInfo = { method, url: resolveUrl(targetInput) };
 
-    const response = await fetch(targetInput, { ...init, method, headers });
+    // 2. Set a 1500ms timeout on the network fetch to prevent hanging in case of offline local server
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 1500) : null;
+
+    let response: Response;
+    try {
+      response = await fetch(targetInput, { 
+        ...init, 
+        method, 
+        headers,
+        signal: controller ? controller.signal : undefined
+      });
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errorData = await parseErrorBody(response, method);
@@ -739,9 +773,11 @@ export async function customFetch<T = unknown>(
       String(error).includes("fetch") || 
       String(error).includes("Failed to fetch") || 
       String(error).includes("NetworkError") ||
-      String(error).includes("Failed to execute 'fetch'")
+      String(error).includes("Failed to execute 'fetch'") ||
+      String(error).includes("aborted") ||
+      (error && (error as any).name === "AbortError")
     )) {
-      console.warn("API connection failed. falling back to client-side localStorage mock database.", error);
+      console.warn("API connection failed or timed out. falling back to client-side localStorage mock database.", error);
       const mockRes = await handleMockRequest(urlStr, options);
       if (mockRes !== null) {
         return mockRes as T;
