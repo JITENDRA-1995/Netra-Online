@@ -1,25 +1,13 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
-  Settings,
   Search,
-  Filter,
   Sliders,
-  DollarSign,
-  Clock,
-  Plus,
-  Trash2,
-  ListPlus,
-  FileText,
-  Zap,
-  CheckCircle2
+  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
 
 interface Service {
   id: number;
@@ -34,7 +22,7 @@ interface Service {
 
 interface SettingsProps {
   servicesList: Service[];
-  setServicesList: React.Dispatch<React.SetStateAction<Service[]>>;
+  onOpenCalibrate: (s: Service) => void;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -58,17 +46,12 @@ const itemVariants = {
 
 export default function SettingsPage({
   servicesList,
-  setServicesList
+  onOpenCalibrate
 }: SettingsProps) {
-  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("ALL");
   
-  // Separate dialog visibility and data states for maximum reliability
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [calibratingService, setCalibratingService] = useState<Service | null>(null);
-
-  // Filtered Services List with full defensive checks
+  // Filtered Services List
   const filtered = servicesList.filter(s => {
     const matchSearch = s.title.toLowerCase().includes(search.toLowerCase()) ||
                         s.desc.toLowerCase().includes(search.toLowerCase());
@@ -79,28 +62,6 @@ export default function SettingsPage({
 
   const getTagColor = (tag: string) => {
     return CATEGORY_COLORS[(tag || "").toUpperCase()] ?? "#666";
-  };
-
-  const handleOpenCalibrate = (s: Service) => {
-    setCalibratingService({ ...s, features: s.features ? [...s.features] : [] });
-    setIsDialogOpen(true);
-  };
-
-  const handleIgniteCalibration = () => {
-    if (!calibratingService) return;
-
-    // Save update to state and localStorage
-    const nextList = servicesList.map(s => s.id === calibratingService.id ? calibratingService : s);
-    setServicesList(nextList);
-    localStorage.setItem("netra_services", JSON.stringify(nextList));
-
-    toast({
-      title: "Service Calibrated Successfully",
-      description: `Updated config for: ${calibratingService.title}`
-    });
-
-    setIsDialogOpen(false);
-    setCalibratingService(null);
   };
 
   return (
@@ -131,7 +92,7 @@ export default function SettingsPage({
         <div className="relative flex-1 min-w-[240px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            className="pl-9 bg-white/5 border-white/10 rounded-xl"
+            className="pl-9 bg-white/5 border-white/10 rounded-xl text-foreground bg-[#0a0f1e]/40"
             placeholder="Search service cards by title or description..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -193,7 +154,7 @@ export default function SettingsPage({
                   </div>
 
                   <Button
-                    onClick={() => handleOpenCalibrate(s)}
+                    onClick={() => onOpenCalibrate(s)}
                     className="w-full bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 font-bold text-xs rounded-xl"
                   >
                     <Sliders className="w-3.5 h-3.5 mr-2" />
@@ -210,171 +171,8 @@ export default function SettingsPage({
           </div>
         )}
       </motion.div>
-
-      {/* Service Editor Calibration Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="bg-[#0a0f1e] border-white/10 max-w-lg max-h-[90vh] overflow-y-auto">
-          {calibratingService && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="text-foreground flex items-center gap-2 uppercase tracking-wide">
-                  <Zap className="w-5 h-5 text-indigo-400 animate-pulse" />
-                  CALIBRATE: <span className="text-glow font-black">{calibratingService.title}</span>
-                </DialogTitle>
-                <DialogDescription className="text-muted-foreground text-xs">
-                  Modify deliverables, quotes, and structural parameters. Saved configuration syncs immediately with clients.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 pt-2 text-xs">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Card Title</label>
-                    <Input
-                      value={calibratingService.title}
-                      onChange={(e) => setCalibratingService({ ...calibratingService, title: e.target.value })}
-                      className="bg-white/5 border-white/10 text-xs rounded-xl text-foreground"
-                      placeholder="Service title"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Icon / Emoji</label>
-                    <Input
-                      value={calibratingService.icon}
-                      onChange={(e) => setCalibratingService({ ...calibratingService, icon: e.target.value })}
-                      className="bg-white/5 border-white/10 text-xs rounded-xl text-foreground"
-                      placeholder="🎨, 📖, etc."
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1.5 col-span-1">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Category Tag</label>
-                    <select
-                      value={calibratingService.tag}
-                      onChange={(e) => setCalibratingService({ ...calibratingService, tag: e.target.value })}
-                      className="w-full h-10 px-3 bg-white/5 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-indigo-400 bg-[#0a0f1e]"
-                      required
-                    >
-                      <option value="BRANDING">BRANDING</option>
-                      <option value="PRINT">PRINT</option>
-                      <option value="DIGITAL">DIGITAL</option>
-                      <option value="VIDEO">VIDEO</option>
-                      <option value="EVENT">EVENT</option>
-                      <option value="COMMERCIAL">COMMERCIAL</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5 col-span-1">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Price</label>
-                    <Input
-                      value={calibratingService.price}
-                      onChange={(e) => setCalibratingService({ ...calibratingService, price: e.target.value })}
-                      className="bg-white/5 border-white/10 text-xs rounded-xl text-foreground"
-                      placeholder="₹ Price"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1.5 col-span-1">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Delivery Time</label>
-                    <Input
-                      value={calibratingService.delivery}
-                      onChange={(e) => setCalibratingService({ ...calibratingService, delivery: e.target.value })}
-                      className="bg-white/5 border-white/10 text-xs rounded-xl text-foreground"
-                      placeholder="e.g. 5 days"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Card Description</label>
-                  <Textarea
-                    value={calibratingService.desc}
-                    onChange={(e) => setCalibratingService({ ...calibratingService, desc: e.target.value })}
-                    className="bg-white/5 border-white/10 text-xs rounded-xl min-h-[70px] text-foreground"
-                    placeholder="Marketing description for client vault..."
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Deliverable Features List</label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="text-3xs font-extrabold text-indigo-400 hover:text-indigo-300 gap-1 h-6 px-2 hover:bg-white/5 rounded-lg"
-                      onClick={() => setCalibratingService({
-                        ...calibratingService,
-                        features: [...(calibratingService.features || []), ""]
-                      })}
-                    >
-                      <ListPlus className="w-3 h-3" />
-                      ADD FEATURE ROW
-                    </Button>
-                  </div>
-
-                  <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1 border border-white/5 p-2 rounded-xl bg-white/[0.01]">
-                    {(calibratingService.features || []).map((feat, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <Input
-                          value={feat}
-                          onChange={(e) => {
-                            const newFeatures = [...calibratingService.features];
-                            newFeatures[idx] = e.target.value;
-                            setCalibratingService({ ...calibratingService, features: newFeatures });
-                          }}
-                          className="bg-white/5 border-white/10 text-2xs rounded-lg h-8 text-foreground"
-                          placeholder={`Feature line #${idx + 1}`}
-                          required
-                        />
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          className="w-8 h-8 rounded-lg hover:bg-rose-500/10 hover:text-rose-400 border border-white/5 flex-shrink-0"
-                          onClick={() => {
-                            const newFeatures = calibratingService.features.filter((_, i) => i !== idx);
-                            setCalibratingService({ ...calibratingService, features: newFeatures });
-                          }}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    ))}
-                    {(!calibratingService.features || calibratingService.features.length === 0) && (
-                      <p className="text-center text-muted-foreground py-4 text-3xs uppercase font-semibold">NO FEATURES DEFINED. CLICK ADD ROW ABOVE.</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex gap-2 pt-2 border-t border-white/5">
-                  <Button
-                    variant="ghost"
-                    className="flex-1 border border-white/10 text-xs"
-                    onClick={() => {
-                      setIsDialogOpen(false);
-                      setCalibratingService(null);
-                    }}
-                  >
-                    DISCARD
-                  </Button>
-                  <Button
-                    className="flex-1 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-400 font-bold text-xs"
-                    onClick={handleIgniteCalibration}
-                  >
-                    IGNITE CALIBRATION
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
     </motion.div>
   );
 }
+
 export { CATEGORY_COLORS };

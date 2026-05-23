@@ -12,6 +12,7 @@ import Clients from '@/pages/clients';
 import Inquiries from '@/pages/inquiries';
 import Financials from '@/pages/financials';
 import SettingsPage from '@/pages/settings';
+import { useToast } from '@/hooks/use-toast';
 import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut } from 'lucide-react';
 
 const queryClient = new QueryClient();
@@ -340,6 +341,31 @@ function App() {
     return defaultServices;
   });
   const services = servicesList;
+  const { toast } = useToast();
+  const [calibratingService, setCalibratingService] = useState(null);
+  const [isCalibrationModalOpen, setIsCalibrationModalOpen] = useState(false);
+
+  const handleOpenCalibrate = (s) => {
+    setCalibratingService({ ...s, features: s.features ? [...s.features] : [] });
+    setIsCalibrationModalOpen(true);
+  };
+
+  const handleIgniteCalibration = () => {
+    if (!calibratingService) return;
+
+    // Save update to state and localStorage
+    const nextList = servicesList.map(s => s.id === calibratingService.id ? calibratingService : s);
+    setServicesList(nextList);
+    localStorage.setItem("netra_services", JSON.stringify(nextList));
+
+    toast({
+      title: "Service Calibrated Successfully",
+      description: `Updated config for: ${calibratingService.title}`
+    });
+
+    setIsCalibrationModalOpen(false);
+    setCalibratingService(null);
+  };
 
   const [editingService, setEditingService] = useState(null);
   const [settingsSearch, setSettingsSearch] = useState("");
@@ -2415,7 +2441,7 @@ function App() {
                     {activeAdminModule === "SETTINGS" && (
                       <SettingsPage
                         servicesList={servicesList}
-                        setServicesList={setServicesList}
+                        onOpenCalibrate={handleOpenCalibrate}
                       />
                     )}
                   </div>
@@ -3397,6 +3423,177 @@ function App() {
                   </>
                 );
               })()}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isCalibrationModalOpen && calibratingService && (
+          <div 
+            className="modal-overlay" 
+            onClick={() => { setIsCalibrationModalOpen(false); setCalibratingService(null); }}
+          >
+            <motion.div 
+              className="calibration-editor-modal"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="calibration-modal-header">
+                <h2>CALIBRATE: <span>{calibratingService.title}</span></h2>
+                <p>System ID: SC-{calibratingService.id.toString().padStart(3, '0')} | Modify parameters for local persistent storage</p>
+              </div>
+
+              <div className="calibration-modal-body">
+                <div className="calibration-form-grid">
+                  <div className="calibration-form-row">
+                    <div className="calibration-input-group">
+                      <label>Card Title</label>
+                      <input 
+                        type="text" 
+                        value={calibratingService.title} 
+                        onChange={e => setCalibratingService({ ...calibratingService, title: e.target.value })} 
+                        placeholder="Service title"
+                        required
+                      />
+                    </div>
+                    <div className="calibration-input-group">
+                      <label>Icon / Emoji</label>
+                      <input 
+                        type="text" 
+                        value={calibratingService.icon} 
+                        onChange={e => setCalibratingService({ ...calibratingService, icon: e.target.value })} 
+                        placeholder="🎨, 📖, etc."
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="calibration-form-row">
+                    <div className="calibration-input-group">
+                      <label>Tag / Category</label>
+                      <select 
+                        value={calibratingService.tag} 
+                        onChange={e => setCalibratingService({ ...calibratingService, tag: e.target.value })}
+                        required
+                        className="bg-[#0a0f1e] text-white border border-white/10 rounded p-2"
+                      >
+                        <option value="BRANDING">BRANDING</option>
+                        <option value="PRINT">PRINT</option>
+                        <option value="DIGITAL">DIGITAL</option>
+                        <option value="VIDEO">VIDEO</option>
+                        <option value="EVENT">EVENT</option>
+                        <option value="COMMERCIAL">COMMERCIAL</option>
+                      </select>
+                    </div>
+                    <div className="calibration-form-row" style={{ gap: '0.5rem', gridTemplateColumns: '1fr 1fr' }}>
+                      <div className="calibration-input-group">
+                        <label>Price</label>
+                        <input 
+                          type="text" 
+                          value={calibratingService.price} 
+                          onChange={e => setCalibratingService({ ...calibratingService, price: e.target.value })} 
+                          placeholder="₹ Price"
+                          required
+                        />
+                      </div>
+                      <div className="calibration-input-group">
+                        <label>Delivery Time</label>
+                        <input 
+                          type="text" 
+                          value={calibratingService.delivery} 
+                          onChange={e => setCalibratingService({ ...calibratingService, delivery: e.target.value })} 
+                          placeholder="e.g. 5 days"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="calibration-input-group">
+                    <label>Card Description</label>
+                    <textarea 
+                      value={calibratingService.desc} 
+                      onChange={e => setCalibratingService({ ...calibratingService, desc: e.target.value })} 
+                      placeholder="Brief marketing narrative for this card"
+                      required
+                      style={{ minHeight: '80px', resize: 'vertical' }}
+                    />
+                  </div>
+
+                  <div>
+                    <div className="features-title-row">
+                      <label>Deliverable Features List</label>
+                      <button 
+                        type="button" 
+                        className="add-feature-inline-btn"
+                        onClick={() => setCalibratingService({
+                          ...calibratingService,
+                          features: [...(calibratingService.features || []), ""]
+                        })}
+                      >
+                        + ADD FEATURE ROW
+                      </button>
+                    </div>
+                    
+                    <div className="features-editor-list">
+                      {(calibratingService.features || []).map((feat, index) => (
+                        <div key={index} className="feature-input-row">
+                          <input 
+                            type="text" 
+                            value={feat} 
+                            onChange={e => {
+                              const newFeats = [...calibratingService.features];
+                              newFeats[index] = e.target.value;
+                              setCalibratingService({ ...calibratingService, features: newFeats });
+                            }} 
+                            placeholder={`Feature line #${index + 1}`}
+                            required
+                          />
+                          <button 
+                            type="button" 
+                            className="delete-feature-btn"
+                            onClick={() => {
+                              const newFeats = calibratingService.features.filter((_, idx) => idx !== index);
+                              setCalibratingService({ ...calibratingService, features: newFeats });
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                      {(!calibratingService.features || calibratingService.features.length === 0) && (
+                        <p style={{ margin: '1rem 0', color: '#606060', fontSize: '0.8rem', textAlign: 'center', fontFamily: 'Poppins' }}>
+                          No features defined. Click add feature row above.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="calibration-modal-footer" style={{ padding: '1rem 2rem 1.8rem 2rem', borderTop: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button 
+                  type="button" 
+                  className="calibration-btn-secondary"
+                  onClick={() => {
+                    setIsCalibrationModalOpen(false);
+                    setCalibratingService(null);
+                  }}
+                >
+                  DISCARD
+                </button>
+                <button 
+                  type="button" 
+                  className="calibration-btn-primary"
+                  onClick={handleIgniteCalibration}
+                >
+                  IGNITE CALIBRATION
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
