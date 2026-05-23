@@ -12,6 +12,7 @@ interface Client {
   address: string;
   status: string;
   joinedDate?: string;
+  gst?: string;
 }
 
 interface ClientsProps {
@@ -163,6 +164,13 @@ export default function Clients({
                     <div className="flex items-center gap-2">
                       <Calendar className="w-3.5 h-3.5 text-amber-400" />
                       <span>Joined {client.joinedDate}</span>
+                    </div>
+                  )}
+                  {client.gst && (
+                    <div className="flex items-center gap-2 mt-1 pt-1 border-t border-white/5">
+                      <span className="client-gst-badge px-2 py-0.5 text-[9px] font-extrabold rounded bg-[#00d4ff]/10 text-[#00d4ff] border border-[#00d4ff]/20 uppercase tracking-widest">
+                        GST: {client.gst}
+                      </span>
                     </div>
                   )}
                 </div>

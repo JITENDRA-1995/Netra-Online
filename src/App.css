@@ -5865,3 +5865,100 @@ input[type="number"] {
   margin-bottom: 2rem;
 }
 
+/* Premium Floating Glassmorphism Actions Panel */
+.invoice-actions-panel {
+  position: fixed;
+  top: 50%;
+  right: 40px;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(8, 12, 22, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  box-shadow: 0 10px 40px rgba(0, 229, 255, 0.15), inset 0 0 25px rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 24px;
+  width: 220px;
+  z-index: 10500;
+  box-sizing: border-box;
+}
+
+.invoice-actions-panel .action-btn {
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 6px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  margin: 0;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.invoice-actions-panel .btn-pdf {
+  background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
+  box-shadow: 0 4px 15px rgba(211, 47, 47, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.invoice-actions-panel .btn-pdf:hover {
+  background: linear-gradient(135deg, #f44336 0%, #c62828 100%);
+  box-shadow: 0 6px 22px rgba(211, 47, 47, 0.65);
+  transform: translateY(-2px);
+}
+
+.invoice-actions-panel .btn-whatsapp {
+  background: linear-gradient(135deg, #128c7e 0%, #075e54 100%);
+  box-shadow: 0 4px 15px rgba(18, 140, 126, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.invoice-actions-panel .btn-whatsapp:hover {
+  background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+  box-shadow: 0 6px 22px rgba(37, 211, 102, 0.65);
+  transform: translateY(-2px);
+}
+
+.invoice-actions-panel .btn-close {
+  background: linear-gradient(135deg, #374151 0%, #111827 100%);
+  box-shadow: 0 4px 15px rgba(55, 65, 81, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.invoice-actions-panel .btn-close:hover {
+  background: linear-gradient(135deg, #4b5563 0%, #1f2937 100%);
+  box-shadow: 0 6px 22px rgba(55, 65, 81, 0.65);
+  transform: translateY(-2px);
+}
+
+/* Responsiveness helper for actions panel */
+@media (max-width: 1200px) {
+  .invoice-actions-panel {
+    position: static;
+    transform: none;
+    width: 100%;
+    margin: 30px auto 0;
+    flex-direction: row;
+    justify-content: center;
+    gap: 15px;
+    background: rgba(8, 12, 22, 0.9);
+  }
+  .invoice-actions-panel .action-btn {
+    width: auto;
+    flex: 1;
+    max-width: 200px;
+  }
+}
+

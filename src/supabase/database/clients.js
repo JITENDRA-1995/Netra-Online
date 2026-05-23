@@ -26,7 +26,8 @@ export const createClientProfile = async (clientData) => {
         phone: clientData.phone,
         address: clientData.address,
         access_key: clientData.accessKey || clientData.access_key,
-        status: clientData.status || 'Active'
+        status: clientData.status || 'Active',
+        gst: clientData.gst || null
       }
     ])
     .select()
@@ -63,7 +64,8 @@ export const updateClientProfile = async (clientId, updates) => {
       phone: updates.phone,
       address: updates.address,
       status: updates.status,
-      access_key: updates.accessKey || updates.access_key
+      access_key: updates.accessKey || updates.access_key,
+      gst: updates.gst || null
     })
     .eq('id', clientId)
     .select()

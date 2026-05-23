@@ -1634,6 +1634,7 @@ function App() {
           email: formData.get('email'),
           phone: formData.get('phone'),
           address: formData.get('address'),
+          gst: formData.get('gst') || '',
           status: selectedClient.status || 'Active'
         };
         let updatedClient;
@@ -1659,6 +1660,7 @@ function App() {
           email: formData.get('email'),
           phone: formData.get('phone'),
           address: formData.get('address'),
+          gst: formData.get('gst') || '',
           status: 'Active',
           accessKey: randomAccessKey
         };
@@ -2472,6 +2474,9 @@ function App() {
 
                     {activeAdminModule === "PROJECTS" && (
                       <Projects 
+                        projects={ignitionQueue}
+                        setProjects={setIgnitionQueue}
+                        clients={clients}
                         onOpenIgnitionModal={() => { setPrefillData(null); setIsIgnitionModalOpen(true); }}
                       />
                     )}
@@ -2698,6 +2703,13 @@ function App() {
                               <div className="input-group">
                                 <label>Billing Address</label>
                                 <input type="text" name="address" defaultValue={selectedClient?.address} placeholder="Physical location for records" required />
+                              </div>
+                            </div>
+
+                            <div className="form-row">
+                              <div className="input-group" style={{ width: '100%' }}>
+                                <label>GST Number (Optional)</label>
+                                <input type="text" name="gst" defaultValue={selectedClient?.gst} placeholder="22AAAAA0000A1Z5" />
                               </div>
                             </div>
 
@@ -3298,14 +3310,11 @@ function App() {
                         color: '#fff', position: 'relative'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '20px', zIndex: 2 }}>
-                           <svg viewBox="0 0 100 125" style={{ width: '44px', height: '55px', flexShrink: 0, filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.35))' }}>
-                             {/* Red square background with subtle rounded corners and clean white stroke */}
-                             <rect x="0" y="0" width="100" height="100" fill="#d32f2f" stroke="#ffffff" strokeWidth="5" rx="6" />
-                             {/* White diamond in center */}
-                             <polygon points="50,20 80,50 50,80 20,50" fill="#ffffff" />
-                             {/* White bar at the bottom */}
-                             <rect x="0" y="112" width="100" height="13" fill="#ffffff" rx="2" />
-                           </svg>
+                           <img 
+                             src="/logo.png" 
+                             alt="Netra Logo" 
+                             style={{ width: '48px', height: '48px', objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.35))' }} 
+                           />
                            <div style={{ display: 'flex', flexDirection: 'column' }}>
                              <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '900', fontFamily: 'Urbanist, sans-serif', letterSpacing: '1px' }}>Netra Graphics & Designing</h1>
                              <div style={{ display: 'flex', gap: '15px', fontSize: '0.65rem', opacity: 0.9, marginTop: '3px' }}>
@@ -3495,35 +3504,43 @@ function App() {
                 return (
                   <>
                     {pageRenders}
-                    <div className="no-print" style={{ position: 'fixed', bottom: '30px', right: '30px', display: 'flex', gap: '15px', zIndex: 1000 }}>
+                    <div className="no-print invoice-actions-panel">
                       <button 
-                        className="ignite-submit-btn" 
-                        style={{ margin: 0, background: '#d32f2f', color: '#fff', padding: '12px 25px', boxShadow: '0 5px 20px rgba(211,47,47,0.4)' }}
+                        className="action-btn btn-pdf" 
                         onClick={() => downloadMultiPageInvoicePDF(invoiceProject, stableInvoiceNo)}
                       >
-                        DOWNLOAD PDF
+                        Download PDF
                       </button>
                       <button 
-                        className="ignite-submit-btn" 
-                        style={{ margin: 0, background: '#25D366', color: '#fff', padding: '12px 25px', boxShadow: '0 5px 20px rgba(37,211,102,0.4)' }}
+                        className="action-btn btn-whatsapp" 
                         onClick={() => {
                           saveInvoiceToVault(invoiceProject, stableInvoiceNo);
                           const msg = `Namaste! Your Tax Invoice (${stableInvoiceNo}) from Netra Graphics is ready. Amount: ₹${(parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0)).toLocaleString()}. Thank you!`;
-                          window.open(`https://wa.me/91${invoiceProject.phone}?text=${encodeURIComponent(msg)}`, '_blank');
+                          
+                          // Look up client phone robustly
+                          const rawPhone = invoiceProject.phone || (invoiceProject.client && invoiceProject.client.phone) || (() => {
+                            const c = clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase());
+                            return c ? c.phone : '';
+                          })();
+                          
+                          // Clean phone and prepend country code
+                          const cleanedPhone = rawPhone.replace(/\D/g, '');
+                          const finalPhone = cleanedPhone.length === 10 ? '91' + cleanedPhone : cleanedPhone;
+                          
+                          window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, '_blank');
                         }}
                       >
-                        SEND VIA WHATSAPP
+                        Send via WhatsApp
                       </button>
                       <button 
-                        className="ignite-submit-btn" 
-                        style={{ margin: 0, background: '#444', color: '#fff', padding: '12px 25px' }}
+                        className="action-btn btn-close" 
                         onClick={() => {
                           setIsInvoicePreviewOpen(false);
                           setInvoiceProject(null);
                           setSelectedBatchProjects([]);
                         }}
                       >
-                        CLOSE PREVIEW
+                        Close Preview
                       </button>
                     </div>
                   </>
