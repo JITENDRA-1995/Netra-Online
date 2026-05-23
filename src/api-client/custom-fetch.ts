@@ -684,6 +684,80 @@ async function handleMockRequest(url: string, options: any): Promise<any> {
     return { success: true };
   }
 
+  // 13. GET /api/invoices
+  if (cleanUrl.endsWith("/api/invoices") && method === "GET") {
+    return db.invoices;
+  }
+
+  // 14. POST /api/invoices
+  if (cleanUrl.endsWith("/api/invoices") && method === "POST") {
+    const input = JSON.parse(options.body);
+    const client = db.clients.find((c: any) => c.id === Number(input.clientId));
+    const project = db.projects.find((p: any) => p.id === Number(input.projectId));
+    const nextNum = db.invoices.length > 0 ? Math.max(...db.invoices.map((i: any) => {
+      const match = i.invoiceNumber.match(/\d+/);
+      return match ? parseInt(match[0], 10) : 0;
+    })) + 1 : 1;
+    const newInvoice = {
+      id: db.invoices.length > 0 ? Math.max(...db.invoices.map((i: any) => i.id)) + 1 : 1,
+      invoiceNumber: `INV-${String(nextNum).padStart(4, '0')}`,
+      clientId: Number(input.clientId),
+      clientName: client ? client.company : "Unknown",
+      projectId: input.projectId ? Number(input.projectId) : null,
+      projectName: project ? project.name : null,
+      amount: Number(input.amount),
+      status: input.status || "draft",
+      dueDate: input.dueDate,
+      paidAt: input.status === "paid" ? new Date().toISOString().split("T")[0] : null,
+      createdAt: new Date().toISOString()
+    };
+    db.invoices.push(newInvoice);
+    if (newInvoice.status === "paid" && client) {
+      client.totalRevenue = Number(client.totalRevenue || 0) + Number(input.amount);
+    }
+    // Add activity log
+    db.activity.unshift({
+      id: db.activity.length > 0 ? Math.max(...db.activity.map((a: any) => a.id)) + 1 : 1,
+      type: "invoice_sent",
+      description: `Invoice ${newInvoice.invoiceNumber} created for ${newInvoice.clientName}`,
+      entityType: "invoice",
+      entityId: newInvoice.id,
+      createdAt: new Date().toISOString()
+    });
+    save();
+    return newInvoice;
+  }
+
+  // 15. PATCH /api/invoices/:id
+  if (/\/api\/invoices\/\d+$/.test(cleanUrl) && method === "PATCH") {
+    const id = Number(cleanUrl.split("/").pop());
+    const input = JSON.parse(options.body);
+    const invoiceIdx = db.invoices.findIndex((i: any) => i.id === id);
+    if (invoiceIdx !== -1) {
+      const oldInvoice = db.invoices[invoiceIdx];
+      db.invoices[invoiceIdx] = { ...oldInvoice, ...input };
+      
+      // If status changed to paid, update client total revenue
+      if (input.status === "paid" && oldInvoice.status !== "paid") {
+        const client = db.clients.find((c: any) => c.id === oldInvoice.clientId);
+        if (client) {
+          client.totalRevenue = Number(client.totalRevenue || 0) + Number(oldInvoice.amount);
+        }
+        // Add activity
+        db.activity.unshift({
+          id: db.activity.length > 0 ? Math.max(...db.activity.map((a: any) => a.id)) + 1 : 1,
+          type: "invoice_paid",
+          description: `Invoice ${oldInvoice.invoiceNumber} marked as paid`,
+          entityType: "invoice",
+          entityId: oldInvoice.id,
+          createdAt: new Date().toISOString()
+        });
+      }
+      save();
+      return db.invoices[invoiceIdx];
+    }
+  }
+
   return null;
 }
 
