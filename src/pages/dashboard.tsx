@@ -50,23 +50,31 @@ const ACTIVITY_COLORS: Record<string, string> = {
 };
 
 function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; prefix?: string; suffix?: string }) {
+  const numValue = Number(value);
   const [display, setDisplay] = useState(0);
+
   useEffect(() => {
+    if (isNaN(numValue) || !isFinite(numValue) || numValue <= 0) {
+      setDisplay(isNaN(numValue) ? 0 : numValue);
+      return;
+    }
+
     const duration = 1200;
     const steps = 60;
-    const increment = value / steps;
+    const increment = numValue / steps;
     let current = 0;
     const timer = setInterval(() => {
       current += increment;
-      if (current >= value) {
-        setDisplay(value);
+      if (current >= numValue) {
+        setDisplay(numValue);
         clearInterval(timer);
       } else {
         setDisplay(Math.floor(current));
       }
     }, duration / steps);
     return () => clearInterval(timer);
-  }, [value]);
+  }, [numValue]);
+
   return <span>{prefix}{display.toLocaleString()}{suffix}</span>;
 }
 
