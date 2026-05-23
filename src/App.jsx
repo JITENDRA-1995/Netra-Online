@@ -637,26 +637,36 @@ function App() {
       createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
     }
   ]);
-  const [clients, setClients] = useState([
-    {
-      id: 10001,
-      name: "Aura Boutique",
-      email: "aura.boutique@gmail.com",
-      phone: "9876543210",
-      address: "M.G. Road, Ahmedabad, 380001",
-      status: 'Active',
-      joinedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toLocaleDateString()
-    },
-    {
-      id: 10002,
-      name: "Apex Cybertech",
-      email: "info@apexcyber.tech",
-      phone: "9988776655",
-      address: "Cyber City, Bangalore, 560001",
-      status: 'Active',
-      joinedDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toLocaleDateString()
+  const [clients, setClients] = useState(() => {
+    const saved = localStorage.getItem('netra_clients');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved clients:", e);
+      }
     }
-  ]);
+    return [
+      {
+        id: 10001,
+        name: "Aura Boutique",
+        email: "aura.boutique@gmail.com",
+        phone: "9876543210",
+        address: "M.G. Road, Ahmedabad, 380001",
+        status: 'Active',
+        joinedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toLocaleDateString()
+      },
+      {
+        id: 10002,
+        name: "Apex Cybertech",
+        email: "info@apexcyber.tech",
+        phone: "9988776655",
+        address: "Cyber City, Bangalore, 560001",
+        status: 'Active',
+        joinedDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toLocaleDateString()
+      }
+    ];
+  });
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [clientViewMode, setClientViewMode] = useState("LIST"); // LIST, VIEW
@@ -712,13 +722,41 @@ function App() {
     setTimeout(() => setBellPulse(false), 2000);
   };
   
+  const [readFlames, setReadFlames] = useState(() => {
+    const saved = localStorage.getItem("netra_read_flames");
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const sparks = inquiries.filter(q => q.status === "New Spark");
   const flames = ignitionQueue.filter(q => {
     const deadline = new Date(q.deadline);
     const now = new Date();
     const diff = deadline - now;
-    return diff > 0 && diff <= 24 * 60 * 60 * 1000;
+    return diff > 0 && diff <= 24 * 60 * 60 * 1000 && !readFlames.includes(q.id);
   });
+
+  const markInquiryAsRead = async (id) => {
+    try {
+      try {
+        await supabase.from('inquiries').update({ status: 'Read' }).eq('id', id);
+      } catch (dbErr) {
+        console.warn("Supabase update failed, falling back to local memory:", dbErr);
+      }
+      setInquiries(prev => prev.map(inq => inq.id === id ? { ...inq, status: 'Read' } : inq));
+      toast({ title: "Inquiry marked as read" });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const markFlameAsRead = (projectId) => {
+    setReadFlames(prev => {
+      const next = [...prev, projectId];
+      localStorage.setItem("netra_read_flames", JSON.stringify(next));
+      return next;
+    });
+    toast({ title: "Alert acknowledged" });
+  };
 
   const calculateDaysRemaining = (deadline) => {
     const diff = new Date(deadline) - new Date();
@@ -1024,7 +1062,7 @@ function App() {
   }, [ignitionQueue, monthlyTarget]);
 
   // --- CASHBOOK SYSTEM ---
-  const [financialTab, setFinancialTab] = useState("LEDGER"); // LEDGER, CASHBOOK
+  const [financialTab, setFinancialTab] = useState("PROJECTS"); // PROJECTS, CASHBOOK, INVOICES
   const [isCashbookEditModalOpen, setIsCashbookEditModalOpen] = useState(false);
   const [selectedCashbookEntry, setSelectedCashbookEntry] = useState(null);
   const [customPaymentPrompt, setCustomPaymentPrompt] = useState(null);
@@ -1598,8 +1636,22 @@ function App() {
           address: formData.get('address'),
           status: selectedClient.status || 'Active'
         };
-        const updatedClient = await updateClientProfile(selectedClient.id, clientData);
-        setClients(prev => prev.map(c => c.id === selectedClient.id ? updatedClient : c));
+        let updatedClient;
+        try {
+          updatedClient = await updateClientProfile(selectedClient.id, clientData);
+        } catch (dbErr) {
+          console.warn("Supabase update failed, falling back to local memory:", dbErr);
+          updatedClient = {
+            ...selectedClient,
+            ...clientData
+          };
+        }
+        setClients(prev => {
+          const next = prev.map(c => c.id === selectedClient.id ? updatedClient : c);
+          localStorage.setItem("netra_clients", JSON.stringify(next));
+          return next;
+        });
+        toast({ title: "Client Updated Successfully", description: `Updated visionary: ${clientData.name}` });
       } else {
         const randomAccessKey = Math.random().toString(36).substring(2, 8).toUpperCase();
         const clientData = {
@@ -1610,12 +1662,27 @@ function App() {
           status: 'Active',
           accessKey: randomAccessKey
         };
-        const newClient = await createClientProfile(clientData);
-        setClients(prev => [...prev, newClient]);
+        let newClient;
+        try {
+          newClient = await createClientProfile(clientData);
+        } catch (dbErr) {
+          console.warn("Supabase insert failed, falling back to local memory:", dbErr);
+          newClient = {
+            id: Date.now(),
+            ...clientData,
+            joinedDate: new Date().toLocaleDateString()
+          };
+        }
+        setClients(prev => {
+          const next = [...prev, newClient];
+          localStorage.setItem("netra_clients", JSON.stringify(next));
+          return next;
+        });
+        toast({ title: "Client Registered Successfully", description: `Onboarded visionary: ${clientData.name}` });
       }
     } catch (err) {
-      console.error("Failed to save client to Supabase:", err);
-      alert("Failed to save client record in database.");
+      console.error("Failed to save client:", err);
+      alert("Failed to save client record.");
     }
     
     setIsClientModalOpen(false);
@@ -1625,12 +1692,21 @@ function App() {
   const deleteClient = async (id) => {
     if (window.confirm("ARE YOU SURE YOU WANT TO EXTINGUISH THIS CLIENT RECORD?")) {
       try {
-        const { error } = await supabase.from('clients').delete().eq('id', id);
-        if (error) throw error;
-        setClients(prev => prev.filter(c => c.id !== id));
+        try {
+          const { error } = await supabase.from('clients').delete().eq('id', id);
+          if (error) throw error;
+        } catch (dbErr) {
+          console.warn("Supabase delete failed, falling back to local memory:", dbErr);
+        }
+        setClients(prev => {
+          const next = prev.filter(c => c.id !== id);
+          localStorage.setItem("netra_clients", JSON.stringify(next));
+          return next;
+        });
+        toast({ title: "Client Deleted Successfully" });
       } catch (err) {
-        console.error("Failed to delete client from Supabase:", err);
-        alert("Failed to delete client record from database.");
+        console.error("Failed to delete client:", err);
+        alert("Failed to delete client record.");
       }
     }
   };
@@ -2395,7 +2471,9 @@ function App() {
                     )}
 
                     {activeAdminModule === "PROJECTS" && (
-                      <Projects />
+                      <Projects 
+                        onOpenIgnitionModal={() => { setPrefillData(null); setIsIgnitionModalOpen(true); }}
+                      />
                     )}
 
                     {activeAdminModule === "INQUIRIES" && (
@@ -2408,7 +2486,13 @@ function App() {
                     )}
 
                     {activeAdminModule === "CLIENTS" && (
-                      <Clients />
+                      <Clients 
+                        clients={clients}
+                        ignitionQueue={ignitionQueue}
+                        onOpenCreateClient={() => { setSelectedClient(null); setIsClientModalOpen(true); }}
+                        onOpenEditClient={(client) => { setSelectedClient(client); setIsClientModalOpen(true); }}
+                        onDeleteClient={deleteClient}
+                      />
                     )}
 
                     {activeAdminModule === "FINANCIALS" && (
@@ -2952,16 +3036,27 @@ function App() {
                 {notifTab === 'SPARKS' ? (
                   <div className="notif-list">
                     {sparks.length > 0 ? sparks.map(s => (
-                      <div key={s.id} className="notif-card spark" onClick={() => {
+                      <div key={s.id} className="notif-card spark flex justify-between items-center" onClick={() => {
                         setActiveAdminModule("INQUIRIES");
                         setIsAdminGridActive(true);
                         setIsNotificationOpen(false);
                       }}>
-                        <div className="notif-icon-box cyan">✦</div>
-                        <div className="notif-info">
-                          <p className="notif-msg">New inquiry from <strong>{s.name}</strong></p>
-                          <span className="notif-time">{s.date}</span>
+                        <div className="flex items-center gap-3">
+                          <div className="notif-icon-box cyan">✦</div>
+                          <div className="notif-info">
+                            <p className="notif-msg">New inquiry from <strong>{s.name}</strong></p>
+                            <span className="notif-time">{s.date}</span>
+                          </div>
                         </div>
+                        <button 
+                          className="text-3xs uppercase tracking-wider text-cyan-400 hover:text-cyan-300 font-extrabold px-2.5 py-1 rounded bg-cyan-400/10 border border-cyan-400/20 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            markInquiryAsRead(s.id);
+                          }}
+                        >
+                          MARK READ
+                        </button>
                       </div>
                     )) : (
                       <div className="empty-state">
@@ -2973,16 +3068,27 @@ function App() {
                 ) : (
                   <div className="notif-list">
                     {flames.length > 0 ? flames.map(f => (
-                      <div key={f.id} className="notif-card flame" onClick={() => {
+                      <div key={f.id} className="notif-card flame flex justify-between items-center" onClick={() => {
                         setActiveAdminModule("DASHBOARD");
                         setIsAdminGridActive(true);
                         setIsNotificationOpen(false);
                       }}>
-                        <div className="notif-icon-box orange">🔥</div>
-                        <div className="notif-info">
-                          <p className="notif-msg">Deadline approaching for <strong>{f.name}</strong></p>
-                          <span className="notif-time">Project Calibration Required within 24h</span>
+                        <div className="flex items-center gap-3">
+                          <div className="notif-icon-box orange">🔥</div>
+                          <div className="notif-info">
+                            <p className="notif-msg">Deadline approaching for <strong>{f.name}</strong></p>
+                            <span className="notif-time">Project Calibration Required within 24h</span>
+                          </div>
                         </div>
+                        <button 
+                          className="text-3xs uppercase tracking-wider text-orange-400 hover:text-orange-300 font-extrabold px-2.5 py-1 rounded bg-orange-400/10 border border-orange-400/20 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            markFlameAsRead(f.id);
+                          }}
+                        >
+                          DISMISS
+                        </button>
                       </div>
                     )) : (
                       <div className="empty-state">

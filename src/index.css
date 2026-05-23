@@ -198,4 +198,8 @@
   * {
     border-color: hsl(var(--border));
   }
+  select option {
+    background-color: #0c101d !important;
+    color: #ffffff !important;
+  }
 }

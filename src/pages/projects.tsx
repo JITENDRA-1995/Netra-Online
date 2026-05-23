@@ -62,7 +62,11 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.35 } },
 };
 
-export default function Projects() {
+interface ProjectsProps {
+  onOpenIgnitionModal: () => void;
+}
+
+export default function Projects({ onOpenIgnitionModal }: ProjectsProps) {
   const { data: projects, isLoading } = useListProjects();
   const { data: clients } = useListClients();
   const createProject = useCreateProject();
@@ -167,12 +171,12 @@ export default function Projects() {
           </p>
         </div>
         <Button
-          onClick={openCreate}
-          className="bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 gap-2"
+          onClick={onOpenIgnitionModal}
+          className="bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 gap-2 font-bold text-xs rounded-xl"
           data-testid="button-create-project"
         >
           <Plus className="w-4 h-4" />
-          New Project
+          START NEW IGNITION
         </Button>
       </motion.div>
 
