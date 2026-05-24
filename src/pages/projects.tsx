@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, FileText } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -56,6 +56,8 @@ interface ProjectsProps {
   setProjects?: React.Dispatch<React.SetStateAction<any[]>>;
   clients?: Client[];
   onOpenIgnitionModal: () => void;
+  setCustomPaymentPrompt?: (p: any) => void;
+  onDownloadInvoice?: (p: any) => void;
 }
 
 const containerVariants = {
@@ -71,7 +73,9 @@ export default function Projects({
   projects = [],
   setProjects = () => {},
   clients = [],
-  onOpenIgnitionModal
+  onOpenIgnitionModal,
+  setCustomPaymentPrompt,
+  onDownloadInvoice
 }: ProjectsProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -87,6 +91,9 @@ export default function Projects({
   const [formBudget, setFormBudget] = useState(0);
   const [formProgress, setFormProgress] = useState(0);
   const [formDeadline, setFormDeadline] = useState("");
+  const [formDiscountValue, setFormDiscountValue] = useState(0);
+  const [formDiscountType, setFormDiscountType] = useState<"rs" | "%">("rs");
+
 
   const filtered = projects.filter((p) => {
     const serviceName = p.service || p.name || "";
@@ -118,6 +125,8 @@ export default function Projects({
     setFormProgress(project.progress || 0);
     const deadlineStr = project.deadline ? project.deadline.split('T')[0] : "";
     setFormDeadline(deadlineStr);
+    setFormDiscountValue(parseFloat(project.discountValue) || parseFloat(project.discount) || 0);
+    setFormDiscountType(project.discountType || 'rs');
 
     setDialogOpen(true);
   }
@@ -128,6 +137,13 @@ export default function Projects({
       const budgetVal = formBudget;
       const statusFormatted = formStatus.charAt(0).toUpperCase() + formStatus.slice(1).replace("_", " ");
       
+      let discountAmt = 0;
+      if (formDiscountType === "%") {
+        discountAmt = (budgetVal * (formDiscountValue || 0)) / 100;
+      } else {
+        discountAmt = formDiscountValue || 0;
+      }
+
       const updatedProject = {
         ...editingProject,
         service: formName,
@@ -139,6 +155,10 @@ export default function Projects({
         budget: budgetVal,
         deadline: formDeadline,
         progress: formProgress,
+        discount: discountAmt,
+        discountValue: formDiscountValue.toString(),
+        discountType: formDiscountType,
+        discountPercent: formDiscountType === "%" ? formDiscountValue.toFixed(2) : ((formDiscountValue / budgetVal) * 100).toFixed(2),
       };
 
       try {
@@ -152,6 +172,9 @@ export default function Projects({
             quote: updatedProject.quote,
             deadline: updatedProject.deadline,
             progress: updatedProject.progress,
+            discount: updatedProject.discount,
+            discount_value: updatedProject.discountValue,
+            discount_type: updatedProject.discountType,
           })
           .eq("id", editingProject.id);
       } catch (err) {
@@ -161,6 +184,25 @@ export default function Projects({
       setProjects((prev) =>
         prev.map((p) => (p.id === editingProject.id ? updatedProject : p))
       );
+
+      // Trigger cashbook catch-up dialog if project is newly marked as Completed
+      if (statusFormatted === "Completed" && editingProject.status !== "Completed") {
+        if (setCustomPaymentPrompt) {
+          const discountVal = parseFloat(updatedProject.discount) || 0;
+          const adv = parseFloat(updatedProject.advanceAmount) || 0;
+          const finalQuote = budgetVal - discountVal;
+          const remainingAmt = finalQuote - adv;
+
+          setCustomPaymentPrompt({
+            p: updatedProject,
+            finalQuote: finalQuote,
+            defaultAmt: remainingAmt,
+            adv: adv,
+            paymentMode: 'UPI'
+          });
+        }
+      }
+
       setDialogOpen(false);
       toast({ title: "Project Calibration Saved", description: `Updated project: ${formName}` });
     }
@@ -294,6 +336,18 @@ export default function Projects({
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-extrabold text-foreground">₹{budgetVal.toLocaleString()}</span>
                   <div className="flex gap-1.5 opacity-80 hover:opacity-100 transition-opacity">
+                    {statusVal === "completed" && onDownloadInvoice && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="w-7 h-7 rounded-lg hover:bg-emerald-500/10 hover:text-emerald-400 border border-white/5"
+                        onClick={() => onDownloadInvoice(project)}
+                        title="Download Invoice"
+                        data-testid={`button-invoice-project-${project.id}`}
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
                     <Button
                       size="icon"
                       variant="ghost"
@@ -430,6 +484,41 @@ export default function Projects({
                 />
               </div>
             </div>
+            
+            <div className="border-t border-white/5 pt-3 mt-3 space-y-2">
+              <label className="text-3xs uppercase tracking-widest text-cyan-400 font-extrabold flex items-center gap-1.5">
+                <span>🎁</span> SPECIAL CONTRACT DISCOUNT
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Discount Value</label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      value={formDiscountValue}
+                      onChange={(e) => setFormDiscountValue(parseFloat(e.target.value) || 0)}
+                      className="bg-white/5 border-white/10 rounded-xl pr-10"
+                      placeholder="0"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-2xs text-muted-foreground font-bold">
+                      {formDiscountType === "rs" ? "₹" : "%"}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Discount Type</label>
+                  <select
+                    className="w-full h-10 px-3 bg-white/5 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 bg-[#0c101d]"
+                    value={formDiscountType}
+                    onChange={(e) => setFormDiscountType(e.target.value as 'rs' | '%')}
+                  >
+                    <option value="rs">Rupees (₹)</option>
+                    <option value="%">Percentage (%)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
             <div className="flex gap-2 pt-2">
               <Button type="button" variant="ghost" className="flex-1 border border-white/10 rounded-xl" onClick={() => setDialogOpen(false)}>Discard</Button>
               <Button type="submit" className="flex-1 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400 rounded-xl font-bold">Save Calibration</Button>

@@ -57,6 +57,7 @@ interface FinancialsProps {
   selectedVaultInvoices: any[];
   setSelectedVaultInvoices: React.Dispatch<React.SetStateAction<any[]>>;
   handleAddCashbookEntry: (e: any) => void;
+  handleMarkMilestonePaid?: (p: any, type: 'deposit' | 'retainer') => void;
 }
 
 const containerVariants = {
@@ -91,7 +92,8 @@ export default function Financials({
   setSelectedBatchProjects,
   selectedVaultInvoices,
   setSelectedVaultInvoices,
-  handleAddCashbookEntry
+  handleAddCashbookEntry,
+  handleMarkMilestonePaid
 }: FinancialsProps) {
   const { toast } = useToast();
   const [ledgerSearch, setLedgerSearch] = useState("");
@@ -311,20 +313,27 @@ export default function Financials({
                       />
                     </th>
                     <th className="p-4">Mission / Client</th>
-                    <th className="p-4 text-center">Financial Status</th>
-                    <th className="p-4 text-right">Calibration Quote</th>
-                    <th className="p-4 text-center">Target Date</th>
-                    <th className="p-4 text-right">Action</th>
+                    <th className="p-4 text-left">Milestone Billings (50/50 Split)</th>
+                    <th className="p-4 text-right">Target Value</th>
+                    <th className="p-4 text-center">Deadline</th>
+                    <th className="p-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {filteredProjects.length > 0 ? (
                     filteredProjects.map((p) => {
                       const baseQuote = p.quote || 0;
-                      const discountPct = parseFloat(p.discountPercent) || 0;
-                      const finalQuote = baseQuote - (baseQuote * discountPct / 100);
-                      const isPaid = p.paymentStatus === 'paid' || p.status === "Completed";
-                      const isPart = p.paymentStatus === 'part';
+                      const milestoneAmt = baseQuote * 0.5;
+
+                      // Check if deposit or retainer invoice exists in invoices array
+                      const hasDepositInvoice = invoices.some(inv => inv.projectId === p.id && (inv.invoiceNo?.includes('-DEP') || inv.clientName?.toLowerCase().includes('deposit') || inv.projectService?.toLowerCase().includes('deposit')));
+                      const hasRetainerInvoice = invoices.some(inv => inv.projectId === p.id && (inv.invoiceNo?.includes('-COM') || inv.clientName?.toLowerCase().includes('retainer') || inv.projectService?.toLowerCase().includes('retainer') || inv.projectService?.toLowerCase().includes('completion')));
+
+                      const depPaid = p.paymentStatus === 'paid' || p.paymentStatus === 'part' || p.advanceAmount >= milestoneAmt;
+                      const depInvoiced = hasDepositInvoice;
+
+                      const retPaid = p.paymentStatus === 'paid' || p.status === 'Completed';
+                      const retInvoiced = hasRetainerInvoice;
 
                       return (
                         <tr key={p.id} className="hover:bg-white/[0.01] transition-colors text-xs">
@@ -345,156 +354,127 @@ export default function Financials({
                               <span className="text-xs text-muted-foreground mt-0.5">{p.name}</span>
                             </div>
                           </td>
-                          <td className="p-4 text-center">
-                            <span className={`inline-block px-2.5 py-0.5 rounded-full text-3xs font-extrabold uppercase tracking-wider ${
-                              isPaid
-                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                : isPart
-                                ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
-                                : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                            }`}>
-                              {isPaid ? "PAID" : isPart ? "PART PAID" : "UNPAID"}
-                            </span>
+                          <td className="p-4 text-left">
+                            <div className="flex flex-col gap-1.5 items-start">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-3xs text-muted-foreground uppercase font-bold tracking-wider w-16">Deposit (50%):</span>
+                                {depPaid ? (
+                                  <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-3xs font-extrabold px-2 py-0">PAID</Badge>
+                                ) : depInvoiced ? (
+                                  <Badge className="bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-3xs font-extrabold px-2 py-0">INVOICED</Badge>
+                                ) : (
+                                  <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-3xs font-extrabold px-2 py-0">UNPAID</Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-3xs text-muted-foreground uppercase font-bold tracking-wider w-16">Retainer (50%):</span>
+                                {retPaid ? (
+                                  <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-3xs font-extrabold px-2 py-0">PAID</Badge>
+                                ) : retInvoiced ? (
+                                  <Badge className="bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-3xs font-extrabold px-2 py-0">INVOICED</Badge>
+                                ) : (
+                                  <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-3xs font-extrabold px-2 py-0">UNPAID</Badge>
+                                )}
+                              </div>
+                            </div>
                           </td>
                           <td className="p-4 text-right font-semibold text-foreground">
-                            <div>₹{p.quote?.toLocaleString()}</div>
-                            <div className="flex items-center gap-1 mt-1 justify-end">
-                              <span className="text-3xs text-muted-foreground uppercase">Disc:</span>
-                              <input
-                                type="number"
-                                className="w-14 h-5 px-1 bg-white/5 border border-white/10 rounded text-3xs text-right text-foreground outline-none focus:border-cyan-400"
-                                value={p.discountValue || ""}
-                                placeholder="0"
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setIgnitionQueue(prev => prev.map(proj =>
-                                    proj.id === p.id ? {
-                                      ...proj,
-                                      discountValue: val,
-                                      discountPercent: (proj.discountType === 'rs') ? ((parseFloat(val) || 0) / proj.quote * 100).toFixed(2) : parseFloat(val) || 0
-                                    } : proj
-                                  ));
-                                }}
-                              />
-                              <select
-                                className="h-5 bg-white/5 border border-white/10 rounded text-3xs text-foreground outline-none"
-                                value={p.discountType || "%"}
-                                onChange={(e) => {
-                                  const newType = e.target.value;
-                                  setIgnitionQueue(prev => prev.map(proj => {
-                                    if (proj.id === p.id) {
-                                      let newVal = proj.discountValue || 0;
-                                      let currentPercent = parseFloat(proj.discountPercent) || 0;
-                                      if (newType === 'rs' && proj.discountType !== 'rs') {
-                                        newVal = (currentPercent / 100) * proj.quote;
-                                      } else if (newType === '%' && proj.discountType === 'rs') {
-                                        newVal = currentPercent;
-                                      }
-                                      return {
-                                        ...proj,
-                                        discountType: newType,
-                                        discountValue: newVal ? parseFloat(String(newVal)).toFixed(2) : ''
-                                      };
-                                    }
-                                    return proj;
-                                  }));
-                                }}
-                              >
-                                <option value="%">%</option>
-                                <option value="rs">₹</option>
-                              </select>
-                            </div>
-                            {isPart && p.advanceAmount && (
-                              <div className="text-3xs text-cyan-400 mt-0.5">Adv: ₹{p.advanceAmount}</div>
-                            )}
+                            <div>₹{baseQuote.toLocaleString()}</div>
+                            <div className="text-3xs text-muted-foreground mt-0.5">₹{milestoneAmt.toLocaleString()} / milestone</div>
                           </td>
-                          <td className="p-4 text-center text-muted-foreground">{new Date(p.deadline).toLocaleDateString()}</td>
+                          <td className="p-4 text-center text-muted-foreground">
+                            {p.deadline ? new Date(p.deadline).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                          </td>
                           <td className="p-4">
                             <div className="flex items-center justify-end gap-2">
-                              <select
-                                className="h-8 bg-white/5 border border-white/10 rounded-lg text-xs px-2 text-foreground outline-none focus:border-cyan-400"
-                                value={p.paymentStatus || (p.status === "Completed" ? 'paid' : 'unpaid')}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (val === 'paid' && p.paymentStatus !== 'paid') {
-                                    const adv = parseFloat(p.advanceAmount) || 0;
-                                    const discountPercent = parseFloat(p.discountPercent) || 0;
-                                    const fQuote = baseQuote - (baseQuote * discountPercent / 100);
-                                    let amt = p.paymentStatus === 'part' ? (fQuote - adv) : fQuote;
-
-                                    setCustomPaymentPrompt({ p, finalQuote: fQuote, defaultAmt: amt, adv, paymentMode: 'UPI' });
-                                    e.target.value = p.paymentStatus || 'unpaid';
-                                    return;
-                                  } else if (val === 'unpaid' || val === 'part') {
-                                    setCashbookEntries(prev => {
-                                      const filtered = prev.filter(entry => entry.projectId !== p.id);
-                                      if (filtered.length !== prev.length) {
-                                        toast({ title: "Related cashbook entries removed" });
-                                      }
-                                      return filtered;
-                                    });
-                                  }
-
-                                  setIgnitionQueue(prev => prev.map(proj =>
-                                    proj.id === p.id ? {
-                                      ...proj,
-                                      paymentStatus: val,
-                                      status: val === 'paid' ? "Completed" : (proj.status === "Completed" ? "Pending" : proj.status)
-                                    } : proj
-                                  ));
-                                }}
-                              >
-                                <option value="unpaid">Unpaid</option>
-                                <option value="part">Part Payment</option>
-                                <option value="paid">Paid</option>
-                              </select>
-
-                              {isPart && (
-                                <div className="flex items-center gap-1">
-                                  <input
-                                    type="number"
-                                    className="w-14 h-8 px-2 bg-white/5 border border-white/10 rounded-lg text-xs text-foreground outline-none"
-                                    placeholder="Adv ₹"
-                                    value={p.advanceAmount || ''}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setIgnitionQueue(prev => prev.map(proj =>
-                                        proj.id === p.id ? { ...proj, advanceAmount: val } : proj
-                                      ));
-                                    }}
-                                  />
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="w-8 h-8 rounded-lg hover:bg-emerald-500/10 hover:text-emerald-400 border border-white/5"
-                                    title="Log Advance to Cashbook"
-                                    onClick={() => {
-                                      const adv = parseFloat(p.advanceAmount) || 0;
-                                      if (adv > 0) {
-                                        setCashbookEntries(prev => [...prev, {
-                                          id: Date.now(),
-                                          projectId: p.id,
-                                          date: new Date().toISOString().split('T')[0],
-                                          desc: `Advance: ${p.service} - ${p.name}`,
-                                          amount: adv,
-                                          type: "INCOME",
-                                          mode: "UPI",
-                                          category: "Project"
-                                        }]);
-                                        toast({ title: `Advance of ₹${adv} logged` });
-                                      }
-                                    }}
-                                  >
-                                    💰
-                                  </Button>
-                                </div>
+                              {/* Ignition Deposit Action Button */}
+                              {!depPaid && (
+                                <>
+                                  {!depInvoiced ? (
+                                    <Button
+                                      size="sm"
+                                      className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-extrabold text-3xs py-1 px-2.5 h-7 rounded-lg"
+                                      onClick={() => {
+                                        const depProject = {
+                                          ...p,
+                                          invoiceType: 'deposit',
+                                          quote: milestoneAmt,
+                                          discount: 0,
+                                          advanceAmount: 0,
+                                          service: `Ignition Deposit (50%) - ${p.service}`
+                                        };
+                                        setInvoiceProject(depProject);
+                                        setIsInvoicePreviewOpen(true);
+                                      }}
+                                    >
+                                      🔥 IGNITE DEPOSIT (50%)
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 font-extrabold text-3xs py-1 px-2.5 h-7 rounded-lg"
+                                      onClick={() => {
+                                        if (handleMarkMilestonePaid) {
+                                          handleMarkMilestonePaid(p, 'deposit');
+                                        }
+                                      }}
+                                    >
+                                      💰 MARK DEPOSIT PAID
+                                    </Button>
+                                  )}
+                                </>
                               )}
 
+                              {/* Delivery Retainer Action Button */}
+                              {depPaid && !retPaid && (
+                                <>
+                                  {!retInvoiced ? (
+                                    <Button
+                                      size="sm"
+                                      className="bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-400 font-extrabold text-3xs py-1 px-2.5 h-7 rounded-lg"
+                                      onClick={() => {
+                                        const retProject = {
+                                          ...p,
+                                          invoiceType: 'retainer',
+                                          quote: milestoneAmt,
+                                          discount: 0,
+                                          advanceAmount: 0,
+                                          service: `Delivery Retainer (50%) - ${p.service}`
+                                        };
+                                        setInvoiceProject(retProject);
+                                        setIsInvoicePreviewOpen(true);
+                                      }}
+                                    >
+                                      📄 INVOICE RETAINER (50%)
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 font-extrabold text-3xs py-1 px-2.5 h-7 rounded-lg"
+                                      onClick={() => {
+                                        if (handleMarkMilestonePaid) {
+                                          handleMarkMilestonePaid(p, 'retainer');
+                                        }
+                                      }}
+                                    >
+                                      🔥 COMPLETE & PAY
+                                    </Button>
+                                  )}
+                                </>
+                              )}
+
+                              {depPaid && retPaid && (
+                                <span className="text-3xs font-extrabold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 py-1.5 px-3 rounded-lg select-none">
+                                  ✓ MISSION SETTLED
+                                </span>
+                              )}
+
+                              {/* Standard billing preview / workspace trigger */}
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="w-8 h-8 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-400 border border-white/5"
-                                title="Generate Invoice"
+                                className="w-8 h-8 rounded-lg hover:bg-white/10 hover:text-white border border-white/5 ml-1"
+                                title="Open Custom Invoicing Workspace"
                                 onClick={() => {
                                   setInvoiceProject(p);
                                   setIsInvoicePreviewOpen(true);

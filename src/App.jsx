@@ -978,85 +978,422 @@ function App() {
   };
 
   const downloadInvoicePDF = async (p, invNo) => {
-    const input = document.querySelector('.invoice-paper');
-    if (!input) return;
-
+    // Save invoice record to vault in background
     saveInvoiceToVault(p, invNo);
 
-    // Hide actions before capturing
-    const actions = input.querySelector('.no-print');
-    if (actions) actions.style.display = 'none';
-
-    try {
-      const canvas = await html2canvas(input, {
-        scale: 3,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        logging: false
+    // Asynchronous image loader helper
+    const loadImage = (src) => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = src;
       });
-
-      if (actions) actions.style.display = 'flex';
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.8);
-      const pdf = new jsPDF('p', 'mm', 'a4');
-
-      const pageWidth = 210;
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pageWidth;
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-
-      const filename = `${p.name.replace(/\s+/g, '_')}_${invNo}.pdf`;
-      pdf.save(filename);
-    } catch (err) {
-      console.error("PDF Generation Error:", err);
-      if (actions) actions.style.display = 'flex';
-      alert("Failed to generate PDF. Please try again.");
-    }
-  };
-
-  const downloadMultiPageInvoicePDF = async (p, invNo) => {
-    const pageNodes = document.querySelectorAll('.invoice-page-unit');
-    if (!pageNodes.length) return;
-
-    saveInvoiceToVault(p, invNo);
-
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const actions = document.querySelector('.invoice-modal-overlay .no-print');
-    if (actions) actions.style.display = 'none';
+    };
 
     try {
-      window.scrollTo(0, 0);
-      for (let i = 0; i < pageNodes.length; i++) {
-        const canvas = await html2canvas(pageNodes[i], {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          logging: false,
-          windowWidth: 1000,
-          windowHeight: 1400,
-          scrollX: 0,
-          scrollY: 0
+      // Compile items array based on whether it is a batch project or a single project
+      const allItems = (p.items && p.items.length > 0)
+        ? p.items.map(item => ({
+          service: item.service,
+          quote: parseFloat(item.quote) || 0,
+          discount: parseFloat(item.discount || 0) || 0
+        }))
+        : [{
+          service: p.service,
+          quote: parseFloat(p.quote) || 0,
+          discount: parseFloat(p.discount || 0) || 0
+        }];
+
+      const discountVal = parseFloat(p.discount) || 0;
+      const advanceVal = parseFloat(p.advanceAmount) || 0;
+      const subtotalVal = allItems.reduce((sum, item) => sum + item.quote, 0);
+      const grandTotal = Math.max(0, subtotalVal - discountVal - advanceVal);
+
+      // Load Netra logo, UPI pay QR code, and Instagram QR code asynchronously
+      const [logoImg, qrImg, igQrImg] = await Promise.all([
+        loadImage('/logo.png'),
+        loadImage(`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=hiraparasavan989@okaxis&pn=Netra%20Graphics&am=${grandTotal}&cu=INR`),
+        loadImage('https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://instagram.com/HIRAPARASAVANPHOTOGRAPHER')
+      ]);
+
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const rowsPerPage = 6;
+      const pagesCount = Math.ceil(allItems.length / rowsPerPage) || 1;
+
+
+      for (let pageIdx = 0; pageIdx < pagesCount; pageIdx++) {
+        if (pageIdx > 0) pdf.addPage();
+
+        const pageItems = allItems.slice(pageIdx * rowsPerPage, (pageIdx + 1) * rowsPerPage);
+        const isLastPage = pageIdx === pagesCount - 1;
+
+        // --- DRAW BRUTE HEADER ---
+        // Red primary banner rectangle
+        pdf.setFillColor(211, 47, 47); // #d32f2f
+        pdf.rect(0, 0, 130, 32, 'F');
+
+        // Charcoal accent banner rectangle
+        pdf.setFillColor(34, 34, 34); // #222
+        pdf.rect(130, 0, 80, 32, 'F');
+
+        // Draw Netra branding logo
+        if (logoImg) {
+          pdf.addImage(logoImg, 'PNG', 12, 6, 20, 20);
+        } else {
+          // Self-healing clean vector fallback
+          pdf.setFillColor(255, 255, 255);
+          pdf.circle(22, 16, 8, 'F');
+          pdf.setTextColor(211, 47, 47);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(12);
+          pdf.text('N', 20.5, 19.5);
+        }
+
+        // Write Branding text
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(20);
+        pdf.text('NETRA GRAPHICS', 35, 16);
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8.5);
+        pdf.text('         +91 73590 93035   |            hiraparasavan989@gmail.com', 35, 22);
+
+        // Draw Premium Vector Green Phone handset (Green color #4CAF50 / rgb(76, 175, 80))
+        pdf.setDrawColor(76, 175, 80);
+        pdf.setFillColor(76, 175, 80);
+        pdf.setLineWidth(0.55);
+        pdf.line(35.8, 21.0, 36.4, 19.8);
+        pdf.line(36.4, 19.8, 37.6, 19.2);
+        pdf.circle(35.8, 21.0, 0.45, 'F');
+        pdf.circle(37.6, 19.2, 0.45, 'F');
+
+        // Draw Premium Vector Envelope Icon (White outline to stand out)
+        pdf.setDrawColor(255, 255, 255);
+        pdf.setLineWidth(0.35);
+        pdf.rect(80, 19.6, 3.2, 2.4, 'D');
+        pdf.line(80, 19.6, 81.6, 20.8);
+        pdf.line(83.2, 19.6, 81.6, 20.8);
+
+        // Write Invoice Header
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(18);
+        pdf.text('TAX INVOICE', 140, 16);
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8.5);
+        pdf.text('Mendarda-Sasan Road, Mendarda, 362260', 140, 22);
+
+        // --- CLIENT BILL-TO & INVOICE DETAILS ---
+        // Bill to section (Left Side)
+        pdf.setTextColor(136, 136, 136);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(8);
+        pdf.text('BILL TO', 15, 45);
+
+        pdf.setTextColor(0, 0, 0);
+        pdf.setFontSize(11);
+        pdf.text(p.name.toUpperCase(), 15, 51);
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(85, 85, 85);
+        const clientAddr = getClientAddress(p.name);
+        pdf.text(`AT: ${clientAddr}`, 15, 57);
+
+        // Render Client GST if it exists
+        const clientGST = (() => {
+          const c = clients.find(c => c.name.toLowerCase() === p.name.toLowerCase());
+          return c ? c.gst : '';
+        })();
+        if (clientGST) {
+          pdf.text(`GSTIN: ${clientGST}`, 15, 63);
+        }
+
+        // Details section (Right Side)
+        pdf.setTextColor(136, 136, 136);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(8);
+        pdf.text('INVOICE DETAILS', 140, 45);
+
+        pdf.setTextColor(0, 0, 0);
+        pdf.setFontSize(9.5);
+        pdf.text(`Invoice #: ${invNo}`, 140, 51);
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8.5);
+        pdf.text(`Issue Date: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`, 140, 57);
+
+        // --- DYNAMIC BACKGROUND WATERMARK ---
+        pdf.setTextColor(246, 246, 246);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(130);
+        pdf.text('N', 105, 145, { align: 'center', angle: 15 });
+
+        // --- SERVICE DETAILS TABLE ---
+        // Header grey rectangle
+        pdf.setFillColor(240, 240, 240);
+        pdf.rect(15, 75, 180, 8, 'F');
+
+        pdf.setTextColor(0, 0, 0);
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(8);
+        pdf.text('SERVICE DESCRIPTION', 18, 80);
+        pdf.text('QTY', 115, 80, { align: 'center' });
+        pdf.text('RATE', 135, 80, { align: 'right' });
+        pdf.text('DISC (%)', 160, 80, { align: 'center' });
+        pdf.text('TOTAL', 190, 80, { align: 'right' });
+
+        let currentY = 88;
+        pageItems.forEach((item, idx) => {
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(8.5);
+
+          // Red bullet point
+          pdf.setTextColor(211, 47, 47);
+          pdf.text('•', 18, currentY);
+
+          // Row details
+          pdf.setTextColor(0, 0, 0);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(item.service, 22, currentY);
+
+          pdf.setFont('helvetica', 'normal');
+          pdf.text('1', 115, currentY, { align: 'center' });
+          pdf.text(`Rs. ${item.quote.toLocaleString()}`, 135, currentY, { align: 'right' });
+
+          const discPercent = item.quote > 0 ? Math.round((item.discount / item.quote) * 100) : 0;
+          if (discPercent > 0) {
+            pdf.setTextColor(46, 125, 50); // green
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(`${discPercent}%`, 160, currentY, { align: 'center' });
+            pdf.setTextColor(0, 0, 0);
+            pdf.setFont('helvetica', 'normal');
+          } else {
+            pdf.text('-', 160, currentY, { align: 'center' });
+          }
+
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(`Rs. ${(item.quote - item.discount).toLocaleString()}`, 190, currentY, { align: 'right' });
+
+          // Thin border line below
+          pdf.setDrawColor(240, 240, 240);
+          pdf.setLineWidth(0.25);
+          pdf.line(15, currentY + 3.5, 195, currentY + 3.5);
+
+          currentY += 10;
         });
 
-        const imgData = canvas.toDataURL('image/jpeg', 0.85);
-        const pageWidth = 210;
-        const imgProps = pdf.getImageProperties(imgData);
-        const pdfWidth = pageWidth;
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        // Blanks loop to maintain table aspect ratio
+        const blankRowsCount = rowsPerPage - pageItems.length;
+        for (let bIdx = 0; bIdx < blankRowsCount; bIdx++) {
+          pdf.setDrawColor(252, 252, 252);
+          pdf.line(15, currentY + 3.5, 195, currentY + 3.5);
+          currentY += 10;
+        }
 
-        if (i > 0) pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        // --- TOTALS, QR CODE & PAYMENT BLOCK (LAST PAGE ONLY) ---
+        if (isLastPage) {
+          const totalsY = 160;
+
+          // Draw Payment Box container
+          pdf.setFillColor(248, 249, 250);
+          pdf.rect(15, totalsY, 105, 28, 'F');
+          pdf.setDrawColor(238, 238, 238);
+          pdf.setLineWidth(0.35);
+          pdf.rect(15, totalsY, 105, 28, 'D');
+
+          // UPI Pay QR Code
+          if (qrImg) {
+            pdf.addImage(qrImg, 'PNG', 17, totalsY + 2, 24, 24);
+          } else {
+            pdf.setDrawColor(220, 220, 220);
+            pdf.rect(17, totalsY + 2, 24, 24, 'D');
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(6.5);
+            pdf.setTextColor(150, 150, 150);
+            pdf.text('Scan UPI', 29, totalsY + 14, { align: 'center' });
+          }
+
+          // Bank Details Texts
+          pdf.setTextColor(84, 110, 122);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(7.5);
+          pdf.text('PAYMENT INSTRUCTIONS', 45, totalsY + 5.5);
+
+          // Draw Premium Vector Home/Bank icon (Gray-blue #546e7a)
+          pdf.setFillColor(84, 110, 122);
+          pdf.setDrawColor(84, 110, 122);
+          pdf.setLineWidth(0.25);
+          // Roof triangle
+          pdf.triangle(39.5, totalsY + 2.0, 37.5, totalsY + 3.7, 41.5, totalsY + 3.7, 'F');
+          // Body rect
+          pdf.rect(38.2, totalsY + 3.7, 2.6, 2.0, 'F');
+          // Tiny door cutout using background fill
+          pdf.setFillColor(248, 249, 250); // match payment box background
+          pdf.rect(39.1, totalsY + 4.5, 0.8, 1.2, 'F');
+
+          pdf.setTextColor(0, 0, 0);
+          pdf.setFontSize(7);
+          pdf.text('Bank Name: State Bank of India (SBI)', 45, totalsY + 10.5);
+          pdf.text('Account Name: Netra Graphics & Designing', 45, totalsY + 14.5);
+          pdf.text('Account Number: 20198798116', 45, totalsY + 18.5);
+          pdf.text('IFSC Code: SBIN0060152', 45, totalsY + 22.5);
+
+          // Price Calculation Block
+          const rightX = 195;
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(8.5);
+          pdf.setTextColor(102, 102, 102);
+
+          pdf.text('SUBTOTAL', 130, totalsY + 4);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(0, 0, 0);
+          pdf.text(`Rs. ${subtotalVal.toLocaleString()}.00`, rightX, totalsY + 4, { align: 'right' });
+
+          if (discountVal > 0) {
+            pdf.setFont('helvetica', 'normal');
+            pdf.setTextColor(102, 102, 102);
+            pdf.text('DISCOUNT', 130, totalsY + 10);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(211, 47, 47);
+            pdf.text(`-Rs. ${discountVal.toLocaleString()}.00`, rightX, totalsY + 10, { align: 'right' });
+          }
+
+          if (advanceVal > 0) {
+            pdf.setFont('helvetica', 'normal');
+            pdf.setTextColor(102, 102, 102);
+            pdf.text('ADVANCE PAID', 130, totalsY + 16);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(46, 125, 50);
+            pdf.text(`-Rs. ${advanceVal.toLocaleString()}.00`, rightX, totalsY + 16, { align: 'right' });
+          }
+
+          // Grand Total Highlighted banner
+          pdf.setFillColor(63, 81, 181); // Royal Blue #3f51b5
+          pdf.rect(130, totalsY + 20, 65, 10, 'F');
+
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(9.5);
+          pdf.text('GRAND TOTAL', 133, totalsY + 26.5);
+          pdf.text(`Rs. ${grandTotal.toLocaleString()}.00`, rightX - 2, totalsY + 26.5, { align: 'right' });
+
+          // Amount in Words accent bar
+          const wordsY = 193;
+          pdf.setFillColor(252, 252, 252);
+          pdf.rect(15, wordsY, 180, 9, 'F');
+          pdf.setFillColor(211, 47, 47); // Red border
+          pdf.rect(15, wordsY, 1.2, 9, 'F');
+
+          pdf.setTextColor(136, 136, 136);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(5.5);
+          pdf.text('AMOUNT IN WORDS', 18, wordsY + 3.2);
+
+          pdf.setTextColor(0, 0, 0);
+          pdf.setFontSize(7.5);
+          pdf.text(amountInWords(grandTotal), 18, wordsY + 7);
+
+          // Signatures Section
+          const sigY = 212;
+          pdf.setDrawColor(150, 150, 150);
+          pdf.setLineWidth(0.25);
+          pdf.line(15, sigY + 14, 55, sigY + 14);
+
+          pdf.setTextColor(102, 102, 102);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(7.5);
+          pdf.text("Receiver's Sign", 25, sigY + 18);
+
+          pdf.setTextColor(0, 0, 0);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(8.5);
+          pdf.text('For Netra Graphics & Designing', 135, sigY + 2);
+
+          pdf.setTextColor(153, 153, 153);
+          pdf.setFont('helvetica', 'italic');
+          pdf.setFontSize(6.5);
+          pdf.text('This is a computer generated invoice', 135, sigY + 14);
+          pdf.text('hence signatory not required.', 135, sigY + 17);
+
+          // Footer branding blocks
+          const footerY = 243;
+          const cardWidth = 56;
+          const cardHeight = 18;
+
+          // Instagram Block
+          pdf.setFillColor(255, 255, 255);
+          pdf.setDrawColor(240, 240, 240);
+          pdf.rect(15, footerY, cardWidth, cardHeight, 'FD');
+          if (igQrImg) {
+            pdf.addImage(igQrImg, 'PNG', 17, footerY + 2, 14, 14);
+          }
+          pdf.setTextColor(0, 0, 0);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(6.5);
+          pdf.text('Follow Us on Instagram', 34, footerY + 5.5);
+          pdf.setTextColor(102, 102, 102);
+          pdf.setFontSize(5);
+          pdf.text('@HIRAPARASAVANPHOTOGRAPHER', 34, footerY + 10.5);
+
+          // Quality block
+          pdf.rect(15 + cardWidth + 6, footerY, cardWidth, cardHeight, 'FD');
+          pdf.setTextColor(0, 0, 0);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(7);
+          pdf.text('Quality Assured Work', 15 + cardWidth + 10, footerY + 6);
+          pdf.setTextColor(102, 102, 102);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(5.5);
+          pdf.text('Every project is crafted with complete', 15 + cardWidth + 10, footerY + 10);
+          pdf.text('precision, pixel-accuracy and passion.', 15 + cardWidth + 10, footerY + 13);
+
+          // Gratitude block
+          pdf.rect(15 + (cardWidth * 2) + 12, footerY, cardWidth, cardHeight, 'FD');
+          pdf.setTextColor(0, 0, 0);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(7);
+          pdf.text('Thank You', 15 + (cardWidth * 2) + 16, footerY + 6);
+          pdf.setTextColor(102, 102, 102);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(5.5);
+          pdf.text('We sincerely value your collaboration,', 15 + (cardWidth * 2) + 16, footerY + 10);
+          pdf.text('trust, and business with Netra Empire.', 15 + (cardWidth * 2) + 16, footerY + 13);
+
+          pdf.setTextColor(187, 187, 187);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(7);
+          pdf.text(`Page ${pageIdx + 1} of ${pagesCount}`, 105, footerY + 23, { align: 'center' });
+
+        } else {
+          // Continued indicator
+          const footerY = 243;
+          pdf.setTextColor(187, 187, 187);
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(8.5);
+          pdf.text(`CONTINUED ON PAGE ${pageIdx + 2}...`, 105, footerY + 10, { align: 'center' });
+          pdf.setFontSize(7);
+          pdf.text(`Page ${pageIdx + 1} of ${pagesCount}`, 105, footerY + 23, { align: 'center' });
+        }
       }
-      if (actions) actions.style.display = 'flex';
-      pdf.save(`${p.name.replace(/\s+/g, '_')}_${invNo}.pdf`);
+
+      // Save PDF output
+      const filename = `${p.name.replace(/\s+/g, '_')}_${invNo}.pdf`;
+      pdf.save(filename);
+      toast({
+        title: "PDF Invoice Generated",
+        description: `Successfully compiled high-fidelity vector invoice ${invNo}`
+      });
     } catch (err) {
       console.error("PDF Generation Error:", err);
-      if (actions) actions.style.display = 'flex';
-      alert("Failed to generate PDF. Please try again.");
+      alert("Failed to generate vector PDF invoice. Please try again.");
     }
   };
+
+  const downloadMultiPageInvoicePDF = downloadInvoicePDF;
 
   // --- STABILITY FIXES ---
   useEffect(() => {
@@ -1163,10 +1500,25 @@ function App() {
   const [isCashbookEditModalOpen, setIsCashbookEditModalOpen] = useState(false);
   const [selectedCashbookEntry, setSelectedCashbookEntry] = useState(null);
   const [customPaymentPrompt, setCustomPaymentPrompt] = useState(null);
-  const [cashbookEntries, setCashbookEntries] = useState([
-    { id: 1, date: new Date().toISOString().split('T')[0], desc: "Adobe CC Subscription", amount: 4500, type: "EXPENSE", mode: "UPI", category: "Software" },
-    { id: 2, date: new Date().toISOString().split('T')[0], desc: "Studio Equipment Maintenance", amount: 2500, type: "EXPENSE", mode: "CASH", category: "Hardware" }
-  ]);
+  const [cashbookEntries, setCashbookEntries] = useState(() => {
+    const saved = localStorage.getItem('netra_cashbook');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse cashbook entries from localStorage:", e);
+      }
+    }
+    return [
+      { id: 1, date: new Date().toISOString().split('T')[0], desc: "Adobe CC Subscription", amount: 4500, type: "EXPENSE", mode: "UPI", category: "Software" },
+      { id: 2, date: new Date().toISOString().split('T')[0], desc: "Studio Equipment Maintenance", amount: 2500, type: "EXPENSE", mode: "CASH", category: "Hardware" }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('netra_cashbook', JSON.stringify(cashbookEntries));
+  }, [cashbookEntries]);
+
 
   const cashbookMetrics = useMemo(() => {
     let totalExpense = 0;
@@ -1482,8 +1834,24 @@ function App() {
       newStatus = "Completed";
     }
 
+    if (newStatus === "Completed" && project.status !== "Completed") {
+      const discountVal = parseFloat(project.discount) || 0;
+      const advanceVal = parseFloat(project.advanceAmount) || 0;
+      const finalQuote = parseFloat(project.quote) - discountVal;
+      const remainingAmt = Math.max(0, finalQuote - advanceVal);
+
+      setCustomPaymentPrompt({
+        p: project,
+        finalQuote: finalQuote,
+        defaultAmt: remainingAmt,
+        adv: advanceVal,
+        paymentMode: "UPI"
+      });
+      return;
+    }
+
     try {
-      await updateProjectState(projectId, nextStage, newStatus);
+      await updateProjectState(projectId, { stage: nextStage, status: newStatus });
       const actionMsg = `Transitioned to ${kanbanColumns[nextStage - 1].title}`;
       await addProjectActivityLog(projectId, actionMsg);
 
@@ -1523,8 +1891,24 @@ function App() {
     const project = ignitionQueue.find(p => p.id === projectId);
     if (!project) return;
 
+    if (newStatus === "Completed" && project.status !== "Completed") {
+      const discountVal = parseFloat(project.discount) || 0;
+      const advanceVal = parseFloat(project.advanceAmount) || 0;
+      const finalQuote = parseFloat(project.quote) - discountVal;
+      const remainingAmt = Math.max(0, finalQuote - advanceVal);
+
+      setCustomPaymentPrompt({
+        p: project,
+        finalQuote: finalQuote,
+        defaultAmt: remainingAmt,
+        adv: advanceVal,
+        paymentMode: "UPI"
+      });
+      return;
+    }
+
     try {
-      await updateProjectState(projectId, project.stage, newStatus);
+      await updateProjectState(projectId, { stage: project.stage, status: newStatus });
       const actionMsg = `Status Updated to ${newStatus.toUpperCase()}`;
       await addProjectActivityLog(projectId, actionMsg);
 
@@ -1783,6 +2167,71 @@ function App() {
     setCashbookEntries(prev => [newEntry, ...prev]);
     e.target.reset();
   };
+
+  const handleMarkMilestonePaid = async (project, type) => {
+    const baseQuote = parseFloat(project.quote) || 0;
+    const milestoneAmt = baseQuote * 0.5;
+
+    let updatedFields = {};
+    let desc = "";
+
+    if (type === 'deposit') {
+      updatedFields = {
+        advanceAmount: milestoneAmt,
+        paymentStatus: 'part'
+      };
+      desc = `Deposit: ${project.service} - ${project.name}`;
+    } else if (type === 'retainer') {
+      updatedFields = {
+        paymentStatus: 'paid',
+        status: 'Completed',
+        stage: 4
+      };
+      desc = `Final: ${project.service} - ${project.name}`;
+    }
+
+    // Check if cashbook entry already exists to prevent double logging
+    const exists = cashbookEntries.some(entry => entry.projectId === project.id && entry.desc.startsWith(type === 'deposit' ? "Deposit:" : "Final:"));
+    if (!exists) {
+      const newEntry = {
+        id: Date.now(),
+        projectId: project.id,
+        date: new Date().toISOString().split('T')[0],
+        desc: desc,
+        amount: milestoneAmt,
+        type: "INCOME",
+        mode: "UPI",
+        category: "Service"
+      };
+      setCashbookEntries(prev => [newEntry, ...prev]);
+    }
+
+    try {
+      await updateProjectState(project.id, {
+        ...project,
+        ...updatedFields
+      });
+      toast({
+        title: `${type === 'deposit' ? 'Ignition Deposit' : 'Delivery Retainer'} Marked Paid`,
+        description: `Successfully logged ₹${milestoneAmt.toLocaleString()} service income.`
+      });
+    } catch (err) {
+      console.warn("Failed to update project status in Supabase:", err);
+    }
+
+    setIgnitionQueue(prev => prev.map(p => {
+      if (p.id === project.id) {
+        return {
+          ...p,
+          ...updatedFields,
+          status: type === 'retainer' ? 'Completed' : p.status,
+          stage: type === 'retainer' ? 4 : p.stage
+        };
+      }
+      return p;
+    }));
+  };
+
 
   const handleUpdateCashbookEntry = (e) => {
     e.preventDefault();
@@ -2674,6 +3123,8 @@ function App() {
                             setProjects={setIgnitionQueue}
                             clients={clients}
                             onOpenIgnitionModal={() => { setPrefillData(null); setIsIgnitionModalOpen(true); }}
+                            setCustomPaymentPrompt={setCustomPaymentPrompt}
+                            onDownloadInvoice={(p) => downloadInvoicePDF(p, p.invoiceNo || getInvoiceNumber(p.createdAt, invoices.length + 1))}
                           />
                         )}
 
@@ -2720,6 +3171,7 @@ function App() {
                             selectedVaultInvoices={selectedVaultInvoices}
                             setSelectedVaultInvoices={setSelectedVaultInvoices}
                             handleAddCashbookEntry={handleAddCashbookEntry}
+                            handleMarkMilestonePaid={handleMarkMilestonePaid}
                           />
                         )}
 
@@ -3413,10 +3865,22 @@ function App() {
                     </button>
                     <button
                       style={{ flex: 1, padding: '0.8rem', background: '#00e5ff', color: '#000', border: 'none', borderRadius: '4px', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
-                      onClick={() => {
+                      onClick={async () => {
                         const inputVal = document.getElementById('custom-payment-input').value;
                         const parsed = parseFloat(inputVal);
                         const amt = (!isNaN(parsed) && parsed > 0) ? parsed : customPaymentPrompt.defaultAmt;
+
+                        try {
+                          await updateProjectState(customPaymentPrompt.p.id, {
+                            stage: 4,
+                            status: "Completed",
+                            paymentStatus: "paid"
+                          });
+                          const actionMsg = `Project marked as Completed & Final Payment of ₹${amt} Logged`;
+                          await addProjectActivityLog(customPaymentPrompt.p.id, actionMsg);
+                        } catch (err) {
+                          console.error("Failed to sync completed project status to Supabase:", err);
+                        }
 
                         if (amt > 0) {
                           setCashbookEntries(prev => [...prev, {
@@ -3437,9 +3901,25 @@ function App() {
                             ...proj,
                             paymentStatus: 'paid',
                             status: "Completed",
-                            stage: 4
+                            stage: 4,
+                            activityLog: [
+                              { action: `Project marked as Completed & Final Payment of ₹${amt} Logged`, time: new Date().toLocaleTimeString() },
+                              ...(proj.activityLog || [])
+                            ]
                           } : proj
                         ));
+
+                        setSelectedKanbanProject(prev => {
+                          if (prev && prev.id === customPaymentPrompt.p.id) {
+                            return {
+                              ...prev,
+                              stage: 4,
+                              status: "Completed",
+                              paymentStatus: 'paid'
+                            };
+                          }
+                          return prev;
+                        });
 
                         setCustomPaymentPrompt(null);
                       }}>
