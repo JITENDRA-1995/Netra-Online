@@ -17,6 +17,7 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _isApiServerOffline = false;
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -778,8 +779,8 @@ export async function customFetch<T = unknown>(
   );
   const isRelativeApi = urlStr.startsWith("/api") || urlStr.startsWith("/");
 
-  if (typeof window !== "undefined" && !isLocalhost && isRelativeApi) {
-    console.info("Production environment (Vercel) detected. Intercepting and serving instantly via client-side database mock:", urlStr);
+  if (typeof window !== "undefined" && isRelativeApi && (_isApiServerOffline || !isLocalhost)) {
+    console.info("Bypassing network fetch and serving instantly via client-side database mock:", urlStr);
     const mockRes = await handleMockRequest(urlStr, options);
     if (mockRes !== null) {
       return mockRes as T;
@@ -842,16 +843,26 @@ export async function customFetch<T = unknown>(
 
     return (await parseSuccessBody(response, responseType, requestInfo)) as T;
   } catch (error) {
-    if (typeof window !== "undefined" && (
+    const isProxyOrServerOffline = 
+      error instanceof ApiError && (
+        error.status === 502 || 
+        error.status === 503 || 
+        error.status === 504 || 
+        error.status === 404
+      );
+
+    const isNetworkOrTimeout = 
       error instanceof TypeError || 
       String(error).includes("fetch") || 
       String(error).includes("Failed to fetch") || 
-      String(error).includes("NetworkError") ||
-      String(error).includes("Failed to execute 'fetch'") ||
-      String(error).includes("aborted") ||
-      (error && (error as any).name === "AbortError")
-    )) {
-      console.warn("API connection failed or timed out. falling back to client-side localStorage mock database.", error);
+      String(error).includes("NetworkError") || 
+      String(error).includes("Failed to execute 'fetch'") || 
+      String(error).includes("aborted") || 
+      (error && (error as any).name === "AbortError");
+
+    if (typeof window !== "undefined" && (isProxyOrServerOffline || isNetworkOrTimeout)) {
+      _isApiServerOffline = true;
+      console.warn("API connection failed, timed out, or returned proxy server error. Switching all future requests to client-side localStorage mock database.", error);
       const mockRes = await handleMockRequest(urlStr, options);
       if (mockRes !== null) {
         return mockRes as T;

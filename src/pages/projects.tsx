@@ -14,6 +14,7 @@ import { supabase } from "../supabase/client";
 
 const STATUS_COLORS: Record<string, string> = {
   active: "#00d4ff",
+  ongoing: "#00d4ff",
   completed: "#10b981",
   on_hold: "#f59e0b",
   cancelled: "#ef4444",
@@ -78,19 +79,14 @@ export default function Projects({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<any | null>(null);
 
-  const form = useForm<ProjectFormData>({
-    resolver: zodResolver(projectSchema),
-    defaultValues: {
-      name: "",
-      description: "",
-      status: "active",
-      category: "branding",
-      clientId: 0,
-      deadline: "",
-      budget: 0,
-      progress: 0,
-    },
-  });
+  // Local React State Form Fields
+  const [formName, setFormName] = useState("");
+  const [formDescription, setFormDescription] = useState("");
+  const [formStatus, setFormStatus] = useState("active");
+  const [formCategory, setFormCategory] = useState("branding");
+  const [formBudget, setFormBudget] = useState(0);
+  const [formProgress, setFormProgress] = useState(0);
+  const [formDeadline, setFormDeadline] = useState("");
 
   const filtered = projects.filter((p) => {
     const serviceName = p.service || p.name || "";
@@ -100,7 +96,8 @@ export default function Projects({
       clientName.toLowerCase().includes(search.toLowerCase());
     
     const statusVal = (p.status || "active").toLowerCase().replace(" ", "_");
-    const matchStatus = filterStatus === "all" || statusVal === filterStatus;
+    const normalizedStatus = statusVal === "ongoing" ? "active" : statusVal;
+    const matchStatus = filterStatus === "all" || normalizedStatus === filterStatus;
     
     return matchSearch && matchStatus;
   });
@@ -109,38 +106,39 @@ export default function Projects({
     setEditingProject(project);
     
     const currentStatus = (project.status || "active").toLowerCase().replace(" ", "_");
+    const formStatusVal = currentStatus === "ongoing" ? "active" : currentStatus;
     const currentCategory = (project.category || "branding").toLowerCase().replace(" ", "_");
     const budgetVal = project.budget !== undefined ? project.budget : (parseFloat(project.quote) || 0);
 
-    form.reset({
-      name: project.service || project.name || "",
-      description: project.description || project.desc || "",
-      status: (["active", "completed", "on_hold", "cancelled"].includes(currentStatus) ? currentStatus : "active") as any,
-      category: (["branding", "web", "print", "motion", "illustration", "social_media", "packaging"].includes(currentCategory) ? currentCategory : "branding") as any,
-      clientId: project.clientId || 0,
-      deadline: project.deadline || "",
-      budget: budgetVal,
-      progress: project.progress || 0,
-    });
+    setFormName(project.service || project.name || "");
+    setFormDescription(project.description || project.desc || "");
+    setFormStatus(["active", "completed", "on_hold", "cancelled"].includes(formStatusVal) ? formStatusVal : "active");
+    setFormCategory(["branding", "web", "print", "motion", "illustration", "social_media", "packaging"].includes(currentCategory) ? currentCategory : "branding");
+    setFormBudget(budgetVal);
+    setFormProgress(project.progress || 0);
+    const deadlineStr = project.deadline ? project.deadline.split('T')[0] : "";
+    setFormDeadline(deadlineStr);
+
     setDialogOpen(true);
   }
 
-  async function onSubmit(data: ProjectFormData) {
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
     if (editingProject && setProjects) {
-      const budgetVal = data.budget;
-      const statusFormatted = data.status.charAt(0).toUpperCase() + data.status.slice(1).replace("_", " ");
+      const budgetVal = formBudget;
+      const statusFormatted = formStatus.charAt(0).toUpperCase() + formStatus.slice(1).replace("_", " ");
       
       const updatedProject = {
         ...editingProject,
-        service: data.name,
-        description: data.description,
-        desc: data.description,
+        service: formName,
+        description: formDescription,
+        desc: formDescription,
         status: statusFormatted,
-        category: data.category,
+        category: formCategory,
         quote: budgetVal,
         budget: budgetVal,
-        deadline: data.deadline,
-        progress: data.progress,
+        deadline: formDeadline,
+        progress: formProgress,
       };
 
       try {
@@ -164,7 +162,7 @@ export default function Projects({
         prev.map((p) => (p.id === editingProject.id ? updatedProject : p))
       );
       setDialogOpen(false);
-      toast({ title: "Project Calibration Saved", description: `Updated project: ${data.name}` });
+      toast({ title: "Project Calibration Saved", description: `Updated project: ${formName}` });
     }
   }
 
@@ -295,7 +293,7 @@ export default function Projects({
 
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-extrabold text-foreground">₹{budgetVal.toLocaleString()}</span>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex gap-1.5 opacity-80 hover:opacity-100 transition-opacity">
                     <Button
                       size="icon"
                       variant="ghost"
@@ -347,130 +345,96 @@ export default function Projects({
           <DialogHeader>
             <DialogTitle className="text-foreground font-black tracking-wide">CALIBRATE PROJECT PARAMETERS</DialogTitle>
           </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Project / Service Title</FormLabel>
-                    <FormControl>
-                      <Input {...field} className="bg-white/5 border-white/10 rounded-xl" placeholder="Service tag/name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+          <form onSubmit={handleSave} className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Project / Service Title</label>
+              <Input
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                className="bg-white/5 border-white/10 rounded-xl"
+                placeholder="Service tag/name"
+                required
               />
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Mission Brief / Notes</FormLabel>
-                    <FormControl>
-                      <Input {...field} className="bg-white/5 border-white/10 rounded-xl" placeholder="Project objectives" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+            </div>
+            <div className="space-y-1">
+              <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Mission Brief / Notes</label>
+              <Input
+                value={formDescription}
+                onChange={(e) => setFormDescription(e.target.value)}
+                className="bg-white/5 border-white/10 rounded-xl"
+                placeholder="Project objectives"
               />
-              <div className="grid grid-cols-2 gap-3">
-                <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Status</FormLabel>
-                      <FormControl>
-                        <select
-                          className="w-full h-10 px-3 bg-white/5 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 bg-[#0c101d]"
-                          value={field.value}
-                          onChange={field.onChange}
-                        >
-                          <option value="active">Active</option>
-                          <option value="completed">Completed</option>
-                          <option value="on_hold">On Hold</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Category</FormLabel>
-                      <FormControl>
-                        <select
-                          className="w-full h-10 px-3 bg-white/5 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 bg-[#0c101d]"
-                          value={field.value}
-                          onChange={field.onChange}
-                        >
-                          <option value="branding">Branding</option>
-                          <option value="web">Web App/UI</option>
-                          <option value="print">Print Media</option>
-                          <option value="motion">Motion Graphics</option>
-                          <option value="illustration">Illustration</option>
-                          <option value="social_media">Social Media</option>
-                          <option value="packaging">Packaging</option>
-                        </select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Status</label>
+                <select
+                  className="w-full h-10 px-3 bg-white/5 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 bg-[#0c101d]"
+                  value={formStatus}
+                  onChange={(e) => setFormStatus(e.target.value)}
+                >
+                  <option value="active">Active</option>
+                  <option value="completed">Completed</option>
+                  <option value="on_hold">On Hold</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Category</label>
+                <select
+                  className="w-full h-10 px-3 bg-white/5 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 bg-[#0c101d]"
+                  value={formCategory}
+                  onChange={(e) => setFormCategory(e.target.value)}
+                >
+                  <option value="branding">Branding</option>
+                  <option value="web">Web App/UI</option>
+                  <option value="print">Print Media</option>
+                  <option value="motion">Motion Graphics</option>
+                  <option value="illustration">Illustration</option>
+                  <option value="social_media">Social Media</option>
+                  <option value="packaging">Packaging</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Budget (₹)</label>
+                <Input
+                  type="number"
+                  value={formBudget}
+                  onChange={(e) => setFormBudget(parseInt(e.target.value) || 0)}
+                  className="bg-white/5 border-white/10 rounded-xl"
+                  required
                 />
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <FormField
-                  control={form.control}
-                  name="budget"
-                  render={({ field }) => (
-                    <FormItem className="col-span-1">
-                      <FormLabel className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Budget (₹)</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} className="bg-white/5 border-white/10 rounded-xl" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="progress"
-                  render={({ field }) => (
-                    <FormItem className="col-span-1">
-                      <FormLabel className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Progress (%)</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} className="bg-white/5 border-white/10 rounded-xl" min={0} max={100} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="deadline"
-                  render={({ field }) => (
-                    <FormItem className="col-span-1">
-                      <FormLabel className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Deadline</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} className="bg-white/5 border-white/10 rounded-xl text-xs" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+              <div className="space-y-1">
+                <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Progress (%)</label>
+                <Input
+                  type="number"
+                  value={formProgress}
+                  onChange={(e) => setFormProgress(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                  className="bg-white/5 border-white/10 rounded-xl"
+                  min={0}
+                  max={100}
+                  required
                 />
               </div>
-              <div className="flex gap-2 pt-2">
-                <Button type="button" variant="ghost" className="flex-1 border border-white/10 rounded-xl" onClick={() => setDialogOpen(false)}>Discard</Button>
-                <Button type="submit" className="flex-1 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400 rounded-xl font-bold">Save Calibration</Button>
+              <div className="space-y-1">
+                <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Deadline</label>
+                <Input
+                  type="date"
+                  value={formDeadline}
+                  onChange={(e) => setFormDeadline(e.target.value)}
+                  className="bg-white/5 border-white/10 rounded-xl text-xs"
+                  required
+                />
               </div>
-            </form>
-          </Form>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button type="button" variant="ghost" className="flex-1 border border-white/10 rounded-xl" onClick={() => setDialogOpen(false)}>Discard</Button>
+              <Button type="submit" className="flex-1 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400 rounded-xl font-bold">Save Calibration</Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </motion.div>

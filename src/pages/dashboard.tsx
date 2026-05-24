@@ -98,7 +98,7 @@ export default function Dashboard() {
     ? [
         {
           label: "Total Revenue",
-          value: stats.totalRevenue,
+          value: stats.totalRevenue ?? 0,
           prefix: "₹",
           icon: TrendingUp,
           trend: stats.revenueGrowth,
@@ -106,7 +106,7 @@ export default function Dashboard() {
         },
         {
           label: "Active Projects",
-          value: stats.activeProjects,
+          value: stats.activeProjects ?? 0,
           icon: Briefcase,
           trend: stats.projectsThisMonth,
           trendLabel: "this month",
@@ -114,13 +114,13 @@ export default function Dashboard() {
         },
         {
           label: "Total Clients",
-          value: stats.totalClients,
+          value: stats.totalClients ?? 0,
           icon: Users,
           color: "#10b981",
         },
         {
           label: "Pending Invoices",
-          value: stats.pendingInvoices,
+          value: stats.pendingInvoices ?? 0,
           prefix: "₹",
           icon: FileText,
           overdue: stats.overdueInvoicesCount,
@@ -157,7 +157,7 @@ export default function Dashboard() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {statsLoading
+        {statsLoading || !stats
           ? Array.from({ length: 4 }).map((_, i) => (
               <motion.div key={i} variants={itemVariants}>
                 <Skeleton className="h-32 w-full rounded-2xl" />
@@ -234,7 +234,7 @@ export default function Dashboard() {
             </div>
             <Zap className="w-5 h-5 text-cyan-400" />
           </div>
-          {trendLoading ? (
+          {trendLoading || !revenueTrend ? (
             <Skeleton className="h-52 w-full rounded-xl" />
           ) : (
             <ResponsiveContainer width="100%" height={210}>
@@ -279,7 +279,7 @@ export default function Dashboard() {
               <p className="text-xs text-muted-foreground mt-0.5">Project distribution</p>
             </div>
           </div>
-          {breakdownLoading ? (
+          {breakdownLoading || !projectBreakdown ? (
             <Skeleton className="h-52 w-full rounded-xl" />
           ) : (
             <>
@@ -340,7 +340,7 @@ export default function Dashboard() {
           <Clock className="w-5 h-5 text-violet-400" />
           <h3 className="font-bold text-foreground text-lg">Recent Activity</h3>
         </div>
-        {activityLoading ? (
+        {activityLoading || !recentActivity ? (
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-10 w-full rounded-xl" />

@@ -73,13 +73,40 @@ export default function Inquiries({
   });
   const [remarkText, setRemarkText] = useState("");
 
+  // Dynamically resolve 5-day expiration for "New Spark" status, format dates and fallbacks
+  const resolvedInquiries = useMemo(() => {
+    return inquiries.map((inq) => {
+      const createdDate = new Date(inq.createdAt || inq.date || Date.now());
+      const diffTime = Date.now() - createdDate.getTime();
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+      
+      let status = inq.status;
+      if (status === "New Spark" && diffDays >= 5) {
+        status = "Expired";
+      }
+
+      const formattedDate = inq.date || createdDate.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+
+      return {
+        ...inq,
+        status,
+        date: formattedDate,
+        location: inq.location || "Remote"
+      };
+    });
+  }, [inquiries]);
+
   // Calculate dynamic stats
   const stats = useMemo(() => {
-    const unread = inquiries.filter(q => q.status === "New Spark").length;
+    const unread = resolvedInquiries.filter(q => q.status === "New Spark").length;
 
     // Count top demanded service
     const counts: Record<string, number> = {};
-    inquiries.forEach(q => {
+    resolvedInquiries.forEach(q => {
       counts[q.service] = (counts[q.service] || 0) + 1;
     });
     let topService = "None";
@@ -92,14 +119,14 @@ export default function Inquiries({
     });
 
     // Conversion rate
-    const ignited = inquiries.filter(q => q.status.toLowerCase().includes("ignit") || q.status.toLowerCase() === "accepted").length;
-    const rate = inquiries.length > 0 ? Math.round((ignited / inquiries.length) * 100) : 84;
+    const ignited = resolvedInquiries.filter(q => q.status.toLowerCase().includes("ignit") || q.status.toLowerCase() === "accepted").length;
+    const rate = resolvedInquiries.length > 0 ? Math.round((ignited / resolvedInquiries.length) * 100) : 84;
 
     return { unread, topService, rate };
-  }, [inquiries]);
+  }, [resolvedInquiries]);
 
   // Filters
-  const filtered = inquiries.filter(inq => {
+  const filtered = resolvedInquiries.filter(inq => {
     const matchSearch = inq.name.toLowerCase().includes(search.toLowerCase()) ||
                         inq.phone.includes(search);
     const matchService = filterService === "all" || inq.service === filterService;
@@ -111,6 +138,7 @@ export default function Inquiries({
   const getStatusBadgeStyles = (status: string) => {
     const lower = status.toLowerCase();
     if (lower === "new spark") return "bg-cyan-500/10 text-cyan-400 border-cyan-500/20";
+    if (lower === "expired") return "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
     if (lower.includes("ignit") || lower === "accepted") return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
     if (lower.includes("extinguish") || lower === "rejected") return "bg-rose-500/10 text-rose-400 border-rose-500/20";
     return "bg-amber-500/10 text-amber-400 border-amber-500/20";
@@ -118,7 +146,7 @@ export default function Inquiries({
 
   const handleSendStatus = () => {
     if (!remarkModal.inquiryId) return;
-    const inq = inquiries.find(i => i.id === remarkModal.inquiryId);
+    const inq = resolvedInquiries.find(i => i.id === remarkModal.inquiryId);
     if (!inq) return;
 
     const actionText = remarkModal.type === "Accepted" ? "Ignited" : "Extinguished";
@@ -236,6 +264,7 @@ export default function Inquiries({
           >
             <option value="all">All Status</option>
             <option value="New Spark">New Spark</option>
+            <option value="Expired">Expired</option>
             <option value="Ignited">Ignited</option>
             <option value="Extinguished">Extinguished</option>
           </select>

@@ -12,24 +12,25 @@ import Clients from '@/pages/clients';
 import Inquiries from '@/pages/inquiries';
 import Financials from '@/pages/financials';
 import SettingsPage from '@/pages/settings';
+import { Portfolio } from '@/pages/Portfolio';
 import { useToast } from '@/hooks/use-toast';
-import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail } from 'lucide-react';
 
 const queryClient = new QueryClient();
 import { supabase } from './supabase/client';
-import { 
+import {
   getInquiries, createInquiry, updateInquiry, deleteInquiry,
   getClients, createClientProfile, verifyClientVaultKey, updateClientProfile,
   getProjects, igniteProject, updateProjectState, toggleMilestone, addProjectActivityLog, sendChatMessage, subscribeToChats, uploadMediaVaultAsset,
-  getInvoices, saveInvoice, deleteInvoice 
+  getInvoices, saveInvoice, deleteInvoice
 } from './supabase/database';
 
 
 const defaultServices = [
-  { 
-    id: 1, 
-    title: "Brand Identity (Logo)", 
-    desc: "Crafting the soul of your business through iconic marks.", 
+  {
+    id: 1,
+    title: "Brand Identity (Logo)",
+    desc: "Crafting the soul of your business through iconic marks.",
     icon: "🎨",
     tag: "BRANDING",
     price: "₹24,999",
@@ -41,10 +42,10 @@ const defaultServices = [
       "Unlimited Revision Rounds"
     ]
   },
-  { 
-    id: 2, 
-    title: "Premium Brochures", 
-    desc: "Tangible narratives that tell your brand story in print.", 
+  {
+    id: 2,
+    title: "Premium Brochures",
+    desc: "Tangible narratives that tell your brand story in print.",
     icon: "📖",
     tag: "PRINT",
     price: "₹11,999",
@@ -56,10 +57,10 @@ const defaultServices = [
       "Stock Imagery Included"
     ]
   },
-  { 
-    id: 3, 
-    title: "Digital Interactive Brochures", 
-    desc: "Immersive, clickable experiences for the modern era.", 
+  {
+    id: 3,
+    title: "Digital Interactive Brochures",
+    desc: "Immersive, clickable experiences for the modern era.",
     icon: "🖱️",
     tag: "DIGITAL",
     price: "₹15,999",
@@ -71,10 +72,10 @@ const defaultServices = [
       "SEO Optimized Digital Output"
     ]
   },
-  { 
-    id: 4, 
-    title: "Corporate Profiles", 
-    desc: "Building authority through professional structural design.", 
+  {
+    id: 4,
+    title: "Corporate Profiles",
+    desc: "Building authority through professional structural design.",
     icon: "🏢",
     tag: "BRANDING",
     price: "₹19,999",
@@ -86,10 +87,10 @@ const defaultServices = [
       "High-Resolution Output Ready"
     ]
   },
-  { 
-    id: 5, 
-    title: "Social Storytelling", 
-    desc: "High-impact graphics designed for digital engagement.", 
+  {
+    id: 5,
+    title: "Social Storytelling",
+    desc: "High-impact graphics designed for digital engagement.",
     icon: "📱",
     tag: "DIGITAL",
     price: "₹7,999",
@@ -101,10 +102,10 @@ const defaultServices = [
       "Source Files & Assets Included"
     ]
   },
-  { 
-    id: 6, 
-    title: "Large Format Media", 
-    desc: "Bold visual statements for hoardings and wall graphics.", 
+  {
+    id: 6,
+    title: "Large Format Media",
+    desc: "Bold visual statements for hoardings and wall graphics.",
     icon: "🏙️",
     tag: "PRINT",
     price: "₹31,999",
@@ -116,10 +117,10 @@ const defaultServices = [
       "Print Partner Coordination Prep"
     ]
   },
-  { 
-    id: 7, 
-    title: "Cinematic Video Packages", 
-    desc: "Motion design and production for a visual revolution.", 
+  {
+    id: 7,
+    title: "Cinematic Video Packages",
+    desc: "Motion design and production for a visual revolution.",
     icon: "🎥",
     tag: "VIDEO",
     price: "₹39,999",
@@ -131,10 +132,10 @@ const defaultServices = [
       "Full 4K Ultra-HD Output"
     ]
   },
-  { 
-    id: 8, 
-    title: "Digital Invitations", 
-    desc: "Modern, elegant WhatsApp-ready invites for every event.", 
+  {
+    id: 8,
+    title: "Digital Invitations",
+    desc: "Modern, elegant WhatsApp-ready invites for every event.",
     icon: "✉️",
     tag: "DIGITAL",
     price: "₹5,999",
@@ -146,10 +147,10 @@ const defaultServices = [
       "Express Delivery Available"
     ]
   },
-  { 
-    id: 9, 
-    title: "Editorial Design", 
-    desc: "Professional layouts for magazines and corporate newsletters.", 
+  {
+    id: 9,
+    title: "Editorial Design",
+    desc: "Professional layouts for magazines and corporate newsletters.",
     icon: "📰",
     tag: "PRINT",
     price: "₹21,999",
@@ -161,10 +162,10 @@ const defaultServices = [
       "Print & Web Ready Formats"
     ]
   },
-  { 
-    id: 10, 
-    title: "Print Masterpieces (Posters)", 
-    desc: "High-resolution visual art for physical spaces.", 
+  {
+    id: 10,
+    title: "Print Masterpieces (Posters)",
+    desc: "High-resolution visual art for physical spaces.",
     icon: "🖼️",
     tag: "PRINT",
     price: "₹9,999",
@@ -176,10 +177,10 @@ const defaultServices = [
       "Ready for Canvas or Paper Print"
     ]
   },
-  { 
-    id: 11, 
-    title: "Marketing Flyers", 
-    desc: "Strategic designs to spark immediate consumer interest.", 
+  {
+    id: 11,
+    title: "Marketing Flyers",
+    desc: "Strategic designs to spark immediate consumer interest.",
     icon: "🚀",
     tag: "PRINT",
     price: "₹6,999",
@@ -191,10 +192,10 @@ const defaultServices = [
       "High-speed Single Day Prep option"
     ]
   },
-  { 
-    id: 12, 
-    title: "Custom Calendars", 
-    desc: "365 days of your brand presence on every desk.", 
+  {
+    id: 12,
+    title: "Custom Calendars",
+    desc: "365 days of your brand presence on every desk.",
     icon: "📅",
     tag: "PRINT",
     price: "₹13,999",
@@ -206,10 +207,10 @@ const defaultServices = [
       "High-Res Desk & Wall Ready Sizes"
     ]
   },
-  { 
-    id: 13, 
-    title: "Prestige Certificates", 
-    desc: "Designing excellence for your milestones and awards.", 
+  {
+    id: 13,
+    title: "Prestige Certificates",
+    desc: "Designing excellence for your milestones and awards.",
     icon: "🏆",
     tag: "BRANDING",
     price: "₹4,999",
@@ -221,10 +222,10 @@ const defaultServices = [
       "Premium Typography Selection"
     ]
   },
-  { 
-    id: 14, 
-    title: "Culinary Menus", 
-    desc: "Visual appetizing designs for restaurants and cafes.", 
+  {
+    id: 14,
+    title: "Culinary Menus",
+    desc: "Visual appetizing designs for restaurants and cafes.",
     icon: "🍴",
     tag: "PRINT",
     price: "₹12,999",
@@ -236,10 +237,10 @@ const defaultServices = [
       "Water-Resistant Material Prep Guide"
     ]
   },
-  { 
-    id: 15, 
-    title: "Festival Greetings", 
-    desc: "Cultural heritage meets high-tech celebratory art.", 
+  {
+    id: 15,
+    title: "Festival Greetings",
+    desc: "Cultural heritage meets high-tech celebratory art.",
     icon: "✨",
     tag: "DIGITAL",
     price: "₹4,999",
@@ -251,10 +252,10 @@ const defaultServices = [
       "Social Media Broadcast Ready"
     ]
   },
-  { 
-    id: 16, 
-    title: "Event Stationery", 
-    desc: "Bespoke invitation cards for every significant gathering.", 
+  {
+    id: 16,
+    title: "Event Stationery",
+    desc: "Bespoke invitation cards for every significant gathering.",
     icon: "🎫",
     tag: "EVENT",
     price: "₹10,999",
@@ -266,10 +267,10 @@ const defaultServices = [
       "Unified Event Visual Identity"
     ]
   },
-  { 
-    id: 17, 
-    title: "Legacy Wedding Albums", 
-    desc: "Transforming your most precious memories into a visual epic.", 
+  {
+    id: 17,
+    title: "Legacy Wedding Albums",
+    desc: "Transforming your most precious memories into a visual epic.",
     icon: "💍",
     tag: "EVENT",
     price: "₹27,999",
@@ -281,10 +282,10 @@ const defaultServices = [
       "Timeless Editorial Text Alignments"
     ]
   },
-  { 
-    id: 18, 
-    title: "Photography", 
-    desc: "Capturing moments with cinematic precision and artistic flair.", 
+  {
+    id: 18,
+    title: "Photography",
+    desc: "Capturing moments with cinematic precision and artistic flair.",
     icon: "📸",
     tag: "DIGITAL",
     price: "₹23,999",
@@ -296,10 +297,10 @@ const defaultServices = [
       "Digital High-Res Photo Delivery"
     ]
   },
-  { 
-    id: 19, 
-    title: "Printing Jobwork", 
-    desc: "Precision engineering for all your commercial printing needs.", 
+  {
+    id: 19,
+    title: "Printing Jobwork",
+    desc: "Precision engineering for all your commercial printing needs.",
     icon: "🖨️",
     tag: "COMMERCIAL",
     price: "₹15,999",
@@ -311,10 +312,10 @@ const defaultServices = [
       "Exact Spot Color (Pantone) Alignments"
     ]
   },
-  { 
-    id: 20, 
-    title: "Typing Jobwork", 
-    desc: "Professional documentation and data services with meticulous accuracy.", 
+  {
+    id: 20,
+    title: "Typing Jobwork",
+    desc: "Professional documentation and data services with meticulous accuracy.",
     icon: "⌨️",
     tag: "COMMERCIAL",
     price: "₹3,999",
@@ -324,6 +325,49 @@ const defaultServices = [
       "Professional Multi-format Documentation",
       "Fast High-Speed Transcriptions",
       "Secure Information Confidentiality"
+    ]
+  }
+];
+
+const defaultVisionSettings = [
+  {
+    serviceId: 1, // Brand Identity (Logo)
+    photos: [
+      { url: "https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&fit=crop&w=800&q=80", title: "Modern Brandmark" },
+      { url: "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=800&q=80", title: "Signature Logo" },
+      { url: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=800&q=80", title: "Corporate Style Guide" }
+    ]
+  },
+  {
+    serviceId: 3, // Digital Interactive Brochures
+    photos: [
+      { url: "https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=800&q=80", title: "NovaTech UI Concept" },
+      { url: "https://images.unsplash.com/photo-1581291518655-9523c932ded7?auto=format&fit=crop&w=800&q=80", title: "Interactive Mockups" },
+      { url: "https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?auto=format&fit=crop&w=800&q=80", title: "User Flows" }
+    ]
+  },
+  {
+    serviceId: 7, // Cinematic Video Packages
+    photos: [
+      { url: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=800&q=80", title: "Motion Teaser Reel" },
+      { url: "https://images.unsplash.com/photo-1542204172-e7052809f852?auto=format&fit=crop&w=800&q=80", title: "3D Motion Shaders" },
+      { url: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=800&q=80", title: "Cinematic Cuts" }
+    ]
+  },
+  {
+    serviceId: 9, // Editorial Design
+    photos: [
+      { url: "https://images.unsplash.com/photo-1561070791-26c113006238?auto=format&fit=crop&w=800&q=80", title: "Strata Lookbook grid" },
+      { url: "https://images.unsplash.com/photo-1547891654-e66ed7edd96c?auto=format&fit=crop&w=800&q=80", title: "Swiss Constructivist Layout" },
+      { url: "https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?auto=format&fit=crop&w=800&q=80", title: "Typographic Art Poster" }
+    ]
+  },
+  {
+    serviceId: 6, // Large Format Media
+    photos: [
+      { url: "https://images.unsplash.com/photo-1517502884422-41eaaced0168?auto=format&fit=crop&w=800&q=80", title: "Oru Water Sustainable Pack" },
+      { url: "https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=800&q=80", title: "Hana Cosmetics Jar Concept" },
+      { url: "https://images.unsplash.com/photo-1605615740060-5f2d472288b6?auto=format&fit=crop&w=800&q=80", title: "Textured Premium Box Mockup" }
     ]
   }
 ];
@@ -342,6 +386,27 @@ function App() {
   });
   const services = servicesList;
   const { toast } = useToast();
+
+  const [visionSettings, setVisionSettings] = useState(() => {
+    const saved = localStorage.getItem('netra_vision_settings');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved vision settings:", e);
+      }
+    }
+    return defaultVisionSettings;
+  });
+
+  const handleSaveVisionSettings = (newSettings) => {
+    setVisionSettings(newSettings);
+    localStorage.setItem('netra_vision_settings', JSON.stringify(newSettings));
+    toast({
+      title: "Vision Settings Saved",
+      description: "Successfully updated the VISION page categories and slideshow assets."
+    });
+  };
   const [calibratingService, setCalibratingService] = useState(null);
   const [isCalibrationModalOpen, setIsCalibrationModalOpen] = useState(false);
 
@@ -455,7 +520,7 @@ function App() {
 
   const toggleSound = () => {
     if (!audioRef.current) return;
-    
+
     if (isPlaying) {
       // Premium volume fade-out over 300ms
       let vol = audioRef.current.volume;
@@ -500,6 +565,8 @@ function App() {
   const [isContactActive, setIsContactActive] = useState(false);
   const [showConstruction, setShowConstruction] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
+  const [isServicesActive, setIsServicesActive] = useState(false);
+  const isNavVertical = isVaultActive && !isContactActive && !isServicesActive;
   const [isSuccess, setIsSuccess] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState("");
@@ -534,7 +601,7 @@ function App() {
       name: "Aura Boutique",
       service: "Logo Designing & Identity",
       stage: 2, // Moodboard phase
-      status: "Ongoing",
+      status: "Active",
       createdAt: Date.now() - 5 * 24 * 60 * 60 * 1000,
       deadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       isManual: true,
@@ -670,7 +737,7 @@ function App() {
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [clientViewMode, setClientViewMode] = useState("LIST"); // LIST, VIEW
-  
+
   const [accessKey, setAccessKey] = useState("");
   const [remarkModal, setRemarkModal] = useState({ open: false, inquiryId: null, type: null });
   const [remarkText, setRemarkText] = useState("");
@@ -695,17 +762,17 @@ function App() {
         if (dbClients && dbClients.length > 0) {
           setClients(dbClients);
         }
-        
+
         const dbInquiries = await getInquiries();
         if (dbInquiries && dbInquiries.length > 0) {
           setInquiries(dbInquiries);
         }
-        
+
         const dbProjects = await getProjects();
         if (dbProjects && dbProjects.length > 0) {
           setIgnitionQueue(dbProjects);
         }
-        
+
         const dbInvoices = await getInvoices();
         if (dbInvoices && dbInvoices.length > 0) {
           setInvoices(dbInvoices);
@@ -721,19 +788,49 @@ function App() {
     setBellPulse(true);
     setTimeout(() => setBellPulse(false), 2000);
   };
-  
+
   const [readFlames, setReadFlames] = useState(() => {
     const saved = localStorage.getItem("netra_read_flames");
     return saved ? JSON.parse(saved) : [];
   });
 
-  const sparks = inquiries.filter(q => q.status === "New Spark");
+  const sparks = inquiries.filter(q => {
+    if (q.status !== "New Spark") return false;
+    const createdDate = new Date(q.createdAt || q.created_at || q.date || Date.now());
+    const diffTime = Date.now() - createdDate.getTime();
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    return diffDays < 5;
+  });
   const flames = ignitionQueue.filter(q => {
+    if (q.status === "Completed" || q.status === "Cancelled") return false;
+    if (!q.deadline) return false;
     const deadline = new Date(q.deadline);
     const now = new Date();
     const diff = deadline - now;
-    return diff > 0 && diff <= 24 * 60 * 60 * 1000 && !readFlames.includes(q.id);
+    return diff <= 5 * 24 * 60 * 60 * 1000 && !readFlames.includes(q.id);
   });
+
+  const getFlameNotifText = (project) => {
+    if (!project.deadline) return "Project Calibration Required";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(project.deadline);
+    target.setHours(0, 0, 0, 0);
+    
+    const diffTime = target - today;
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+      const days = Math.abs(diffDays);
+      return `OVERDUE by ${days} day${days > 1 ? 's' : ''}! Immediate Calibration Required`;
+    } else if (diffDays === 0) {
+      return `Due TODAY! Immediate Calibration Required`;
+    } else if (diffDays === 1) {
+      return `Due TOMORROW! Calibration Required`;
+    } else {
+      return `Due in ${diffDays} days (Calibration Required)`;
+    }
+  };
 
   const markInquiryAsRead = async (id) => {
     try {
@@ -800,7 +897,7 @@ function App() {
     const sglDigit = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"],
       dblDigit = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"],
       tensPlace = ["", "Ten", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
-      
+
     const convertLessThanThousand = (num) => {
       let temp = "";
       if (num >= 100) {
@@ -819,9 +916,9 @@ function App() {
 
     let n = Math.floor(price);
     if (n === 0) return "Zero Only";
-    
+
     let str = "";
-    
+
     // Crore
     if (n >= 10000000) {
       str += convertLessThanThousand(Math.floor(n / 10000000)) + "Crore ";
@@ -841,7 +938,7 @@ function App() {
     if (n > 0) {
       str += convertLessThanThousand(n);
     }
-    
+
     // Normalize spaces and return
     return str.replace(/\s+/g, ' ').trim() + " Only";
   };
@@ -853,7 +950,7 @@ function App() {
 
   const saveInvoiceToVault = async (p, invNo) => {
     if (invoices.find(i => i.invoiceNo === invNo)) return;
-    
+
     const newInvoice = {
       invoiceNo: invNo,
       clientName: p.name,
@@ -862,7 +959,7 @@ function App() {
       grandTotal: parseFloat(p.quote) - (parseFloat(p.advanceAmount) || 0) - (parseFloat(p.discount) || 0),
       projectId: p.id
     };
-    
+
     try {
       const savedInvoice = await saveInvoice(newInvoice);
       const formattedInvoice = {
@@ -897,19 +994,19 @@ function App() {
         backgroundColor: '#ffffff',
         logging: false
       });
-      
+
       if (actions) actions.style.display = 'flex';
 
       const imgData = canvas.toDataURL('image/jpeg', 0.8);
       const pdf = new jsPDF('p', 'mm', 'a4');
-      
+
       const pageWidth = 210;
       const imgProps = pdf.getImageProperties(imgData);
       const pdfWidth = pageWidth;
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      
+
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      
+
       const filename = `${p.name.replace(/\s+/g, '_')}_${invNo}.pdf`;
       pdf.save(filename);
     } catch (err) {
@@ -942,7 +1039,7 @@ function App() {
           scrollX: 0,
           scrollY: 0
         });
-        
+
         const imgData = canvas.toDataURL('image/jpeg', 0.85);
         const pageWidth = 210;
         const imgProps = pdf.getImageProperties(imgData);
@@ -985,23 +1082,23 @@ function App() {
   const serviceStats = useMemo(() => {
     return services.map(s => {
       // Count matches in Inquiries
-      const inqMatches = inquiries.filter(inq => 
-        s.title.toLowerCase().includes(inq.service.toLowerCase()) || 
+      const inqMatches = inquiries.filter(inq =>
+        s.title.toLowerCase().includes(inq.service.toLowerCase()) ||
         inq.service.toLowerCase().includes(s.title.toLowerCase())
       ).length;
 
       // Count matches in Projects
-      const projMatches = ignitionQueue.filter(proj => 
-        s.title.toLowerCase().includes(proj.service.toLowerCase()) || 
+      const projMatches = ignitionQueue.filter(proj =>
+        s.title.toLowerCase().includes(proj.service.toLowerCase()) ||
         proj.service.toLowerCase().includes(s.title.toLowerCase())
       ).length;
 
       // Base Growth (Deterministic based on ID to prevent hover jumps)
-      const baseGrowth = 15 + (s.id * 7) % 25; 
-      
+      const baseGrowth = 15 + (s.id * 7) % 25;
+
       // Weighted Popularity
       const popularity = baseGrowth + (inqMatches * 18) + (projMatches * 32);
-      
+
       return {
         id: s.id,
         growth: Math.min(popularity, 98),
@@ -1025,11 +1122,11 @@ function App() {
       const baseQuote = p.quote || 0;
       const discountPct = parseFloat(p.discountPercent) || 0;
       const finalQuote = baseQuote - (baseQuote * discountPct / 100);
-      
+
       const adv = parseFloat(p.advanceAmount) || 0;
       const isPaid = p.paymentStatus === 'paid' || p.status === "Completed";
       const isPart = p.paymentStatus === 'part';
-      
+
       let revenueFromProject = 0;
       let duesFromProject = 0;
 
@@ -1122,12 +1219,24 @@ function App() {
     const headerTimer = setTimeout(() => setHeaderVisible(true), 3200);
     const completionTimer = setTimeout(() => setIsFullyRevealed(true), 3500);
 
+    return () => {
+      clearTimeout(logoTimer);
+      clearTimeout(revealTimer);
+      clearTimeout(headlineTimer);
+      clearTimeout(taglineTimer);
+      clearTimeout(missionTimer);
+      clearTimeout(headerTimer);
+      clearTimeout(completionTimer);
+    };
+  }, []);
+
+  useEffect(() => {
     const handleMouseMove = (e) => {
       if (containerRef.current) {
         const { left, top, width, height } = containerRef.current.getBoundingClientRect();
-        setMousePos({ 
-          x: ((e.clientX - left) / width) * 100, 
-          y: ((e.clientY - top) / height) * 100 
+        setMousePos({
+          x: ((e.clientX - left) / width) * 100,
+          y: ((e.clientY - top) / height) * 100
         });
       }
     };
@@ -1135,8 +1244,18 @@ function App() {
     const handleWheel = (e) => {
       if (isTransitioning || showConstruction) return;
 
-      // Transition from Hero to Vault
-      if (!isVaultActive && !isContactActive && e.deltaY > 30 && missionActive) {
+      // Transition from Hero to Vault (only if no other page views are active)
+      if (
+        !isVaultActive &&
+        !isContactActive &&
+        !isServicesActive &&
+        !isLoginActive &&
+        !isCommandCenterActive &&
+        !isClientVaultActive &&
+        !isAdminGridActive &&
+        e.deltaY > 30 &&
+        missionActive
+      ) {
         setIsTransitioning(true);
         setIsVaultActive(true);
         setTimeout(() => setIsTransitioning(false), 1200);
@@ -1155,18 +1274,22 @@ function App() {
     document.addEventListener('mousedown', handleClickOutside);
 
     return () => {
-      clearTimeout(logoTimer);
-      clearTimeout(revealTimer);
-      clearTimeout(headlineTimer);
-      clearTimeout(taglineTimer);
-      clearTimeout(missionTimer);
-      clearTimeout(headerTimer);
-      clearTimeout(completionTimer);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('wheel', handleWheel);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isVaultActive, missionActive, isTransitioning, showConstruction]);
+  }, [
+    isVaultActive,
+    isContactActive,
+    isServicesActive,
+    isLoginActive,
+    isCommandCenterActive,
+    isClientVaultActive,
+    isAdminGridActive,
+    missionActive,
+    isTransitioning,
+    showConstruction
+  ]);
 
   useEffect(() => {
     if (showSparkToast) {
@@ -1189,10 +1312,13 @@ function App() {
 
     // Exact replica of the majestic initial loading sequence
     setTimeout(() => setLogoDrawn(true), 1800);
-    
+
     setTimeout(() => {
       setRevealStarted(true);
       targetPageSetter();
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
     }, 2000);
 
     setTimeout(() => setHeadlineActive(true), 2600);
@@ -1212,6 +1338,9 @@ function App() {
     setLogoDrawn(true);
     setRevealStarted(true);
     targetPageSetter();
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
   };
 
   const resetForm = () => {
@@ -1222,6 +1351,7 @@ function App() {
   const clearAllPages = () => {
     setIsVaultActive(false);
     setIsContactActive(false);
+    setIsServicesActive(false);
     setIsLoginActive(false);
     setIsCommandCenterActive(false);
     setIsClientVaultActive(false);
@@ -1230,20 +1360,68 @@ function App() {
     setShowConstruction(false);
     setSelectedService(null);
     resetForm();
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
-  const goHome = () => triggerSplashTransition(() => {
+  useEffect(() => {
+    if ((isVaultActive && !isTransitioning) || isServicesActive) {
+      document.body.style.overflow = 'auto';
+      document.documentElement.style.overflow = 'auto';
+    } else {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+    }
+    return () => {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+    };
+  }, [isVaultActive, isServicesActive, isTransitioning]);
+
+  // Reset scroll positions of absolute-positioned sub-pages/panels to top when activated
+  useEffect(() => {
+    if (isServicesActive) {
+      const el = document.querySelector('.services-page');
+      if (el) el.scrollTop = 0;
+    }
+  }, [isServicesActive]);
+
+  useEffect(() => {
+    if (isLoginActive) {
+      const el = document.querySelector('.login-page');
+      if (el) el.scrollTop = 0;
+    }
+  }, [isLoginActive]);
+
+  useEffect(() => {
+    if (isCommandCenterActive) {
+      const el = document.querySelector('.admin-vault-page');
+      if (el) el.scrollTop = 0;
+    }
+  }, [isCommandCenterActive]);
+
+  useEffect(() => {
+    if (isClientVaultActive) {
+      const el = document.querySelector('.client-vault-page');
+      if (el) el.scrollTop = 0;
+    }
+  }, [isClientVaultActive]);
+
+  const goHome = () => triggerInstantTransition(() => {
     clearAllPages();
   });
 
-  const goToVault = () => triggerInstantTransition(() => {
+  const goToServices = () => triggerInstantTransition(() => {
+    clearAllPages();
+    setIsServicesActive(true);
+  });
+
+  const goToVision = () => triggerInstantTransition(() => {
     clearAllPages();
     setIsVaultActive(true);
   });
 
   const goToContact = () => triggerInstantTransition(() => {
     clearAllPages();
-    setIsVaultActive(true);
     setIsContactActive(true);
   });
 
@@ -1297,18 +1475,18 @@ function App() {
   const moveProjectStage = async (projectId) => {
     const project = ignitionQueue.find(p => p.id === projectId);
     if (!project || project.stage >= 4) return;
-    
+
     const nextStage = project.stage + 1;
     let newStatus = project.status;
     if (nextStage === 4) {
       newStatus = "Completed";
     }
-    
+
     try {
       await updateProjectState(projectId, nextStage, newStatus);
-      const actionMsg = `Transitioned to ${kanbanColumns[nextStage-1].title}`;
+      const actionMsg = `Transitioned to ${kanbanColumns[nextStage - 1].title}`;
       await addProjectActivityLog(projectId, actionMsg);
-      
+
       setIgnitionQueue(prev => prev.map(p => {
         if (p.id === projectId) {
           return {
@@ -1326,17 +1504,17 @@ function App() {
     } catch (err) {
       console.error("Failed to update project stage in Supabase:", err);
     }
-    
+
     triggerBellPulse();
-    
+
     // Update the drawer view
     setSelectedKanbanProject(prev => {
       if (!prev) return null;
       const nextStage = Math.min(4, prev.stage + 1);
-      return { 
-        ...prev, 
-        stage: nextStage, 
-        status: nextStage === 4 ? "Completed" : prev.status 
+      return {
+        ...prev,
+        stage: nextStage,
+        status: nextStage === 4 ? "Completed" : prev.status
       };
     });
   };
@@ -1344,12 +1522,12 @@ function App() {
   const updateProjectStatus = async (projectId, newStatus) => {
     const project = ignitionQueue.find(p => p.id === projectId);
     if (!project) return;
-    
+
     try {
       await updateProjectState(projectId, project.stage, newStatus);
       const actionMsg = `Status Updated to ${newStatus.toUpperCase()}`;
       await addProjectActivityLog(projectId, actionMsg);
-      
+
       setIgnitionQueue(prev => prev.map(p => {
         if (p.id === projectId) {
           return {
@@ -1366,14 +1544,14 @@ function App() {
     } catch (err) {
       console.error("Failed to update project status in Supabase:", err);
     }
-    
+
     setSelectedKanbanProject(prev => prev ? { ...prev, status: newStatus } : null);
     triggerBellPulse();
   };
 
   const handleIgniteFromInquiry = (inq) => {
-    const serviceMatch = services.find(s => 
-      s.title.toLowerCase().includes(inq.service.toLowerCase()) || 
+    const serviceMatch = services.find(s =>
+      s.title.toLowerCase().includes(inq.service.toLowerCase()) ||
       inq.service.toLowerCase().includes(s.title.toLowerCase())
     );
     setPrefillData({
@@ -1395,14 +1573,14 @@ function App() {
     const formData = new FormData(form);
     const serviceId = formData.get('service');
     const serviceName = services.find(s => s.id === parseInt(serviceId))?.title || "Custom Service";
-    
+
     const btn = form.querySelector('.ignite-submit-btn');
     btn.innerText = "IGNITING...";
-    
+
     try {
       let clientInfo;
       let clientDbId = null;
-      
+
       if (ignitionClientType === "EXISTING") {
         const clientId = formData.get('existingClientId');
         const existingClient = clients.find(c => c.id === parseInt(clientId));
@@ -1421,7 +1599,7 @@ function App() {
           email: formData.get('email'),
           address: formData.get('address')
         };
-        
+
         // Register new client with access key passcode
         const randomAccessKey = Math.random().toString(36).substring(2, 8).toUpperCase();
         const newClient = await createClientProfile({
@@ -1429,21 +1607,21 @@ function App() {
           accessKey: randomAccessKey,
           status: 'Active'
         });
-        
+
         clientDbId = newClient.id;
         setClients(prev => [...prev, newClient]);
       }
-      
+
       const milestoneNames = ["Discovery", "Moodboard", "Sketching", "Final Flame"];
       const quoteVal = parseInt(formData.get('quote')) || 15000;
       const discountVal = parseInt(formData.get('discount')) || 0;
       const discountPct = ((discountVal / quoteVal) * 100).toFixed(2);
-      
+
       const projectPayload = {
         name: clientInfo.name,
         service: serviceName,
         stage: 1,
-        status: "Ongoing",
+        status: "Active",
         deadline: formData.get('deadline'),
         isManual: true,
         client: clientInfo,
@@ -1460,17 +1638,17 @@ function App() {
           { id: 1, sender: "SYSTEM", text: "Project Ignited", time: new Date().toLocaleTimeString() }
         ]
       };
-      
+
       const savedProjCore = await igniteProject({
         ...projectPayload,
         client_id: clientDbId
       });
-      
+
       const newProject = {
         ...projectPayload,
         id: savedProjCore.id
       };
-      
+
       setIgnitionQueue(prev => [...prev, newProject]);
       triggerBellPulse();
 
@@ -1485,7 +1663,7 @@ function App() {
           console.error("Failed to update inquiry status on auto-ignition:", e);
         }
       }
-      
+
       btn.innerText = "MISSION START";
       setTimeout(() => {
         setIsIgnitionModalOpen(false);
@@ -1493,7 +1671,7 @@ function App() {
         setActiveAdminModule("PROJECTS");
         setSelectedProjectTab(newProject.id);
       }, 1000);
-      
+
     } catch (err) {
       console.error("Failed to ignite project:", err);
       btn.innerText = "ERROR - RETRY";
@@ -1518,7 +1696,7 @@ function App() {
   // Real-time Chat Subscription Effect
   useEffect(() => {
     if (!selectedProjectTab) return;
-    
+
     const subscription = subscribeToChats(selectedProjectTab, (newMsg) => {
       setIgnitionQueue(prevQueue => prevQueue.map(proj => {
         if (proj.id === selectedProjectTab) {
@@ -1546,10 +1724,10 @@ function App() {
     if (!file) return;
 
     alert(`Uploading ${file.name} to secure studio vault...\nSize: ${(file.size / 1024).toFixed(1)} KB`);
-    
+
     try {
       const uploadedAsset = await uploadMediaVaultAsset(projectId, file, file.name);
-      
+
       setIgnitionQueue(prevQueue => prevQueue.map(proj => {
         if (proj.id === projectId) {
           return {
@@ -1571,7 +1749,7 @@ function App() {
     const formData = new FormData(e.target);
     const serviceId = formData.get('service');
     const serviceName = services.find(s => s.id === parseInt(serviceId))?.title || "Custom Service";
-    
+
     setIgnitionQueue(prev => prev.map(p => {
       if (p.id === selectedProjectTab) {
         return {
@@ -1581,7 +1759,7 @@ function App() {
           quote: parseInt(formData.get('quote')),
           discountValue: formData.get('discount') || '0',
           discountType: 'rs',
-          discountPercent: ((parseFloat(formData.get('discount'))||0) / parseInt(formData.get('quote')) * 100).toFixed(2),
+          discountPercent: ((parseFloat(formData.get('discount')) || 0) / parseInt(formData.get('quote')) * 100).toFixed(2),
           discount: parseInt(formData.get('discount')) || 0
         };
       }
@@ -1626,7 +1804,7 @@ function App() {
   const handleAddClient = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    
+
     try {
       if (selectedClient) {
         const clientData = {
@@ -1686,7 +1864,7 @@ function App() {
       console.error("Failed to save client:", err);
       alert("Failed to save client record.");
     }
-    
+
     setIsClientModalOpen(false);
     setSelectedClient(null);
   };
@@ -1725,7 +1903,7 @@ function App() {
       await createInquiry({
         name: nameVal,
         email: emailVal,
-        phone: phoneVal, 
+        phone: phoneVal,
         service: serviceVal,
         desc: visionVal,
         status: 'New Spark'
@@ -1745,1983 +1923,2018 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="app-container" ref={containerRef}>
-      {/* Side-aligned Sidebar (Only shown when a module is open) */}
-      {isCommandCenterActive && isAdminGridActive && (
-        <aside className="admin-sidebar">
-          <div className="sidebar-branding">
-            <img src="/logo.png" alt="Netra Logo" className="sidebar-logo-img" />
-            <span className="sidebar-branding-text">NETRA</span>
-          </div>
-          
-          <nav className="sidebar-menu">
-            {[
-              { id: "DASHBOARD", label: "Dashboard", icon: LayoutDashboard },
-              { id: "PROJECTS", label: "Projects", icon: Folder },
-              { id: "INQUIRIES", label: "Inquiries", icon: Inbox, badge: showInquiryBadge },
-              { id: "CLIENTS", label: "Clients", icon: Users },
-              { id: "FINANCIALS", label: "Financials", icon: FileText },
-              { id: "SETTINGS", label: "Settings", icon: Settings }
-            ].map((link) => {
-              const isActive = activeAdminModule === link.id;
-              const Icon = link.icon;
-              return (
-                <a 
-                  key={link.id}
-                  href="#" 
-                  className={`sidebar-menu-link ${isActive ? 'active' : ''}`}
-                  onClick={(e) => { 
-                    e.preventDefault(); 
-                    setActiveAdminModule(link.id); 
-                    setIsAdminGridActive(true); 
-                    setIsIgnitionModalOpen(false); // Auto-close modal on navigation
-                    if (link.id === "INQUIRIES") setShowInquiryBadge(false);
-                  }}
-                  data-testid={`link-sidebar-${link.label.toLowerCase()}`}
-                >
-                  <Icon className={`sidebar-link-icon ${isActive ? 'text-[#00E5FF]' : ''}`} />
-                  <span className="sidebar-link-label">{link.label}</span>
-                  {link.badge && (
-                    <span className="sidebar-notification-dot"></span>
-                  )}
-                </a>
-              );
-            })}
-          </nav>
-
-          <div className="sidebar-footer">
-            <div className="sidebar-notifications-trigger" onClick={() => setIsNotificationOpen(true)}>
-              <div className={`notification-bell-wrapper ${ ((sparks.length + flames.length) > 0 || bellPulse) ? 'has-alerts' : ''}`}>
-                <svg className="bell-icon" viewBox="0 0 24 24" width="20" height="20">
-                  <path fill="currentColor" d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
-                </svg>
-                {(sparks.length + flames.length) > 0 && (
-                  <span className="bell-badge">{sparks.length + flames.length}</span>
-                )}
-              </div>
-              <span className="notifications-label">SYSTEM ALERTS</span>
-            </div>
-
-            <a href="#" className="sidebar-logout-btn" onClick={handleLogout}>
-              <LogOut className="w-4 h-4" />
-              <span>LOGOUT</span>
-            </a>
-
-            <div className="sidebar-version-tag">
-              <p className="v-title">Netra OS v2.4</p>
-              <p className="v-status">Systems online.</p>
-            </div>
-          </div>
-        </aside>
-      )}
-
-      {/* Fixed Public Header */}
-      {!isCommandCenterActive && !isClientVaultActive && !isLoginActive && (
-        <header className={`main-header ${headerVisible ? 'header-reveal' : 'header-hidden'}`}>
-          <nav className="header-nav">
-            <div 
-              className={`branding-container ${(isVaultActive && !isContactActive && !isLoginActive) ? 'logo-middle' : ''}`}
-              onClick={goHome}
-            >
-              <motion.span layout className="branding-text word-netra">NETRA</motion.span>
-              <motion.div layout className="logo-asset-wrapper">
-                <img src="/logo.png" alt="Netra Logo" className="branding-logo" />
-                <div className="radiant-glow"></div>
-              </motion.div>
-              <motion.span layout className="branding-text word-graphics">GRAPHICS</motion.span>
-            </div>
-            <div className="menu-container">
-              <a href="#" className="menu-link" onClick={(e) => { e.preventDefault(); goHome(); }}>HOME</a>
-              <span className="menu-divider"></span>
-              <a href="#" className="menu-link" onClick={(e) => { e.preventDefault(); goToVault(); }}>SERVICES</a>
-              <span className="menu-divider"></span>
-              <a href="#projects" className="menu-link">OUR PROJECTS</a>
-              <span className="menu-divider"></span>
-              <a href="#" className="menu-link" onClick={(e) => { e.preventDefault(); goToContact(); }}>CONTACT US</a>
-              <span className="menu-divider"></span>
-              <a href="#" className="menu-link" onClick={(e) => { e.preventDefault(); goToLogin(); }}>LOGIN</a>
-              <span className="menu-divider"></span>
-              <button className="sound-toggle-btn" onClick={toggleSound} title={isPlaying ? "Mute Ambient Track" : "Play Ambient Track"}>
-                <div className={`sound-waves ${isPlaying ? 'playing' : ''}`}>
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              </button>
-            </div>
-          </nav>
-        </header>
-      )}
-
-      {/* Landing Experience */}
-      {!isLoginActive && !isCommandCenterActive && !isClientVaultActive && (
-        <>
-          {/* Hero Page */}
-          <section className={`hero-page ${isVaultActive ? 'slide-up' : ''}`}>
-        <div 
-          className="fluid-background"
-          style={{ '--mouse-x': `${mousePos.x}%`, '--mouse-y': `${mousePos.y}%` }}
-        >
-          <div className="gradient-sphere sphere-1"></div>
-          <div className="gradient-sphere sphere-2"></div>
-          <div className="grid-texture"></div>
-        </div>
-
-        <section className={`hero-section ${revealStarted ? 'clear' : 'blurred'}`}>
-          <div className="hero-content">
-            <h1 className="main-headline">
-              {"NETRA".split("").map((letter, idx) => (
-                <span key={idx} className={`stagger-letter ${headlineActive ? 'animate' : ''}`} style={{ '--delay': `${idx * 0.1}s` }}>
-                  {letter}
-                </span>
-              ))}
-            </h1>
-            <div className="hero-info">
-              <p className={`hero-tagline ${taglineActive ? 'fade-in' : ''}`}>VISUAL INTELLIGENCE & DESIGN</p>
-              <div className={`mission-statement ${missionActive ? 'fade-in-blur' : ''}`}>
-                We don't just create designs—we ignite visual revolutions. <br />
-                From the spark of an idea to the flame of execution, we transform brands into legendary experiences.
-              </div>
-            </div>
-          </div>
-          <div className={`scroll-beacon ${missionActive ? 'visible' : ''}`}>
-            <div className="beacon-content">
-              <span className="arrow">↓</span>
-              <span className="beacon-text">SCROLL TO EXPLORE</span>
-            </div>
-          </div>
-        </section>
-      </section>
-
-      {/* Service Vault Page */}
-      <section className={`vault-page ${isVaultActive ? 'active' : ''}`} ref={vaultRef}>
-        <div className="vault-background">
-          <div className="embers-container">
-            {emberStats.map((ember, i) => (
-              <div key={i} className="ember" style={{ 
-                '--left': ember.left,
-                '--delay': ember.delay,
-                '--duration': ember.duration
-              }}></div>
-            ))}
-          </div>
-        </div>
-
-        <div className="vault-content">
-          <div className="service-grid">
-            <AnimatePresence>
-              {isVaultActive && services.map((service, index) => (
-                <motion.div 
-                  key={service.id}
-                  className="service-card"
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1, duration: 0.5 }}
-                  onClick={() => {
-                    setSelectedService(service);
-                    setShowConstruction(true);
-                  }}
-                >
-                  <div className="card-visual">{service.icon}</div>
-                  <div className="card-info">
-                    <h3 className="service-name">{service.title}</h3>
-                    <p className="service-desc">{service.desc}</p>
-                  </div>
-                  <div className="inquiry-icon" data-tooltip="Booking Engine Coming Soon">
-                    <svg viewBox="0 0 24 24" width="20" height="20">
-                      <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-                    </svg>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        </div>
-      </section>
-
-      {/* Vision in Progress Overlay (Maintenance State) */}
-      <AnimatePresence>
-        {showConstruction && selectedService && (
-          <motion.div 
-            className="vision-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => {
-              setShowConstruction(false);
-              setSelectedService(null);
-            }}
-          >
-            <motion.div 
-              className="service-detail-popup"
-              initial={{ opacity: 0, scale: 0.9, y: 30 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 30 }}
-              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Close Button */}
-              <button 
-                className="popup-close-btn"
-                onClick={() => {
-                  setShowConstruction(false);
-                  setSelectedService(null);
-                }}
-                aria-label="Close details"
-              >
-                &times;
-              </button>
-
-              {/* Top Row: Icon and Tag */}
-              <div className="popup-header-row">
-                <div className="popup-icon-container">
-                  <span className="popup-service-icon">{selectedService.icon}</span>
-                </div>
-                {selectedService.tag && (
-                  <span className="popup-service-tag">{selectedService.tag}</span>
-                )}
+        <div className={`app-container ${isVaultActive ? 'vault-active' : ''}`} ref={containerRef}>
+          {/* Side-aligned Sidebar (Only shown when a module is open) */}
+          {isCommandCenterActive && isAdminGridActive && (
+            <aside className="admin-sidebar">
+              <div className="sidebar-branding">
+                <img src="/logo.png" alt="Netra Logo" className="sidebar-logo-img" />
+                <span className="sidebar-branding-text">NETRA</span>
               </div>
 
-              {/* Title and Description */}
-              <h2 className="popup-service-title">{selectedService.title}</h2>
-              <p className="popup-service-desc">{selectedService.desc}</p>
-
-              {/* Features List */}
-              <ul className="popup-features-list">
-                {selectedService.features && selectedService.features.map((feature, i) => (
-                  <li key={i} className="popup-feature-item">
-                    <span className="cyan-bullet-ring">
-                      <span className="cyan-bullet-dot"></span>
-                    </span>
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-
-              {/* Divider */}
-              <div className="popup-divider"></div>
-
-              {/* Footer Pricing / Delivery details */}
-              <div className="popup-footer-row">
-                <div className="popup-footer-col">
-                  <span className="popup-footer-label">STARTING AT</span>
-                  <span className="popup-footer-value price">{selectedService.price}</span>
-                </div>
-                <div className="popup-footer-col text-right">
-                  <span className="popup-footer-label">DELIVERY</span>
-                  <span className="popup-footer-value">{selectedService.delivery}</span>
-                </div>
-              </div>
-
-              {/* Get Started Button */}
-              <button 
-                className="popup-cta-btn" 
-                onClick={() => {
-                  setShowConstruction(false);
-                  setSelectedService(null);
-                  goToContact();
-                }}
-              >
-                Get Started
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Contact Portal Page */}
-      <section className={`contact-page ${isContactActive ? 'active' : ''}`}>
-        <div className="liquid-metal-bg" style={{ '--mouse-x': `${mousePos.x}%`, '--mouse-y': `${mousePos.y}%` }}>
-          <div className="liquid-overlay"></div>
-        </div>
-
-        <div className="contact-content">
-          <div className="split-narrative">
-            {/* Left Side: The Human Connection */}
-            <div className="connection-side">
-              <motion.div 
-                className="connection-reveal"
-                initial={false}
-                animate={isContactActive ? "visible" : "hidden"}
-                variants={{
-                  visible: { transition: { staggerChildren: 0.2 } },
-                  hidden: {}
-                }}
-              >
-                <motion.h2 
-                  className="contact-title"
-                  variants={{
-                    hidden: { opacity: 0, x: -50 },
-                    visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: "easeOut" } }
-                  }}
-                >
-                  LET'S IGNITE
-                </motion.h2>
-                <motion.div 
-                  className="contact-details"
-                  variants={{
-                    hidden: { opacity: 0, x: -30 },
-                    visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: "easeOut" } }
-                  }}
-                >
-                  <p className="detail-item email">hiraparasavan989@gmail.com</p>
-                  <p className="detail-item phone">+91 73590 93035</p>
-                  <p className="detail-item address">Shreeji Complex, Opp. AaramGruh, Mendarda-Sasan Road, Mendarda-362260</p>
-                </motion.div>
-                <motion.div 
-                  className="social-links"
-                  variants={{
-                    hidden: { opacity: 0, x: -20 },
-                    visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: "easeOut" } }
-                  }}
-                >
-                  <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" className="social-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
-                  </a>
-                  <a href="https://wa.me/917359093035?text=I am interested in starting a visual revolution with Netra Graphics." target="_blank" rel="noopener noreferrer" className="social-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 1 1-7.6-7.6 8.38 8.38 0 0 1 3.8.9L21 4.5l-4.1 4.1" /><path d="M11 11a1 1 0 1 0 2 0 1 1 0 1 0-2 0" /><path d="M17 11a1 1 0 1 0 2 0 1 1 0 1 0-2 0" /><path d="M7 11a1 1 0 1 0 2 0 1 1 0 1 0-2 0" /></svg>
-                  </a>
-                </motion.div>
-              </motion.div>
-            </div>
-
-            {/* Right Side: The Spark Interaction */}
-            <div className="spark-side">
-              {!isSuccess ? (
-                <form className="inquiry-form" onSubmit={handleSendSpark}>
-                  <div className="form-group">
-                    <input type="text" id="name" required placeholder=" " />
-                    <label htmlFor="name">Name</label>
-                    <div className="input-line"></div>
-                  </div>
-                  <div className="form-group">
-                    <input type="email" id="email" required placeholder=" " />
-                    <label htmlFor="email">Email</label>
-                    <div className="input-line"></div>
-                  </div>
-                  <div className="form-group">
-                    <input type="tel" id="phone" required placeholder=" " />
-                    <label htmlFor="phone">Mobile / WhatsApp</label>
-                    <div className="input-line"></div>
-                  </div>
-                  <div className="form-group custom-dropdown-wrapper" ref={dropdownRef}>
-                    <div 
-                      className={`custom-dropdown ${selectedProject ? 'has-value' : ''}`} 
-                      onClick={() => setDropdownOpen(!dropdownOpen)}
+              <nav className="sidebar-menu">
+                {[
+                  { id: "DASHBOARD", label: "Dashboard", icon: LayoutDashboard },
+                  { id: "PROJECTS", label: "Projects", icon: Folder },
+                  { id: "INQUIRIES", label: "Inquiries", icon: Inbox, badge: showInquiryBadge },
+                  { id: "CLIENTS", label: "Clients", icon: Users },
+                  { id: "FINANCIALS", label: "Financials", icon: FileText },
+                  { id: "SETTINGS", label: "Settings", icon: Settings }
+                ].map((link) => {
+                  const isActive = activeAdminModule === link.id;
+                  const Icon = link.icon;
+                  return (
+                    <a
+                      key={link.id}
+                      href="#"
+                      className={`sidebar-menu-link ${isActive ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setActiveAdminModule(link.id);
+                        setIsAdminGridActive(true);
+                        setIsIgnitionModalOpen(false); // Auto-close modal on navigation
+                        if (link.id === "INQUIRIES") setShowInquiryBadge(false);
+                      }}
+                      data-testid={`link-sidebar-${link.label.toLowerCase()}`}
                     >
-                      <span className="selected-value">{selectedProject || " "}</span>
-                      <label>Project Type</label>
-                      <div className="dropdown-arrow">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M6 9l6 6 6-6" />
-                        </svg>
-                      </div>
-                      <div className="input-line"></div>
+                      <Icon className={`sidebar-link-icon ${isActive ? 'text-[#00E5FF]' : ''}`} />
+                      <span className="sidebar-link-label">{link.label}</span>
+                      {link.badge && (
+                        <span className="sidebar-notification-dot"></span>
+                      )}
+                    </a>
+                  );
+                })}
+              </nav>
+
+              <div className="sidebar-footer">
+                <div className="sidebar-notifications-trigger" onClick={() => setIsNotificationOpen(true)}>
+                  <div className={`notification-bell-wrapper ${((sparks.length + flames.length) > 0 || bellPulse) ? 'has-alerts' : ''}`}>
+                    <svg className="bell-icon" viewBox="0 0 24 24" width="20" height="20">
+                      <path fill="currentColor" d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+                    </svg>
+                    {(sparks.length + flames.length) > 0 && (
+                      <span className="bell-badge">{sparks.length + flames.length}</span>
+                    )}
+                  </div>
+                  <span className="notifications-label">SYSTEM ALERTS</span>
+                </div>
+
+                <a href="#" className="sidebar-logout-btn" onClick={handleLogout}>
+                  <LogOut className="w-4 h-4" />
+                  <span>LOGOUT</span>
+                </a>
+
+                <div className="sidebar-version-tag">
+                  <p className="v-title">Netra OS v2.4</p>
+                  <p className="v-status">Systems online.</p>
+                </div>
+              </div>
+            </aside>
+          )}
+
+          {/* Fixed Public Header */}
+          {!isCommandCenterActive && !isClientVaultActive && !isLoginActive && (
+            <header className={`main-header ${headerVisible ? 'header-reveal' : 'header-hidden'} ${isNavVertical ? 'vision-mode nav-vertical' : ''}`}>
+              <nav className="header-nav">
+                <div
+                  className={`branding-container ${(isVaultActive && !isContactActive && !isLoginActive) ? 'logo-middle' : ''}`}
+                  onClick={goHome}
+                >
+                  <motion.span layout className="branding-text word-netra">NETRA</motion.span>
+                  <motion.div layout className="logo-asset-wrapper">
+                    <img src="/logo.png" alt="Netra Logo" className="branding-logo" />
+                    <div className="radiant-glow"></div>
+                  </motion.div>
+                  <motion.span layout className="branding-text word-graphics">GRAPHICS</motion.span>
+                </div>
+                <div className="menu-container">
+                  <a href="#" className="menu-link" title="HOME" onClick={(e) => { e.preventDefault(); goHome(); }}>
+                    <Home className="menu-icon" />
+                    <span className="menu-text">HOME</span>
+                  </a>
+                  <span className="menu-divider"></span>
+                  <a href="#" className="menu-link" title="SERVICES" onClick={(e) => { e.preventDefault(); goToServices(); }}>
+                    <Briefcase className="menu-icon" />
+                    <span className="menu-text">SERVICES</span>
+                  </a>
+                  <span className="menu-divider"></span>
+                  <a href="#" className="menu-link" title="VISION" onClick={(e) => { e.preventDefault(); goToVision(); }}>
+                    <Eye className="menu-icon" />
+                    <span className="menu-text">VISION</span>
+                  </a>
+                  <span className="menu-divider"></span>
+                  <a href="#" className="menu-link" title="CONTACT US" onClick={(e) => { e.preventDefault(); goToContact(); }}>
+                    <Mail className="menu-icon" />
+                    <span className="menu-text">CONTACT US</span>
+                  </a>
+                  <span className="menu-divider"></span>
+                  <a href="#" className="menu-link" title="LOGIN" onClick={(e) => { e.preventDefault(); goToLogin(); }}>
+                    <LogIn className="menu-icon" />
+                    <span className="menu-text">LOGIN</span>
+                  </a>
+                  <span className="menu-divider"></span>
+                  <button className="sound-toggle-btn" onClick={toggleSound} title={isPlaying ? "Mute Ambient Track" : "Play Ambient Track"}>
+                    <div className={`sound-waves ${isPlaying ? 'playing' : ''}`}>
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                      <span></span>
                     </div>
-                    
-                    <AnimatePresence>
-                      {dropdownOpen && (
-                        <motion.div 
-                          className="dropdown-list"
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                  </button>
+                </div>
+              </nav>
+            </header>
+          )}
+
+          {/* Landing Experience */}
+          {!isLoginActive && !isCommandCenterActive && !isClientVaultActive && (
+            <>
+              {/* Hero Page */}
+              <section className={`hero-page ${isVaultActive ? 'slide-up' : ''} ${(isVaultActive && !isTransitioning) ? 'hidden-when-vault' : ''}`}>
+                <div
+                  className="fluid-background"
+                  style={{ '--mouse-x': `${mousePos.x}%`, '--mouse-y': `${mousePos.y}%` }}
+                >
+                  <div className="gradient-sphere sphere-1"></div>
+                  <div className="gradient-sphere sphere-2"></div>
+                  <div className="grid-texture"></div>
+                </div>
+
+                <section className={`hero-section ${revealStarted ? 'clear' : 'blurred'}`}>
+                  <div className="hero-content">
+                    <h1 className="main-headline">
+                      {"NETRA".split("").map((letter, idx) => (
+                        <span key={idx} className={`stagger-letter ${headlineActive ? 'animate' : ''}`} style={{ '--delay': `${idx * 0.1}s` }}>
+                          {letter}
+                        </span>
+                      ))}
+                    </h1>
+                    <div className="hero-info">
+                      <p className={`hero-tagline ${taglineActive ? 'fade-in' : ''}`}>VISUAL INTELLIGENCE & DESIGN</p>
+                      <div className={`mission-statement ${missionActive ? 'fade-in-blur' : ''}`}>
+                        We don't just create designs—we ignite visual revolutions. <br />
+                        From the spark of an idea to the flame of execution, we transform brands into legendary experiences.
+                      </div>
+                    </div>
+                  </div>
+                  <div className={`scroll-beacon ${missionActive ? 'visible' : ''}`}>
+                    <div className="beacon-content">
+                      <span className="arrow">↓</span>
+                      <span className="beacon-text">SCROLL TO EXPLORE</span>
+                    </div>
+                  </div>
+                </section>
+              </section>
+
+              {/* Service Vault Page / Netra-Showcase */}
+              <section className={`vault-page ${isVaultActive ? 'active' : ''} ${isTransitioning ? 'transitioning' : ''}`} ref={vaultRef}>
+                {isVaultActive && (
+                  <Portfolio
+                    onContactClick={goToContact}
+                    visionSettings={visionSettings}
+                    servicesList={servicesList}
+                  />
+                )}
+              </section>
+
+              {/* Vision in Progress Overlay (Maintenance State) */}
+              <AnimatePresence>
+                {showConstruction && selectedService && (
+                  <motion.div
+                    className="vision-overlay"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => {
+                      setShowConstruction(false);
+                      setSelectedService(null);
+                    }}
+                  >
+                    <motion.div
+                      className="service-detail-popup"
+                      initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: 30 }}
+                      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* Close Button */}
+                      <button
+                        className="popup-close-btn"
+                        onClick={() => {
+                          setShowConstruction(false);
+                          setSelectedService(null);
+                        }}
+                        aria-label="Close details"
+                      >
+                        &times;
+                      </button>
+
+                      {/* Top Row: Icon and Tag */}
+                      <div className="popup-header-row">
+                        <div className="popup-icon-container">
+                          <span className="popup-service-icon">{selectedService.icon}</span>
+                        </div>
+                        {selectedService.tag && (
+                          <span className="popup-service-tag">{selectedService.tag}</span>
+                        )}
+                      </div>
+
+                      {/* Title and Description */}
+                      <h2 className="popup-service-title">{selectedService.title}</h2>
+                      <p className="popup-service-desc">{selectedService.desc}</p>
+
+                      {/* Features List */}
+                      <ul className="popup-features-list">
+                        {selectedService.features && selectedService.features.map((feature, i) => (
+                          <li key={i} className="popup-feature-item">
+                            <span className="cyan-bullet-ring">
+                              <span className="cyan-bullet-dot"></span>
+                            </span>
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
+
+                      {/* Divider */}
+                      <div className="popup-divider"></div>
+
+                      {/* Footer Pricing / Delivery details */}
+                      <div className="popup-footer-row">
+                        <div className="popup-footer-col">
+                          <span className="popup-footer-label">STARTING AT</span>
+                          <span className="popup-footer-value price">{selectedService.price}</span>
+                        </div>
+                        <div className="popup-footer-col text-right">
+                          <span className="popup-footer-label">DELIVERY</span>
+                          <span className="popup-footer-value">{selectedService.delivery}</span>
+                        </div>
+                      </div>
+
+                      {/* Get Started Button */}
+                      <button
+                        className="popup-cta-btn"
+                        onClick={() => {
+                          setShowConstruction(false);
+                          setSelectedService(null);
+                          goToContact();
+                        }}
+                      >
+                        Get Started
+                      </button>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Services Catalogue Page */}
+              <section className={`services-page ${isServicesActive ? 'active' : ''}`}>
+                {/* Grid */}
+
+                {/* Grid */}
+                <div className="services-page-body">
+                  <div className="service-grid">
+                    {services.map((s, i) => (
+                      <motion.div
+                        key={s.id}
+                        className="service-card"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={isServicesActive ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+                        transition={{ duration: 0.4, delay: i * 0.03, ease: [0.16, 1, 0.3, 1] }}
+                        onClick={() => {
+                          setSelectedService(s);
+                          setShowConstruction(true);
+                        }}
+                      >
+                        {s.tag && (
+                          <span className="service-card-tag">{s.tag}</span>
+                        )}
+                        <div className="card-visual">{s.icon}</div>
+                        <div className="card-info">
+                          <h3 className="service-name">{s.title}</h3>
+                          <p className="service-desc">{s.desc}</p>
+                        </div>
+                        <span className="inquiry-icon" data-tooltip="View Details">
+                          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                            <path d="M3 15L15 3M15 3H7M15 3V11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              {/* Contact Portal Page */}
+              <section className={`contact-page ${isContactActive ? 'active' : ''}`}>
+                <div className="liquid-metal-bg" style={{ '--mouse-x': `${mousePos.x}%`, '--mouse-y': `${mousePos.y}%` }}>
+                  <div className="liquid-overlay"></div>
+                </div>
+
+                <div className="contact-content">
+                  <div className="split-narrative">
+                    {/* Left Side: The Human Connection */}
+                    <div className="connection-side">
+                      <motion.div
+                        className="connection-reveal"
+                        initial={false}
+                        animate={isContactActive ? "visible" : "hidden"}
+                        variants={{
+                          visible: { transition: { staggerChildren: 0.2 } },
+                          hidden: {}
+                        }}
+                      >
+                        <motion.h2
+                          className="contact-title"
+                          variants={{
+                            hidden: { opacity: 0, x: -50 },
+                            visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: "easeOut" } }
+                          }}
                         >
-                          {services.map((s, i) => (
-                            <motion.div 
-                              key={s.id}
-                              className="dropdown-item"
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: i * 0.03 }}
-                              onClick={() => {
-                                setSelectedProject(s.title);
-                                setDropdownOpen(false);
-                              }}
+                          LET'S IGNITE
+                        </motion.h2>
+                        <motion.div
+                          className="contact-details"
+                          variants={{
+                            hidden: { opacity: 0, x: -30 },
+                            visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: "easeOut" } }
+                          }}
+                        >
+                          <p className="detail-item email">hiraparasavan989@gmail.com</p>
+                          <p className="detail-item phone">+91 73590 93035</p>
+                          <p className="detail-item address">Shreeji Complex, Opp. AaramGruh, Mendarda-Sasan Road, Mendarda-362260</p>
+                        </motion.div>
+                        <motion.div
+                          className="social-links"
+                          variants={{
+                            hidden: { opacity: 0, x: -20 },
+                            visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: "easeOut" } }
+                          }}
+                        >
+                          <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" className="social-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                          </a>
+                          <a href="https://wa.me/917359093035?text=I am interested in starting a visual revolution with Netra Graphics." target="_blank" rel="noopener noreferrer" className="social-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 1 1-7.6-7.6 8.38 8.38 0 0 1 3.8.9L21 4.5l-4.1 4.1" /><path d="M11 11a1 1 0 1 0 2 0 1 1 0 1 0-2 0" /><path d="M17 11a1 1 0 1 0 2 0 1 1 0 1 0-2 0" /><path d="M7 11a1 1 0 1 0 2 0 1 1 0 1 0-2 0" /></svg>
+                          </a>
+                        </motion.div>
+                      </motion.div>
+                    </div>
+
+                    {/* Right Side: The Spark Interaction */}
+                    <div className="spark-side">
+                      {!isSuccess ? (
+                        <form className="inquiry-form" onSubmit={handleSendSpark}>
+                          <div className="form-group">
+                            <input type="text" id="name" required placeholder=" " />
+                            <label htmlFor="name">Name</label>
+                            <div className="input-line"></div>
+                          </div>
+                          <div className="form-group">
+                            <input type="email" id="email" required placeholder=" " />
+                            <label htmlFor="email">Email</label>
+                            <div className="input-line"></div>
+                          </div>
+                          <div className="form-group">
+                            <input type="tel" id="phone" required placeholder=" " />
+                            <label htmlFor="phone">Mobile / WhatsApp</label>
+                            <div className="input-line"></div>
+                          </div>
+                          <div className="form-group custom-dropdown-wrapper" ref={dropdownRef}>
+                            <div
+                              className={`custom-dropdown ${selectedProject ? 'has-value' : ''}`}
+                              onClick={() => setDropdownOpen(!dropdownOpen)}
                             >
-                              {s.title}
-                            </motion.div>
-                          ))}
+                              <span className="selected-value">{selectedProject || " "}</span>
+                              <label>Project Type</label>
+                              <div className="dropdown-arrow">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M6 9l6 6 6-6" />
+                                </svg>
+                              </div>
+                              <div className="input-line"></div>
+                            </div>
+
+                            <AnimatePresence>
+                              {dropdownOpen && (
+                                <motion.div
+                                  className="dropdown-list"
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                                >
+                                  {services.map((s, i) => (
+                                    <motion.div
+                                      key={s.id}
+                                      className="dropdown-item"
+                                      initial={{ opacity: 0, x: -10 }}
+                                      animate={{ opacity: 1, x: 0 }}
+                                      transition={{ delay: i * 0.03 }}
+                                      onClick={() => {
+                                        setSelectedProject(s.title);
+                                        setDropdownOpen(false);
+                                      }}
+                                    >
+                                      {s.title}
+                                    </motion.div>
+                                  ))}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                          <div className="form-group">
+                            <textarea id="vision" required placeholder=" " rows="1"></textarea>
+                            <label htmlFor="vision">Your Vision</label>
+                            <div className="input-line"></div>
+                          </div>
+                          <button type="submit" className="magnetic-button">
+                            <span className="btn-text">SEND SPARK</span>
+                            <div className="btn-glow"></div>
+                          </button>
+                        </form>
+                      ) : (
+                        <div className="success-sequence">
+                          <div className="light-speed-particles">
+                            {[...Array(50)].map((_, i) => (
+                              <div
+                                key={i}
+                                className="particle"
+                                style={{
+                                  '--tx': `${(Math.random() - 0.5) * 1000}px`,
+                                  '--ty': `${(Math.random() - 0.5) * 1000}px`,
+                                  '--delay': `${Math.random() * 0.5}s`
+                                }}
+                              ></div>
+                            ))}
+                          </div>
+                          <motion.div
+                            className="success-logo-container"
+                            initial={{ opacity: 0, scale: 0.5 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 1.2, ease: "easeOut" }}
+                          >
+                            <div className="logo-formation">
+                              <img src="/logo.png" alt="Netra Logo" className="success-brand-logo" />
+                              <div className="cyan-bloom-pulse"></div>
+                            </div>
+                          </motion.div>
+                          <h3 className="success-msg">VISION RECEIVED. PREPARING FOR REVOLUTION.</h3>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <footer className="contact-footer">
+                  <div className="footer-watermark">
+                    <img src="/image_0.png" alt="Watermark" />
+                  </div>
+                  <p>© 2026 NETRA GRAPHICS | MENDARDA, GUJARAT | PRECISION IN EVERY PIXEL</p>
+                </footer>
+              </section>
+            </>
+          )}
+
+          {/* Login Module Page */}
+          <section className={`login-page ${isLoginActive ? 'active' : ''}`}>
+            <div
+              ref={loginContainerRef}
+              className="netra-bg"
+            >
+              {/* Background Effects */}
+              <div className={`cyber-grid ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`} />
+
+              {/* Floating Particles */}
+              {loginParticles.map((p) => (
+                <motion.div
+                  key={p.id}
+                  className={`absolute rounded-full ${!isAdminSelected ? 'bg-[#08d9d6]' : 'bg-[#ff2e63]'}`}
+                  style={{
+                    width: `${p.size}px`,
+                    height: `${p.size}px`,
+                    position: 'absolute',
+                    top: `${p.top}%`,
+                    left: `${p.left}%`,
+                    opacity: 0.25,
+                  }}
+                  animate={{
+                    y: [0, -120],
+                    x: [0, p.targetX],
+                    opacity: [0, 0.7, 0],
+                  }}
+                  transition={{
+                    duration: p.duration,
+                    repeat: Infinity,
+                    ease: "linear",
+                    delay: p.delay,
+                  }}
+                />
+              ))}
+
+              {/* Main Container */}
+              <motion.div
+                className="perspective-container"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                <motion.div
+                  className={`glass-panel ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}
+                  layout
+                >
+                  {/* Card Scan Overlay */}
+                  <div className={`scan-line-overlay ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`} />
+
+                  {/* Header */}
+                  <div className="login-header-group">
+                    <motion.div
+                      className="login-header-icon-wrapper"
+                      animate={{
+                        boxShadow: !isAdminSelected
+                          ? ['0 0 0px #08d9d6', '0 0 20px #08d9d6', '0 0 0px #08d9d6']
+                          : ['0 0 0px #ff2e63', '0 0 20px #ff2e63', '0 0 0px #ff2e63']
+                      }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
+                      {!isAdminSelected ? <Sparkles className="w-8 h-8 text-[#08d9d6]" /> : <Terminal className="w-8 h-8 text-[#ff2e63]" />}
+                    </motion.div>
+                    <h1 className="login-header-title">
+                      NETRA GRAPHICS
+                    </h1>
+                    <p className={`login-header-subtitle ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}>
+                      {!isAdminSelected ? 'CLIENT PORTAL' : 'SECURE ADMIN ACCESS'}
+                    </p>
+                  </div>
+
+                  {/* Mode Switcher */}
+                  <div className="login-mode-switcher">
+                    <motion.div
+                      className="login-mode-indicator"
+                      style={{
+                        backgroundColor: !isAdminSelected ? 'rgba(8, 217, 214, 0.2)' : 'rgba(255, 46, 99, 0.2)'
+                      }}
+                      animate={{ x: !isAdminSelected ? '100%' : '0%' }}
+                      transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setIsAdminSelected(true)}
+                      className="login-mode-btn"
+                      style={{ color: isAdminSelected ? '#ff2e63' : 'rgba(255, 255, 255, 0.5)' }}
+                    >
+                      Admin
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsAdminSelected(false)}
+                      className="login-mode-btn"
+                      style={{ color: !isAdminSelected ? '#08d9d6' : 'rgba(255, 255, 255, 0.5)' }}
+                    >
+                      Client
+                    </button>
+                  </div>
+
+                  {/* Form */}
+                  <form onSubmit={handleLogin} className="login-form-fields">
+                    <div className="netra-input-wrapper">
+                      <User className="w-4 h-4 input-icon" />
+                      <input
+                        type="email"
+                        placeholder="Identification (Email)"
+                        value={accessKey}
+                        onChange={(e) => setAccessKey(e.target.value)}
+                        className={`netra-input ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}
+                        spellCheck={false}
+                        required
+                      />
+                    </div>
+
+                    <div className="netra-input-wrapper">
+                      <Lock className="w-4 h-4 input-icon" />
+                      <input
+                        type={showPassphrase ? 'text' : 'password'}
+                        placeholder="Passcode"
+                        value={passphrase}
+                        onChange={(e) => setPassphrase(e.target.value)}
+                        className={`netra-input ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassphrase(!showPassphrase)}
+                        className="passphrase-toggle-btn"
+                      >
+                        {showPassphrase ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+
+                    <AnimatePresence>
+                      {loginError && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0, y: -10 }}
+                          animate={{ opacity: 1, height: 'auto', y: 0 }}
+                          exit={{ opacity: 0, height: 0, y: -10 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="login-inline-error">
+                            <ShieldAlert className="w-3 h-3 flex-shrink-0" />
+                            <span>{loginError}</span>
+                          </div>
                         </motion.div>
                       )}
                     </AnimatePresence>
+
+                    <button
+                      type="submit"
+                      className={`cyber-button ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}
+                    >
+                      <span>Initialize Access</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </form>
+
+                  {/* Return to Home Option */}
+                  <div className="login-back-to-home-container">
+                    <button
+                      type="button"
+                      onClick={goHome}
+                      className={`login-back-home-btn ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      <span>Return to Main Frame</span>
+                    </button>
                   </div>
-                  <div className="form-group">
-                    <textarea id="vision" required placeholder=" " rows="1"></textarea>
-                    <label htmlFor="vision">Your Vision</label>
-                    <div className="input-line"></div>
-                  </div>
-                  <button type="submit" className="magnetic-button">
-                    <span className="btn-text">SEND SPARK</span>
-                    <div className="btn-glow"></div>
-                  </button>
-                </form>
-              ) : (
-                <div className="success-sequence">
-                  <div className="light-speed-particles">
-                    {[...Array(50)].map((_, i) => (
-                      <div 
-                        key={i} 
-                        className="particle" 
-                        style={{ 
-                          '--tx': `${(Math.random() - 0.5) * 1000}px`, 
-                          '--ty': `${(Math.random() - 0.5) * 1000}px`,
-                          '--delay': `${Math.random() * 0.5}s`
-                        }}
-                      ></div>
-                    ))}
-                  </div>
-                  <motion.div 
-                    className="success-logo-container"
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 1.2, ease: "easeOut" }}
+                </motion.div>
+              </motion.div>
+            </div>
+          </section>
+
+          {/* Command Center (Admin View) */}
+          <section className={`admin-vault-page ${isCommandCenterActive ? 'active' : ''}`}>
+            <div className="admin-view-wrapper">
+              <AnimatePresence mode="wait">
+                {!isAdminGridActive ? (
+                  /* Welcome / Administrative Modules Grid */
+                  <motion.div
+                    key="welcome"
+                    className="admin-welcome-screen"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0, x: -50 }}
+                    transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                   >
-                    <div className="logo-formation">
-                      <img src="/logo.png" alt="Netra Logo" className="success-brand-logo" />
-                      <div className="cyan-bloom-pulse"></div>
+                    <div className="aura-ignition-bg">
+                      <div className="aura-container">
+                        <div className="plasma-sphere plasma-cyan"></div>
+                        <div className="plasma-sphere plasma-orange"></div>
+                        <div className="plasma-sphere plasma-slate"></div>
+                        <div className="aura-pulse-core"></div>
+                      </div>
+                      <div className="admin-grid-overlay"></div>
+                    </div>
+                    <div className="vault-content modules-grid-layout">
+                      <div className="modules-header">
+                        <span className="header-bar"></span>
+                        <h2>ADMINISTRATIVE MODULES</h2>
+                      </div>
+
+                      <div className="admin-cards-grid">
+                        {[
+                          { id: "DASHBOARD", title: "DASHBOARD", desc: "Global metrics and high-level project status.", icon: "⚡" },
+                          { id: "PROJECTS", title: "PROJECTS", desc: "Active project management and media vault.", icon: "📁" },
+                          { id: "INQUIRIES", title: "INQUIRIES", desc: "Managing 'Sparks' from the contact portal.", icon: "📥" },
+                          { id: "CLIENTS", title: "CLIENTS", desc: "Full CRM database of the Netra network.", icon: "👥" },
+                          { id: "FINANCIALS", title: "FINANCIALS", desc: "Invoice generation and revenue ignition.", icon: "💰" },
+                          { id: "SETTINGS", title: "SETTINGS", desc: "Calibrating the 17 service cards and pricing.", icon: "⚙️" },
+                          { id: "LOGOUT", title: "LOGOUT", desc: "Safe session termination and return to Home.", icon: "🚪" }
+                        ].map((card) => (
+                          <div
+                            key={card.id}
+                            className={`admin-module-card ${card.id === "INQUIRIES" && unreadSparksCount > 0 ? 'magic-alert' : ''}`}
+                            onClick={() => {
+                              if (card.id === "LOGOUT") {
+                                handleLogout({ preventDefault: () => { } });
+                              } else {
+                                setActiveAdminModule(card.id);
+                                setIsAdminGridActive(true);
+                                if (card.id === "INQUIRIES") {
+                                  setUnreadSparksCount(0);
+                                  setShowInquiryBadge(false);
+                                }
+                              }
+                            }}
+                          >
+                            <div className="card-icon">{card.icon}</div>
+                            <h3 className="card-title">{card.title}</h3>
+                            <p className="card-desc">{card.desc}</p>
+                            {card.id === "INQUIRIES" && unreadSparksCount > 0 && (
+                              <div className="card-magic-badge">NEW SPARKS</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </motion.div>
-                  <h3 className="success-msg">VISION RECEIVED. PREPARING FOR REVOLUTION.</h3>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <footer className="contact-footer">
-          <div className="footer-watermark">
-            <img src="/image_0.png" alt="Watermark" />
-          </div>
-          <p>© 2026 NETRA GRAPHICS | MENDARDA, GUJARAT | PRECISION IN EVERY PIXEL</p>
-        </footer>
-      </section>
-    </>
-  )}
-
-      {/* Login Module Page */}
-      <section className={`login-page ${isLoginActive ? 'active' : ''}`}>
-        <div 
-          ref={loginContainerRef}
-          className="netra-bg"
-        >
-          {/* Background Effects */}
-          <div className={`cyber-grid ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`} />
-          
-          {/* Floating Particles */}
-          {loginParticles.map((p) => (
-            <motion.div
-              key={p.id}
-              className={`absolute rounded-full ${!isAdminSelected ? 'bg-[#08d9d6]' : 'bg-[#ff2e63]'}`}
-              style={{
-                width: `${p.size}px`,
-                height: `${p.size}px`,
-                position: 'absolute',
-                top: `${p.top}%`,
-                left: `${p.left}%`,
-                opacity: 0.25,
-              }}
-              animate={{
-                y: [0, -120],
-                x: [0, p.targetX],
-                opacity: [0, 0.7, 0],
-              }}
-              transition={{
-                duration: p.duration,
-                repeat: Infinity,
-                ease: "linear",
-                delay: p.delay,
-              }}
-            />
-          ))}
-
-          {/* Main Container */}
-          <motion.div 
-            className="perspective-container"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <motion.div 
-              className={`glass-panel ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}
-              layout
-            >
-              {/* Card Scan Overlay */}
-              <div className={`scan-line-overlay ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`} />
-              
-              {/* Header */}
-              <div className="login-header-group">
-                <motion.div 
-                  className="login-header-icon-wrapper"
-                  animate={{ 
-                    boxShadow: !isAdminSelected 
-                      ? ['0 0 0px #08d9d6', '0 0 20px #08d9d6', '0 0 0px #08d9d6']
-                      : ['0 0 0px #ff2e63', '0 0 20px #ff2e63', '0 0 0px #ff2e63']
-                  }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  {!isAdminSelected ? <Sparkles className="w-8 h-8 text-[#08d9d6]" /> : <Terminal className="w-8 h-8 text-[#ff2e63]" />}
-                </motion.div>
-                <h1 className="login-header-title">
-                  NETRA GRAPHICS
-                </h1>
-                <p className={`login-header-subtitle ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}>
-                  {!isAdminSelected ? 'CLIENT PORTAL' : 'SECURE ADMIN ACCESS'}
-                </p>
-              </div>
-
-              {/* Mode Switcher */}
-              <div className="login-mode-switcher">
-                <motion.div 
-                  className="login-mode-indicator"
-                  style={{
-                    backgroundColor: !isAdminSelected ? 'rgba(8, 217, 214, 0.2)' : 'rgba(255, 46, 99, 0.2)'
-                  }}
-                  animate={{ x: !isAdminSelected ? '100%' : '0%' }}
-                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                />
-                
-                <button
-                  type="button"
-                  onClick={() => setIsAdminSelected(true)}
-                  className="login-mode-btn"
-                  style={{ color: isAdminSelected ? '#ff2e63' : 'rgba(255, 255, 255, 0.5)' }}
-                >
-                  Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsAdminSelected(false)}
-                  className="login-mode-btn"
-                  style={{ color: !isAdminSelected ? '#08d9d6' : 'rgba(255, 255, 255, 0.5)' }}
-                >
-                  Client
-                </button>
-              </div>
-
-              {/* Form */}
-              <form onSubmit={handleLogin} className="login-form-fields">
-                <div className="netra-input-wrapper">
-                  <User className="w-4 h-4 input-icon" />
-                  <input
-                    type="email"
-                    placeholder="Identification (Email)"
-                    value={accessKey}
-                    onChange={(e) => setAccessKey(e.target.value)}
-                    className={`netra-input ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}
-                    spellCheck={false}
-                    required
-                  />
-                </div>
-                
-                <div className="netra-input-wrapper">
-                  <Lock className="w-4 h-4 input-icon" />
-                  <input
-                    type={showPassphrase ? 'text' : 'password'}
-                    placeholder="Passcode"
-                    value={passphrase}
-                    onChange={(e) => setPassphrase(e.target.value)}
-                    className={`netra-input ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassphrase(!showPassphrase)}
-                    className="passphrase-toggle-btn"
+                ) : (
+                  /* Administrative Modules (Command Grid) */
+                  <motion.div
+                    key="grid"
+                    className="admin-grid-screen sidebar-active"
+                    initial={{ opacity: 0, x: 100 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 100 }}
+                    transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                   >
-                    {showPassphrase ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-
-                <AnimatePresence>
-                  {loginError && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0, y: -10 }}
-                      animate={{ opacity: 1, height: 'auto', y: 0 }}
-                      exit={{ opacity: 0, height: 0, y: -10 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="login-inline-error">
-                        <ShieldAlert className="w-3 h-3 flex-shrink-0" />
-                        <span>{loginError}</span>
+                    <div className="aura-ignition-bg">
+                      <div className="aura-container">
+                        <div className="plasma-sphere plasma-cyan"></div>
+                        <div className="plasma-sphere plasma-orange"></div>
+                        <div className="plasma-sphere plasma-slate"></div>
+                        <div className="aura-pulse-core"></div>
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      <div className="admin-grid-overlay"></div>
+                    </div>
+                    <div className="vault-content grid-layout">
+                      <div className="active-module-header">
+                        <h2 className="module-title">{activeAdminModule}</h2>
+                        <div className="title-underline"></div>
+                      </div>
 
-                <button
-                  type="submit"
-                  className={`cyber-button ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}
-                >
-                  <span>Initialize Access</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </form>
+                      <div className="module-content-area">
+                        {activeAdminModule === "DASHBOARD" && (
+                          <Dashboard />
+                        )}
 
-              {/* Return to Home Option */}
-              <div className="login-back-to-home-container">
-                <button 
-                  type="button" 
-                  onClick={goHome} 
-                  className={`login-back-home-btn ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Return to Main Frame</span>
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
+                        {activeAdminModule === "PROJECTS" && (
+                          <Projects
+                            projects={ignitionQueue}
+                            setProjects={setIgnitionQueue}
+                            clients={clients}
+                            onOpenIgnitionModal={() => { setPrefillData(null); setIsIgnitionModalOpen(true); }}
+                          />
+                        )}
 
-      {/* Command Center (Admin View) */}
-      <section className={`admin-vault-page ${isCommandCenterActive ? 'active' : ''}`}>
-        <div className="admin-view-wrapper">
-          <AnimatePresence mode="wait">
-            {!isAdminGridActive ? (
-              /* Welcome / Administrative Modules Grid */
-              <motion.div 
-                key="welcome"
-                className="admin-welcome-screen"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0, x: -50 }}
-                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <div className="aura-ignition-bg">
-                  <div className="aura-container">
-                    <div className="plasma-sphere plasma-cyan"></div>
-                    <div className="plasma-sphere plasma-orange"></div>
-                    <div className="plasma-sphere plasma-slate"></div>
-                    <div className="aura-pulse-core"></div>
-                  </div>
-                  <div className="admin-grid-overlay"></div>
-                </div>
-                <div className="vault-content modules-grid-layout">
-                  <div className="modules-header">
-                    <span className="header-bar"></span>
-                    <h2>ADMINISTRATIVE MODULES</h2>
-                  </div>
-                  
-                  <div className="admin-cards-grid">
-                    {[
-                      { id: "DASHBOARD", title: "DASHBOARD", desc: "Global metrics and high-level project status.", icon: "⚡" },
-                      { id: "PROJECTS", title: "PROJECTS", desc: "Active project management and media vault.", icon: "📁" },
-                      { id: "INQUIRIES", title: "INQUIRIES", desc: "Managing 'Sparks' from the contact portal.", icon: "📥" },
-                      { id: "CLIENTS", title: "CLIENTS", desc: "Full CRM database of the Netra network.", icon: "👥" },
-                      { id: "FINANCIALS", title: "FINANCIALS", desc: "Invoice generation and revenue ignition.", icon: "💰" },
-                      { id: "SETTINGS", title: "SETTINGS", desc: "Calibrating the 17 service cards and pricing.", icon: "⚙️" },
-                      { id: "LOGOUT", title: "LOGOUT", desc: "Safe session termination and return to Home.", icon: "🚪" }
-                    ].map((card) => (
-                      <div 
-                        key={card.id} 
-                        className={`admin-module-card ${card.id === "INQUIRIES" && unreadSparksCount > 0 ? 'magic-alert' : ''}`}
-                        onClick={() => {
-                          if (card.id === "LOGOUT") {
-                            handleLogout({ preventDefault: () => {} });
-                          } else {
-                            setActiveAdminModule(card.id);
-                            setIsAdminGridActive(true);
-                            if (card.id === "INQUIRIES") {
-                              setUnreadSparksCount(0);
-                              setShowInquiryBadge(false);
-                            }
-                          }
-                        }}
-                      >
-                        <div className="card-icon">{card.icon}</div>
-                        <h3 className="card-title">{card.title}</h3>
-                        <p className="card-desc">{card.desc}</p>
-                        {card.id === "INQUIRIES" && unreadSparksCount > 0 && (
-                          <div className="card-magic-badge">NEW SPARKS</div>
+                        {activeAdminModule === "INQUIRIES" && (
+                          <Inquiries
+                            inquiries={inquiries}
+                            setInquiries={setInquiries}
+                            services={services}
+                            handleIgniteFromInquiry={handleIgniteFromInquiry}
+                          />
+                        )}
+
+                        {activeAdminModule === "CLIENTS" && (
+                          <Clients
+                            clients={clients}
+                            ignitionQueue={ignitionQueue}
+                            onOpenCreateClient={() => { setSelectedClient(null); setIsClientModalOpen(true); }}
+                            onOpenEditClient={(client) => { setSelectedClient(client); setIsClientModalOpen(true); }}
+                            onDeleteClient={deleteClient}
+                          />
+                        )}
+
+                        {activeAdminModule === "FINANCIALS" && (
+                          <Financials
+                            ignitionQueue={ignitionQueue}
+                            setIgnitionQueue={setIgnitionQueue}
+                            cashbookEntries={cashbookEntries}
+                            setCashbookEntries={setCashbookEntries}
+                            invoices={invoices}
+                            setInvoices={setInvoices}
+                            monthlyTarget={monthlyTarget}
+                            setMonthlyTarget={setMonthlyTarget}
+                            financialTab={financialTab}
+                            setFinancialTab={setFinancialTab}
+                            financialMetrics={financialMetrics}
+                            cashbookMetrics={cashbookMetrics}
+                            setCustomPaymentPrompt={setCustomPaymentPrompt}
+                            setIsCashbookEditModalOpen={setIsCashbookEditModalOpen}
+                            setSelectedCashbookEntry={setSelectedCashbookEntry}
+                            setIsInvoicePreviewOpen={setIsInvoicePreviewOpen}
+                            setInvoiceProject={setInvoiceProject}
+                            selectedBatchProjects={selectedBatchProjects}
+                            setSelectedBatchProjects={setSelectedBatchProjects}
+                            selectedVaultInvoices={selectedVaultInvoices}
+                            setSelectedVaultInvoices={setSelectedVaultInvoices}
+                            handleAddCashbookEntry={handleAddCashbookEntry}
+                          />
+                        )}
+
+                        {activeAdminModule === "SETTINGS" && (
+                          <SettingsPage
+                            servicesList={servicesList}
+                            onOpenCalibrate={handleOpenCalibrate}
+                            visionSettings={visionSettings}
+                            onSaveVisionSettings={handleSaveVisionSettings}
+                          />
                         )}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
-            ) : (
-              /* Administrative Modules (Command Grid) */
-              <motion.div 
-                key="grid"
-                className="admin-grid-screen sidebar-active"
-                initial={{ opacity: 0, x: 100 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 100 }}
-                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <div className="aura-ignition-bg">
-                  <div className="aura-container">
-                    <div className="plasma-sphere plasma-cyan"></div>
-                    <div className="plasma-sphere plasma-orange"></div>
-                    <div className="plasma-sphere plasma-slate"></div>
-                    <div className="aura-pulse-core"></div>
-                  </div>
-                  <div className="admin-grid-overlay"></div>
-                </div>
-                <div className="vault-content grid-layout">
-                  <div className="active-module-header">
-                    <h2 className="module-title">{activeAdminModule}</h2>
-                    <div className="title-underline"></div>
-                  </div>
-                  
-                  <div className="module-content-area">
-                    {activeAdminModule === "DASHBOARD" && (
-                      <Dashboard />
-                    )}
 
-                    {activeAdminModule === "PROJECTS" && (
-                      <Projects 
-                        projects={ignitionQueue}
-                        setProjects={setIgnitionQueue}
-                        clients={clients}
-                        onOpenIgnitionModal={() => { setPrefillData(null); setIsIgnitionModalOpen(true); }}
-                      />
-                    )}
+                      {/* Floating Action Button (Ignition Trigger) - Dashboard & Projects */}
+                      {(activeAdminModule === "DASHBOARD" || activeAdminModule === "PROJECTS") && (
+                        <>
+                          <motion.button
+                            className="ignition-fab"
+                            whileHover={{ width: '260px' }}
+                            onClick={() => { setPrefillData(null); setIsIgnitionModalOpen(true); }}
+                          >
+                            <span className="fab-icon">+</span>
+                            <span className="fab-text">START NEW IGNITION</span>
+                          </motion.button>
 
-                    {activeAdminModule === "INQUIRIES" && (
-                      <Inquiries
-                        inquiries={inquiries}
-                        setInquiries={setInquiries}
-                        services={services}
-                        handleIgniteFromInquiry={handleIgniteFromInquiry}
-                      />
-                    )}
+                        </>
+                      )}
 
-                    {activeAdminModule === "CLIENTS" && (
-                      <Clients 
-                        clients={clients}
-                        ignitionQueue={ignitionQueue}
-                        onOpenCreateClient={() => { setSelectedClient(null); setIsClientModalOpen(true); }}
-                        onOpenEditClient={(client) => { setSelectedClient(client); setIsClientModalOpen(true); }}
-                        onDeleteClient={deleteClient}
-                      />
-                    )}
-
-                    {activeAdminModule === "FINANCIALS" && (
-                      <Financials
-                        ignitionQueue={ignitionQueue}
-                        setIgnitionQueue={setIgnitionQueue}
-                        cashbookEntries={cashbookEntries}
-                        setCashbookEntries={setCashbookEntries}
-                        invoices={invoices}
-                        setInvoices={setInvoices}
-                        monthlyTarget={monthlyTarget}
-                        setMonthlyTarget={setMonthlyTarget}
-                        financialTab={financialTab}
-                        setFinancialTab={setFinancialTab}
-                        financialMetrics={financialMetrics}
-                        cashbookMetrics={cashbookMetrics}
-                        setCustomPaymentPrompt={setCustomPaymentPrompt}
-                        setIsCashbookEditModalOpen={setIsCashbookEditModalOpen}
-                        setSelectedCashbookEntry={setSelectedCashbookEntry}
-                        setIsInvoicePreviewOpen={setIsInvoicePreviewOpen}
-                        setInvoiceProject={setInvoiceProject}
-                        selectedBatchProjects={selectedBatchProjects}
-                        setSelectedBatchProjects={setSelectedBatchProjects}
-                        selectedVaultInvoices={selectedVaultInvoices}
-                        setSelectedVaultInvoices={setSelectedVaultInvoices}
-                        handleAddCashbookEntry={handleAddCashbookEntry}
-                      />
-                    )}
-
-                    {activeAdminModule === "SETTINGS" && (
-                      <SettingsPage
-                        servicesList={servicesList}
-                        onOpenCalibrate={handleOpenCalibrate}
-                      />
-                    )}
-                  </div>
-
-                  {/* Floating Action Button (Ignition Trigger) - Dashboard & Projects */}
-                  {(activeAdminModule === "DASHBOARD" || activeAdminModule === "PROJECTS") && (
-                    <>
-                      <motion.button 
-                        className="ignition-fab"
-                        whileHover={{ width: '260px' }}
-                        onClick={() => { setPrefillData(null); setIsIgnitionModalOpen(true); }}
-                      >
-                        <span className="fab-icon">+</span>
-                        <span className="fab-text">START NEW IGNITION</span>
-                      </motion.button>
-
-                    </>
-                  )}
-
-                  {/* Modals - Moved outside of specific module conditionals to be globally accessible in Admin */}
-                  <AnimatePresence>
-                    {isIgnitionModalOpen && (
-                      <div className="modal-overlay">
-                        <motion.div 
-                          className="ignition-modal"
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          exit={{ 
-                            scale: 1.5, 
-                            opacity: 0,
-                            filter: 'brightness(3) saturate(2)',
-                            boxShadow: '0 0 100px #FF4500, 0 0 200px #00E5FF' 
-                          }}
-                          transition={{ duration: 0.5 }}
-                        >
-                          <button className="close-modal" onClick={() => setIsIgnitionModalOpen(false)}>×</button>
-                          <div className="modal-header">
-                            <h2>MANUAL PROJECT IGNITION</h2>
-                            <p>Calibrating a new visual revolution</p>
-                          </div>
-                          
-                          <form className="ignition-form" onSubmit={handleIgniteProject} key={prefillData ? prefillData.inquiryId || 'spark' : 'manual'}>
-                            <div className="client-type-selector">
-                              <button 
-                                type="button" 
-                                className={`type-btn ${ignitionClientType === 'NEW' ? 'active' : ''}`}
-                                onClick={() => setIgnitionClientType('NEW')}
-                              >
-                                NEW VISIONARY
-                              </button>
-                              <button 
-                                type="button" 
-                                className={`type-btn ${ignitionClientType === 'EXISTING' ? 'active' : ''}`}
-                                onClick={() => setIgnitionClientType('EXISTING')}
-                              >
-                                EXISTING CLIENT
-                              </button>
-                            </div>
-
-                            {ignitionClientType === 'EXISTING' ? (
-                              <div className="input-group">
-                                <label>Select Existing Client</label>
-                                <select name="existingClientId" required>
-                                  <option value="">Choose from your network...</option>
-                                  {clients.map(c => (
-                                    <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
-                                  ))}
-                                </select>
-                                {clients.length === 0 && <p className="dim-text small-hint">No clients registered yet. Please create a new one.</p>}
+                      {/* Modals - Moved outside of specific module conditionals to be globally accessible in Admin */}
+                      <AnimatePresence>
+                        {isIgnitionModalOpen && (
+                          <div className="modal-overlay">
+                            <motion.div
+                              className="ignition-modal"
+                              initial={{ scale: 0.8, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{
+                                scale: 1.5,
+                                opacity: 0,
+                                filter: 'brightness(3) saturate(2)',
+                                boxShadow: '0 0 100px #FF4500, 0 0 200px #00E5FF'
+                              }}
+                              transition={{ duration: 0.5 }}
+                            >
+                              <button className="close-modal" onClick={() => setIsIgnitionModalOpen(false)}>×</button>
+                              <div className="modal-header">
+                                <h2>MANUAL PROJECT IGNITION</h2>
+                                <p>Calibrating a new visual revolution</p>
                               </div>
-                            ) : (
-                              <>
-                                <div className="form-row">
-                                  <div className="input-group">
-                                    <label>Client Name</label>
-                                    <input type="text" name="clientName" defaultValue={prefillData?.clientName || ''} placeholder="Identity of the visionary" required />
-                                  </div>
-                                  <div className="input-group">
-                                    <label>Client Email</label>
-                                    <input type="email" name="email" defaultValue={prefillData?.email || ''} placeholder="Direct digital link" required />
-                                  </div>
+
+                              <form className="ignition-form" onSubmit={handleIgniteProject} key={prefillData ? prefillData.inquiryId || 'spark' : 'manual'}>
+                                <div className="client-type-selector">
+                                  <button
+                                    type="button"
+                                    className={`type-btn ${ignitionClientType === 'NEW' ? 'active' : ''}`}
+                                    onClick={() => setIgnitionClientType('NEW')}
+                                  >
+                                    NEW VISIONARY
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`type-btn ${ignitionClientType === 'EXISTING' ? 'active' : ''}`}
+                                    onClick={() => setIgnitionClientType('EXISTING')}
+                                  >
+                                    EXISTING CLIENT
+                                  </button>
                                 </div>
 
-                                <div className="form-row">
+                                {ignitionClientType === 'EXISTING' ? (
                                   <div className="input-group">
-                                    <label>Client Mobile</label>
-                                    <input type="tel" name="whatsapp" defaultValue={prefillData?.phone || ''} placeholder="+91 XXXXX XXXXX" required />
+                                    <label>Select Existing Client</label>
+                                    <select name="existingClientId" required>
+                                      <option value="">Choose from your network...</option>
+                                      {clients.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
+                                      ))}
+                                    </select>
+                                    {clients.length === 0 && <p className="dim-text small-hint">No clients registered yet. Please create a new one.</p>}
                                   </div>
-                                  <div className="input-group">
-                                    <label>Client Billing Address</label>
-                                    <input type="text" name="address" defaultValue={prefillData?.address || ''} placeholder="Official registered address" required />
-                                  </div>
-                                </div>
-                              </>
-                            )}
-
-                            <div className="form-row">
-                              <div className="input-group">
-                                <label>Select Service Calibration</label>
-                                <select name="service" required defaultValue={prefillData?.serviceId || ''}>
-                                  <option value="">Choose service...</option>
-                                  {services.map(s => (
-                                    <option key={s.id} value={s.id}>{s.title}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="input-group">
-                                <label>Target Delivery Date</label>
-                                <input type="date" name="deadline" required />
-                              </div>
-                            </div>
-
-                            <div className="form-row">
-                              <div className="input-group">
-                                <label>Estimated Quote (₹)</label>
-                                <input type="number" name="quote" placeholder="Suggested base: ₹15,000" />
-                              </div>
-                              <div className="input-group">
-                                <label>Special Discount (₹)</label>
-                                <input type="number" name="discount" placeholder="0" />
-                              </div>
-                            </div>
-
-                            <div className="modal-actions">
-                              <button type="button" className="cancel-mission-btn" onClick={() => setIsIgnitionModalOpen(false)}>
-                                CANCEL MISSION
-                              </button>
-                              <button type="submit" className="ignite-submit-btn">
-                                IGNITE PROJECT
-                              </button>
-                            </div>
-                          </form>
-                        </motion.div>
-                      </div>
-                    )}
-                  </AnimatePresence>
-
-                  <AnimatePresence>
-                    {isClientModalOpen && (
-                      <div className="modal-overlay">
-                        <motion.div 
-                          className="ignition-modal"
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          exit={{ scale: 0.8, opacity: 0 }}
-                        >
-                          <button className="close-modal" onClick={() => { setIsClientModalOpen(false); setSelectedClient(null); }}>×</button>
-                          <div className="modal-header">
-                            <h2>{selectedClient ? 'EDIT CLIENT PROFILE' : 'ADD NEW CLIENT'}</h2>
-                            <p>{selectedClient ? 'Updating parameters for an existing visionary' : 'Onboarding a new visionary to the Netra Graphics network'}</p>
-                          </div>
-                          
-                          <form className="ignition-form" onSubmit={handleAddClient}>
-                            <div className="form-row">
-                              <div className="input-group">
-                                <label>Full Name / Company</label>
-                                <input type="text" name="name" defaultValue={selectedClient?.name} placeholder="Identity of the visionary" required />
-                              </div>
-                              <div className="input-group">
-                                <label>Email Address</label>
-                                <input type="email" name="email" defaultValue={selectedClient?.email} placeholder="Direct digital link" required />
-                              </div>
-                            </div>
-
-                            <div className="form-row">
-                              <div className="input-group">
-                                <label>Mobile Number</label>
-                                <input type="tel" name="phone" defaultValue={selectedClient?.phone} placeholder="+91 XXXXX XXXXX" required />
-                              </div>
-                              <div className="input-group">
-                                <label>Billing Address</label>
-                                <input type="text" name="address" defaultValue={selectedClient?.address} placeholder="Physical location for records" required />
-                              </div>
-                            </div>
-
-                            <div className="form-row">
-                              <div className="input-group" style={{ width: '100%' }}>
-                                <label>GST Number (Optional)</label>
-                                <input type="text" name="gst" defaultValue={selectedClient?.gst} placeholder="22AAAAA0000A1Z5" />
-                              </div>
-                            </div>
-
-                            <div className="modal-actions">
-                              <button type="button" className="cancel-mission-btn" onClick={() => { setIsClientModalOpen(false); setSelectedClient(null); }}>
-                                CANCEL
-                              </button>
-                              <button type="submit" className="ignite-submit-btn">
-                                {selectedClient ? 'UPDATE CLIENT' : 'REGISTER CLIENT'}
-                              </button>
-                            </div>
-                          </form>
-                        </motion.div>
-                      </div>
-                    )}
-                  </AnimatePresence>
-                  
-                  <AnimatePresence>
-                    {isProjectEditModalOpen && (
-                      <div className="modal-overlay">
-                        <motion.div 
-                          className="ignition-modal"
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          exit={{ scale: 0.8, opacity: 0 }}
-                        >
-                          <button className="close-modal" onClick={() => setIsProjectEditModalOpen(false)}>×</button>
-                          <div className="modal-header">
-                            <h2>CALIBRATE MISSION</h2>
-                            <p>Updating parameters for the current revolution</p>
-                          </div>
-                          
-                          {(() => {
-                            const currentProject = ignitionQueue.find(p => p.id === selectedProjectTab);
-                            return (
-                              <form className="ignition-form" onSubmit={handleEditProject}>
-                                <div className="input-group">
-                                  <label>Service Calibration</label>
-                                  <select name="service" defaultValue={services.find(s => s.title === currentProject?.service)?.id} required>
-                                    {services.map(s => (
-                                      <option key={s.id} value={s.id}>{s.title}</option>
-                                    ))}
-                                  </select>
-                                </div>
-
-                                <div className="form-row">
-                                  <div className="input-group">
-                                    <label>Deadline Adjustment</label>
-                                    <input type="date" name="deadline" defaultValue={currentProject?.deadline} required />
-                                  </div>
-                                  <div className="form-row">
-                                    <div className="input-group">
-                                      <label>Quote Calibration (₹)</label>
-                                      <input type="number" name="quote" defaultValue={currentProject?.quote} required />
+                                ) : (
+                                  <>
+                                    <div className="form-row">
+                                      <div className="input-group">
+                                        <label>Client Name</label>
+                                        <input type="text" name="clientName" defaultValue={prefillData?.clientName || ''} placeholder="Identity of the visionary" required />
+                                      </div>
+                                      <div className="input-group">
+                                        <label>Client Email</label>
+                                        <input type="email" name="email" defaultValue={prefillData?.email || ''} placeholder="Direct digital link" required />
+                                      </div>
                                     </div>
-                                    <div className="input-group">
-                                      <label>Discount Calibration (₹)</label>
-                                      <input type="number" name="discount" defaultValue={currentProject?.discount} />
+
+                                    <div className="form-row">
+                                      <div className="input-group">
+                                        <label>Client Mobile</label>
+                                        <input type="tel" name="whatsapp" defaultValue={prefillData?.phone || ''} placeholder="+91 XXXXX XXXXX" required />
+                                      </div>
+                                      <div className="input-group">
+                                        <label>Client Billing Address</label>
+                                        <input type="text" name="address" defaultValue={prefillData?.address || ''} placeholder="Official registered address" required />
+                                      </div>
                                     </div>
+                                  </>
+                                )}
+
+                                <div className="form-row">
+                                  <div className="input-group">
+                                    <label>Select Service Calibration</label>
+                                    <select name="service" required defaultValue={prefillData?.serviceId || ''}>
+                                      <option value="">Choose service...</option>
+                                      {services.map(s => (
+                                        <option key={s.id} value={s.id}>{s.title}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="input-group">
+                                    <label>Target Delivery Date</label>
+                                    <input type="date" name="deadline" required />
+                                  </div>
+                                </div>
+
+                                <div className="form-row">
+                                  <div className="input-group">
+                                    <label>Estimated Quote (₹)</label>
+                                    <input type="number" name="quote" placeholder="Suggested base: ₹15,000" />
+                                  </div>
+                                  <div className="input-group">
+                                    <label>Special Discount (₹)</label>
+                                    <input type="number" name="discount" placeholder="0" />
                                   </div>
                                 </div>
 
                                 <div className="modal-actions">
-                                  <button type="button" className="cancel-mission-btn" onClick={() => setIsProjectEditModalOpen(false)}>
-                                    CANCEL
+                                  <button type="button" className="cancel-mission-btn" onClick={() => setIsIgnitionModalOpen(false)}>
+                                    CANCEL MISSION
                                   </button>
                                   <button type="submit" className="ignite-submit-btn">
-                                    SAVE CALIBRATION
+                                    IGNITE PROJECT
                                   </button>
                                 </div>
                               </form>
-                            );
-                          })()}
-                        </motion.div>
-                      </div>
-                    )}
-                  </AnimatePresence>
-                  <AnimatePresence>
-                    {isCashbookEditModalOpen && selectedCashbookEntry && (
-                      <div className="modal-overlay">
-                        <motion.div 
-                          className="ignition-modal"
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          exit={{ scale: 0.8, opacity: 0 }}
-                        >
-                          <button className="close-modal" onClick={() => { setIsCashbookEditModalOpen(false); setSelectedCashbookEntry(null); }}>×</button>
-                          <div className="modal-header">
-                            <h2>EDIT CASHBOOK ENTRY</h2>
-                            <p>Modifying financial records</p>
+                            </motion.div>
                           </div>
-                          
-                          <form className="ignition-form" onSubmit={handleUpdateCashbookEntry}>
-                            <div className="form-row">
-                              <div className="input-group">
-                                <label>Date</label>
-                                <input type="date" name="date" defaultValue={selectedCashbookEntry.date} required />
+                        )}
+                      </AnimatePresence>
+
+                      <AnimatePresence>
+                        {isClientModalOpen && (
+                          <div className="modal-overlay">
+                            <motion.div
+                              className="ignition-modal"
+                              initial={{ scale: 0.8, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0.8, opacity: 0 }}
+                            >
+                              <button className="close-modal" onClick={() => { setIsClientModalOpen(false); setSelectedClient(null); }}>×</button>
+                              <div className="modal-header">
+                                <h2>{selectedClient ? 'EDIT CLIENT PROFILE' : 'ADD NEW CLIENT'}</h2>
+                                <p>{selectedClient ? 'Updating parameters for an existing visionary' : 'Onboarding a new visionary to the Netra Graphics network'}</p>
                               </div>
-                              <div className="input-group">
-                                <label>Description</label>
-                                <input type="text" name="desc" defaultValue={selectedCashbookEntry.desc} required />
-                              </div>
-                            </div>
-                            <div className="form-row">
-                              <div className="input-group">
-                                <label>Amount (₹)</label>
-                                <input type="number" name="amount" defaultValue={selectedCashbookEntry.amount} required />
-                              </div>
-                              <div className="input-group">
-                                <label>Type</label>
-                                <select name="type" defaultValue={selectedCashbookEntry.type}>
-                                  <option value="EXPENSE">Expense</option>
-                                  <option value="INCOME">Misc Income</option>
-                                </select>
-                              </div>
-                            </div>
-                            <div className="form-row">
-                              <div className="input-group">
-                                <label>Payment Mode</label>
-                                <select name="mode" defaultValue={selectedCashbookEntry.mode}>
-                                  <option value="UPI">UPI / Online</option>
-                                  <option value="CASH">Cash</option>
-                                </select>
-                              </div>
-                              <div className="input-group">
-                                <label>Category</label>
-                                <select name="category" defaultValue={selectedCashbookEntry.category}>
-                                  <option value="Software">Software</option>
-                                  <option value="Hardware">Hardware</option>
-                                  <option value="Marketing">Marketing</option>
-                                  <option value="Salary">Salary/Wages</option>
-                                  <option value="Rent">Rent</option>
-                                  <option value="Service">Service Income</option>
-                                  <option value="Other">Other</option>
-                                </select>
-                              </div>
-                            </div>
 
-                            <div className="modal-actions">
-                              <button type="button" className="cancel-mission-btn" onClick={() => { setIsCashbookEditModalOpen(false); setSelectedCashbookEntry(null); }}>
-                                CANCEL
-                              </button>
-                              <button type="submit" className="ignite-submit-btn">
-                                UPDATE ENTRY
-                              </button>
-                            </div>
-                          </form>
-                        </motion.div>
-                      </div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </section>
+                              <form className="ignition-form" onSubmit={handleAddClient}>
+                                <div className="form-row">
+                                  <div className="input-group">
+                                    <label>Full Name / Company</label>
+                                    <input type="text" name="name" defaultValue={selectedClient?.name} placeholder="Identity of the visionary" required />
+                                  </div>
+                                  <div className="input-group">
+                                    <label>Email Address</label>
+                                    <input type="email" name="email" defaultValue={selectedClient?.email} placeholder="Direct digital link" required />
+                                  </div>
+                                </div>
 
-      {/* Client Vault Placeholder */}
-      <section className={`client-vault-page ${isClientVaultActive ? 'active' : ''}`}>
-        <div className="vault-background client-bg"></div>
-        <div className="vault-content">
-          <h1 className="vision-title">CLIENT VAULT</h1>
-          <p className="vision-subtitle">Secure access granted. Your brand's evolution is stored here.</p>
-          <button className="vision-back-btn" onClick={goHome}>EXIT TO MAIN FRAME</button>
-        </div>
-      </section>
+                                <div className="form-row">
+                                  <div className="input-group">
+                                    <label>Mobile Number</label>
+                                    <input type="tel" name="phone" defaultValue={selectedClient?.phone} placeholder="+91 XXXXX XXXXX" required />
+                                  </div>
+                                  <div className="input-group">
+                                    <label>Billing Address</label>
+                                    <input type="text" name="address" defaultValue={selectedClient?.address} placeholder="Physical location for records" required />
+                                  </div>
+                                </div>
 
-      {/* Cinematic Splash Overlay System */}
-      {!isFullyRevealed && (
-        <div className="splash-overlay" style={{ '--logo-duration': '1.8s' }}>
-          <div className={`eyelid upper-lid ${revealStarted ? 'retract-up' : ''}`}></div>
-          <div className={`eyelid lower-lid ${revealStarted ? 'retract-down' : ''}`}></div>
-          <div className="logo-outer-container">
-            <svg viewBox="0 0 100 100" className={`logo-svg ${logoDrawn ? 'bloom-active' : ''} ${revealStarted ? 'fade-out' : ''}`}>
-              <defs>
-                <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#00E5FF" /><stop offset="100%" stopColor="#FFFFFF" />
-                </linearGradient>
-                <filter id="bloom-filter" x="-100%" y="-100%" width="300%" height="300%">
-                  <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur1" />
-                  <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="blur2" />
-                  <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur3" />
-                  <feColorMatrix in="blur3" type="matrix" values="0 0 0 0 0  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0" result="cyan-glow" />
-                  <feMerge><feMergeNode in="blur1" /><feMergeNode in="blur2" /><feMergeNode in="cyan-glow" /><feMergeNode in="SourceGraphic" /></feMerge>
-                </filter>
-              </defs>
-              <path className="logo-path" d="M30 75 L30 25 L70 75 L70 25" fill="none" stroke="url(#logo-gradient)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" pathLength="100" />
-            </svg>
-          </div>
-        </div>
-      )}
-        {/* Project Detail Drawer */}
-      <AnimatePresence>
-        {selectedKanbanProject && (
-          <div className="notification-drawer-overlay" onClick={() => setSelectedKanbanProject(null)}>
-            <motion.div 
-              className="project-detail-drawer"
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 30, stiffness: 200 }}
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="drawer-header">
-                <div className="header-label">
-                  <span className="accent-bar orange"></span>
-                  <h2>PROJECT BLUEPRINT</h2>
-                </div>
-                <button className="close-notif" onClick={() => setSelectedKanbanProject(null)}>✕</button>
-              </div>
-              
-              <div className="drawer-body">
-                <section className="client-profile-section">
-                  <div className="profile-header">
-                    <div className="p-avatar">{selectedKanbanProject.client.name.charAt(0)}</div>
-                    <div className="p-main">
-                      <h3>{selectedKanbanProject.client.name}</h3>
-                      <p className="p-location">{selectedKanbanProject.client.address}</p>
-                    </div>
-                  </div>
-                  <div className="profile-details-grid">
-                    <div className="pd-item">
-                      <span className="pd-label">WhatsApp</span>
-                      <span className="pd-value">{selectedKanbanProject.client.phone}</span>
-                    </div>
-                    <div className="pd-item">
-                      <span className="pd-label">Email</span>
-                      <span className="pd-value">{selectedKanbanProject.client.email}</span>
-                    </div>
-                  </div>
-                </section>
+                                <div className="form-row">
+                                  <div className="input-group" style={{ width: '100%' }}>
+                                    <label>GST Number (Optional)</label>
+                                    <input type="text" name="gst" defaultValue={selectedClient?.gst} placeholder="22AAAAA0000A1Z5" />
+                                  </div>
+                                </div>
 
-                <section className="drawer-sub-section">
-                  <h4 className="section-title">PROGRESS ROADMAP</h4>
-                  <div className="roadmap-list">
-                    {selectedKanbanProject.milestones.map((m, idx) => (
-                      <div key={idx} className={`roadmap-step ${selectedKanbanProject.completedMilestones.includes(m) ? 'done' : ''}`}>
-                        <div className="step-check">
-                          {selectedKanbanProject.completedMilestones.includes(m) && "✓"}
-                        </div>
-                        <span className="step-name">{m}</span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="drawer-sub-section">
-                  <h4 className="section-title">ACTIVITY LOG</h4>
-                  <div className="log-list">
-                    {selectedKanbanProject.activityLog.map((log, idx) => (
-                      <div key={idx} className="log-entry">
-                        <div className="log-dot"></div>
-                        <div className="log-info">
-                          <span className="log-time">{log.time}</span>
-                          <p className="log-action">{log.action}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              </div>
-
-              <div className="drawer-footer">
-                <div className="status-management">
-                  <span className="status-label">MANAGE PROJECT STATUS</span>
-                  <div className="status-buttons">
-                    {selectedKanbanProject.status !== "Ongoing" && (
-                      <button className="status-btn s-ongoing" onClick={() => updateProjectStatus(selectedKanbanProject.id, "Ongoing")}>RESTORE TO ONGOING</button>
-                    )}
-                    {selectedKanbanProject.status !== "Completed" && (
-                      <button className="status-btn s-completed" onClick={() => updateProjectStatus(selectedKanbanProject.id, "Completed")}>MARK COMPLETED</button>
-                    )}
-                    {selectedKanbanProject.status !== "Closed" && (
-                      <button className="status-btn s-closed" onClick={() => updateProjectStatus(selectedKanbanProject.id, "Closed")}>CLOSE PROJECT</button>
-                    )}
-                    {selectedKanbanProject.status !== "Dismissed" && (
-                      <button className="status-btn s-dismissed" onClick={() => updateProjectStatus(selectedKanbanProject.id, "Dismissed")}>DISMISS PROJECT</button>
-                    )}
-                  </div>
-                </div>
-
-                {selectedKanbanProject.stage < 4 && selectedKanbanProject.status === "Ongoing" && (
-                  <button 
-                    className="move-stage-btn" 
-                    onClick={() => moveProjectStage(selectedKanbanProject.id)}
-                  >
-                    IGNITE {kanbanColumns[selectedKanbanProject.stage].title}
-                  </button>
-                )}
-                <button className="vault-link-btn" onClick={() => setSelectedKanbanProject(null)}>CLOSE BLUEPRINT</button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Notification Engine Drawer */}
-      <AnimatePresence>
-        {isNotificationOpen && (
-          <div className="notification-drawer-overlay" onClick={() => setIsNotificationOpen(false)}>
-            <motion.div 
-              className="notification-drawer"
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 30, stiffness: 200 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="drawer-header">
-                <div className="header-label">
-                  <span className="accent-bar"></span>
-                  <h2>NOTIFICATIONS</h2>
-                </div>
-                <button className="close-notif" onClick={() => setIsNotificationOpen(false)}>✕</button>
-              </div>
-
-              <div className="drawer-tabs">
-                <button 
-                  className={`tab-btn ${notifTab === 'SPARKS' ? 'active' : ''}`}
-                  onClick={() => setNotifTab('SPARKS')}
-                >
-                  NEW SPARKS
-                  {sparks.length > 0 && <span className="tab-badge cyan">{sparks.length}</span>}
-                </button>
-                <button 
-                  className={`tab-btn ${notifTab === 'FLAMES' ? 'active' : ''}`}
-                  onClick={() => setNotifTab('FLAMES')}
-                >
-                  URGENT FLAMES
-                  {flames.length > 0 && <span className="tab-badge orange">{flames.length}</span>}
-                </button>
-              </div>
-
-              <div className="drawer-content">
-                {notifTab === 'SPARKS' ? (
-                  <div className="notif-list">
-                    {sparks.length > 0 ? sparks.map(s => (
-                      <div key={s.id} className="notif-card spark flex justify-between items-center" onClick={() => {
-                        setActiveAdminModule("INQUIRIES");
-                        setIsAdminGridActive(true);
-                        setIsNotificationOpen(false);
-                      }}>
-                        <div className="flex items-center gap-3">
-                          <div className="notif-icon-box cyan">✦</div>
-                          <div className="notif-info">
-                            <p className="notif-msg">New inquiry from <strong>{s.name}</strong></p>
-                            <span className="notif-time">{s.date}</span>
+                                <div className="modal-actions">
+                                  <button type="button" className="cancel-mission-btn" onClick={() => { setIsClientModalOpen(false); setSelectedClient(null); }}>
+                                    CANCEL
+                                  </button>
+                                  <button type="submit" className="ignite-submit-btn">
+                                    {selectedClient ? 'UPDATE CLIENT' : 'REGISTER CLIENT'}
+                                  </button>
+                                </div>
+                              </form>
+                            </motion.div>
                           </div>
-                        </div>
-                        <button 
-                          className="text-3xs uppercase tracking-wider text-cyan-400 hover:text-cyan-300 font-extrabold px-2.5 py-1 rounded bg-cyan-400/10 border border-cyan-400/20 cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            markInquiryAsRead(s.id);
-                          }}
-                        >
-                          MARK READ
-                        </button>
-                      </div>
-                    )) : (
-                      <div className="empty-state">
-                        <span className="empty-icon">✧</span>
-                        <p>No new sparks detected.</p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="notif-list">
-                    {flames.length > 0 ? flames.map(f => (
-                      <div key={f.id} className="notif-card flame flex justify-between items-center" onClick={() => {
-                        setActiveAdminModule("DASHBOARD");
-                        setIsAdminGridActive(true);
-                        setIsNotificationOpen(false);
-                      }}>
-                        <div className="flex items-center gap-3">
-                          <div className="notif-icon-box orange">🔥</div>
-                          <div className="notif-info">
-                            <p className="notif-msg">Deadline approaching for <strong>{f.name}</strong></p>
-                            <span className="notif-time">Project Calibration Required within 24h</span>
+                        )}
+                      </AnimatePresence>
+
+                      <AnimatePresence>
+                        {isProjectEditModalOpen && (
+                          <div className="modal-overlay">
+                            <motion.div
+                              className="ignition-modal"
+                              initial={{ scale: 0.8, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0.8, opacity: 0 }}
+                            >
+                              <button className="close-modal" onClick={() => setIsProjectEditModalOpen(false)}>×</button>
+                              <div className="modal-header">
+                                <h2>CALIBRATE MISSION</h2>
+                                <p>Updating parameters for the current revolution</p>
+                              </div>
+
+                              {(() => {
+                                const currentProject = ignitionQueue.find(p => p.id === selectedProjectTab);
+                                return (
+                                  <form className="ignition-form" onSubmit={handleEditProject}>
+                                    <div className="input-group">
+                                      <label>Service Calibration</label>
+                                      <select name="service" defaultValue={services.find(s => s.title === currentProject?.service)?.id} required>
+                                        {services.map(s => (
+                                          <option key={s.id} value={s.id}>{s.title}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+
+                                    <div className="form-row">
+                                      <div className="input-group">
+                                        <label>Deadline Adjustment</label>
+                                        <input type="date" name="deadline" defaultValue={currentProject?.deadline} required />
+                                      </div>
+                                      <div className="form-row">
+                                        <div className="input-group">
+                                          <label>Quote Calibration (₹)</label>
+                                          <input type="number" name="quote" defaultValue={currentProject?.quote} required />
+                                        </div>
+                                        <div className="input-group">
+                                          <label>Discount Calibration (₹)</label>
+                                          <input type="number" name="discount" defaultValue={currentProject?.discount} />
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="modal-actions">
+                                      <button type="button" className="cancel-mission-btn" onClick={() => setIsProjectEditModalOpen(false)}>
+                                        CANCEL
+                                      </button>
+                                      <button type="submit" className="ignite-submit-btn">
+                                        SAVE CALIBRATION
+                                      </button>
+                                    </div>
+                                  </form>
+                                );
+                              })()}
+                            </motion.div>
                           </div>
-                        </div>
-                        <button 
-                          className="text-3xs uppercase tracking-wider text-orange-400 hover:text-orange-300 font-extrabold px-2.5 py-1 rounded bg-orange-400/10 border border-orange-400/20 cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            markFlameAsRead(f.id);
-                          }}
-                        >
-                          DISMISS
-                        </button>
-                      </div>
-                    )) : (
-                      <div className="empty-state">
-                        <span className="empty-icon">🕯️</span>
-                        <p>No urgent flames currently burning.</p>
-                      </div>
-                    )}
-                  </div>
+                        )}
+                      </AnimatePresence>
+                      <AnimatePresence>
+                        {isCashbookEditModalOpen && selectedCashbookEntry && (
+                          <div className="modal-overlay">
+                            <motion.div
+                              className="ignition-modal"
+                              initial={{ scale: 0.8, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0.8, opacity: 0 }}
+                            >
+                              <button className="close-modal" onClick={() => { setIsCashbookEditModalOpen(false); setSelectedCashbookEntry(null); }}>×</button>
+                              <div className="modal-header">
+                                <h2>EDIT CASHBOOK ENTRY</h2>
+                                <p>Modifying financial records</p>
+                              </div>
+
+                              <form className="ignition-form" onSubmit={handleUpdateCashbookEntry}>
+                                <div className="form-row">
+                                  <div className="input-group">
+                                    <label>Date</label>
+                                    <input type="date" name="date" defaultValue={selectedCashbookEntry.date} required />
+                                  </div>
+                                  <div className="input-group">
+                                    <label>Description</label>
+                                    <input type="text" name="desc" defaultValue={selectedCashbookEntry.desc} required />
+                                  </div>
+                                </div>
+                                <div className="form-row">
+                                  <div className="input-group">
+                                    <label>Amount (₹)</label>
+                                    <input type="number" name="amount" defaultValue={selectedCashbookEntry.amount} required />
+                                  </div>
+                                  <div className="input-group">
+                                    <label>Type</label>
+                                    <select name="type" defaultValue={selectedCashbookEntry.type}>
+                                      <option value="EXPENSE">Expense</option>
+                                      <option value="INCOME">Misc Income</option>
+                                    </select>
+                                  </div>
+                                </div>
+                                <div className="form-row">
+                                  <div className="input-group">
+                                    <label>Payment Mode</label>
+                                    <select name="mode" defaultValue={selectedCashbookEntry.mode}>
+                                      <option value="UPI">UPI / Online</option>
+                                      <option value="CASH">Cash</option>
+                                    </select>
+                                  </div>
+                                  <div className="input-group">
+                                    <label>Category</label>
+                                    <select name="category" defaultValue={selectedCashbookEntry.category}>
+                                      <option value="Software">Software</option>
+                                      <option value="Hardware">Hardware</option>
+                                      <option value="Marketing">Marketing</option>
+                                      <option value="Salary">Salary/Wages</option>
+                                      <option value="Rent">Rent</option>
+                                      <option value="Service">Service Income</option>
+                                      <option value="Other">Other</option>
+                                    </select>
+                                  </div>
+                                </div>
+
+                                <div className="modal-actions">
+                                  <button type="button" className="cancel-mission-btn" onClick={() => { setIsCashbookEditModalOpen(false); setSelectedCashbookEntry(null); }}>
+                                    CANCEL
+                                  </button>
+                                  <button type="submit" className="ignite-submit-btn">
+                                    UPDATE ENTRY
+                                  </button>
+                                </div>
+                              </form>
+                            </motion.div>
+                          </div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </motion.div>
                 )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              </AnimatePresence>
+            </div>
+          </section>
 
-      {customPaymentPrompt && (
-        <div className="modal-overlay" style={{zIndex: 9999}}>
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            style={{ 
-              maxWidth: '400px', width: '90%', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto',
-              background: 'rgba(5, 5, 5, 0.98)', border: '1px solid rgba(255, 255, 255, 0.05)', 
-              borderTop: '2px solid #00E5FF', borderRadius: '4px' 
-            }}
-          >
-            <h2 className="modal-title" style={{color: '#00e5ff', marginTop: '0', marginBottom: '0.8rem'}}>Log Payment</h2>
-            <p className="dim-text" style={{marginBottom: '1rem', fontSize: '0.85rem', lineHeight: '1.4'}}>
-              {customPaymentPrompt.adv > 0 
-                ? `Advance of ₹${customPaymentPrompt.adv} recorded. Enter remaining amount to log for ` 
-                : `No advance recorded. Enter amount to log to cashbook for `}
-              <strong>{customPaymentPrompt.p.service}</strong>:
-              <br/><span style={{fontSize: '0.75rem'}}>(Leave as is for full remaining amount)</span>
-            </p>
-            
-            <div className="ignition-form">
-              <div className="input-group" style={{marginBottom: '1.2rem'}}>
-                <label>Payment Mode</label>
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                  <button 
-                    className="ignition-btn"
-                    style={{ flex: 1, padding: '0.6rem', fontSize: '0.8rem', background: customPaymentPrompt.paymentMode === 'UPI' ? 'rgba(0, 229, 255, 0.2)' : 'transparent', border: customPaymentPrompt.paymentMode === 'UPI' ? '1px solid #00E5FF' : '1px solid rgba(255,255,255,0.2)', color: customPaymentPrompt.paymentMode === 'UPI' ? '#00e5ff' : '#808080' }}
-                    onClick={() => setCustomPaymentPrompt({...customPaymentPrompt, paymentMode: 'UPI'})}
-                  >UPI</button>
-                  <button 
-                    className="ignition-btn secondary"
-                    style={{ flex: 1, padding: '0.6rem', fontSize: '0.8rem', background: customPaymentPrompt.paymentMode === 'Cash' ? 'rgba(0, 229, 255, 0.2)' : 'transparent', border: customPaymentPrompt.paymentMode === 'Cash' ? '1px solid #00E5FF' : '1px solid rgba(255,255,255,0.2)', color: customPaymentPrompt.paymentMode === 'Cash' ? '#00e5ff' : '#808080' }}
-                    onClick={() => setCustomPaymentPrompt({...customPaymentPrompt, paymentMode: 'Cash'})}
-                  >CASH</button>
-                </div>
-              </div>
+          {/* Client Vault Placeholder */}
+          <section className={`client-vault-page ${isClientVaultActive ? 'active' : ''}`}>
+            <div className="vault-background client-bg"></div>
+            <div className="vault-content">
+              <h1 className="vision-title">CLIENT VAULT</h1>
+              <p className="vision-subtitle">Secure access granted. Your brand's evolution is stored here.</p>
+              <button className="vision-back-btn" onClick={goHome}>EXIT TO MAIN FRAME</button>
+            </div>
+          </section>
 
-              <div className="input-group">
-                <label>Amount (₹)</label>
-                <input 
-                  type="number" 
-                  id="custom-payment-input" 
-                  className="ignition-input" 
-                  defaultValue={customPaymentPrompt.defaultAmt} 
-                />
-              </div>
-
-              <div style={{display: 'flex', gap: '0.8rem', marginTop: '1rem', flexWrap: 'wrap'}}>
-                <button 
-                  style={{
-                    fontSize: '0.75rem', padding: '0.5rem 1rem', 
-                    background: 'rgba(255, 255, 255, 0.05)', 
-                    color: '#fff', border: '1px solid rgba(255,255,255,0.1)', 
-                    borderRadius: '4px', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif'
-                  }}
-                  onClick={() => document.getElementById('custom-payment-input').value = customPaymentPrompt.finalQuote}
-                >
-                  Full (₹{customPaymentPrompt.finalQuote})
-                </button>
-                {customPaymentPrompt.adv > 0 && (
-                  <>
-                    <button 
-                      style={{
-                        fontSize: '0.75rem', padding: '0.5rem 1rem', 
-                        background: 'rgba(0, 229, 255, 0.1)', 
-                        color: '#00e5ff', border: '1px solid rgba(0,229,255,0.3)', 
-                        borderRadius: '4px', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif'
-                      }}
-                      onClick={() => document.getElementById('custom-payment-input').value = customPaymentPrompt.defaultAmt}
-                    >
-                      Remaining (₹{customPaymentPrompt.defaultAmt})
-                    </button>
-                    <button 
-                      style={{
-                        fontSize: '0.75rem', padding: '0.5rem 1rem', 
-                        background: 'rgba(255, 69, 0, 0.1)', 
-                        color: '#ff4500', border: '1px solid rgba(255,69,0,0.3)', 
-                        borderRadius: '4px', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif'
-                      }}
-                      onClick={() => document.getElementById('custom-payment-input').value = customPaymentPrompt.adv}
-                    >
-                      Advance (₹{customPaymentPrompt.adv})
-                    </button>
-                  </>
-                )}
-              </div>
-              
-              <div className="modal-actions" style={{marginTop: '1.5rem', display: 'flex', gap: '1rem'}}>
-                <button 
-                  style={{flex: 1, padding: '0.8rem', background: 'transparent', color: '#808080', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold'}} 
-                  onClick={() => setCustomPaymentPrompt(null)}
-                >
-                  CANCEL
-                </button>
-                <button 
-                  style={{flex: 1, padding: '0.8rem', background: '#00e5ff', color: '#000', border: 'none', borderRadius: '4px', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold'}} 
-                  onClick={() => {
-                  const inputVal = document.getElementById('custom-payment-input').value;
-                  const parsed = parseFloat(inputVal);
-                  const amt = (!isNaN(parsed) && parsed > 0) ? parsed : customPaymentPrompt.defaultAmt;
-                  
-                  if (amt > 0) {
-                    setCashbookEntries(prev => [...prev, {
-                      id: Date.now(),
-                      projectId: customPaymentPrompt.p.id,
-                      date: new Date().toISOString().split('T')[0],
-                      desc: `Payment: ${customPaymentPrompt.p.service} - ${customPaymentPrompt.p.name}`,
-                      amount: amt,
-                      type: "INCOME",
-                      mode: customPaymentPrompt.paymentMode,
-                      category: "Project"
-                    }]);
-                    alert(`Payment of ₹${amt} logged to Cashbook!`);
-                  }
-                  
-                  setIgnitionQueue(prev => prev.map(proj => 
-                    proj.id === customPaymentPrompt.p.id ? { 
-                      ...proj, 
-                      paymentStatus: 'paid', 
-                      status: "Completed",
-                      stage: 4
-                    } : proj
-                  ));
-                  
-                  setCustomPaymentPrompt(null);
-                }}>
-                  CONFIRM
-                </button>
+          {/* Cinematic Splash Overlay System */}
+          {!isFullyRevealed && (
+            <div className="splash-overlay" style={{ '--logo-duration': '1.8s' }}>
+              <div className={`eyelid upper-lid ${revealStarted ? 'retract-up' : ''}`}></div>
+              <div className={`eyelid lower-lid ${revealStarted ? 'retract-down' : ''}`}></div>
+              <div className="logo-outer-container">
+                <svg viewBox="0 0 100 100" className={`logo-svg ${logoDrawn ? 'bloom-active' : ''} ${revealStarted ? 'fade-out' : ''}`}>
+                  <defs>
+                    <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#00E5FF" /><stop offset="100%" stopColor="#FFFFFF" />
+                    </linearGradient>
+                    <filter id="bloom-filter" x="-100%" y="-100%" width="300%" height="300%">
+                      <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur1" />
+                      <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="blur2" />
+                      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur3" />
+                      <feColorMatrix in="blur3" type="matrix" values="0 0 0 0 0  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0" result="cyan-glow" />
+                      <feMerge><feMergeNode in="blur1" /><feMergeNode in="blur2" /><feMergeNode in="cyan-glow" /><feMergeNode in="SourceGraphic" /></feMerge>
+                    </filter>
+                  </defs>
+                  <path className="logo-path" d="M30 75 L30 25 L70 75 L70 25" fill="none" stroke="url(#logo-gradient)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" pathLength="100" />
+                </svg>
               </div>
             </div>
-          </motion.div>
-        </div>
-      )}
-      <AnimatePresence>
-        {isInvoicePreviewOpen && invoiceProject && (
-          <div className="invoice-modal-overlay" style={{
-            position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-            background: 'rgba(0,0,0,0.9)', zIndex: 10000, display: 'flex',
-            justifyContent: 'center', alignItems: 'flex-start', overflowY: 'auto', padding: '40px 20px'
-          }}>
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              className="invoice-paper" 
-              style={{
-                width: '100%', maxWidth: '850px', background: 'transparent', color: '#000',
-                padding: '0', borderRadius: '8px', overflow: 'visible'
-              }}
-            >
-              {(() => {
-                const rowsPerPage = 6;
-                const stableInvoiceNo = invoiceProject.invoiceNo || getInvoiceNumber(invoiceProject.createdAt, invoices.length + 1);
-                
-                // If it's a batch project, use its internal items, otherwise use single project as one item
-                const allItems = (invoiceProject.items && invoiceProject.items.length > 0) 
-                  ? invoiceProject.items.map(item => ({
-                      service: item.service,
-                      quote: item.quote,
-                      discount: item.discount || 0
-                    }))
-                  : [{ 
-                      service: invoiceProject.service, 
-                      quote: invoiceProject.quote, 
-                      discount: invoiceProject.discount || 0 
-                    }];
-
-                const pages = [];
-                for (let i = 0; i < allItems.length; i += rowsPerPage) {
-                  pages.push(allItems.slice(i, i + rowsPerPage));
-                }
-                if (pages.length === 0) pages.push([]);
-
-                const pageRenders = pages.map((pageItems, pageIdx) => {
-                  const isLastPage = pageIdx === pages.length - 1;
-                  const blankRowsCount = Math.max(0, rowsPerPage - pageItems.length);
-                  
-                  return (
-                    <div 
-                      key={pageIdx} 
-                      className="invoice-page-unit"
-                      style={{
-                        width: '800px', height: '1130px', background: '#fff', 
-                        marginBottom: '30px', borderRadius: '4px', overflow: 'hidden',
-                        display: 'flex', flexDirection: 'column', position: 'relative',
-                        boxShadow: '0 10px 30px rgba(0,0,0,0.2)', margin: '0 auto 30px'
-                      }}
-                    >
-                      <div style={{ 
-                        background: 'linear-gradient(115deg, #d32f2f 58%, #222 58.2%)', 
-                        padding: '20px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        color: '#fff', position: 'relative'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', zIndex: 2 }}>
-                           <img 
-                             src="/logo.png" 
-                             alt="Netra Logo" 
-                             style={{ width: '48px', height: '48px', objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.35))' }} 
-                           />
-                           <div style={{ display: 'flex', flexDirection: 'column' }}>
-                             <h1 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '900', fontFamily: 'Urbanist, sans-serif', letterSpacing: '1px' }}>Netra Graphics & Designing</h1>
-                             <div style={{ display: 'flex', gap: '15px', fontSize: '0.65rem', opacity: 0.9, marginTop: '3px' }}>
-                               <span>📞 73590 93035</span>
-                               <span>📧 hiraparasavan989@gmail.com</span>
-                             </div>
-                           </div>
-                        </div>
-                        <div style={{ textAlign: 'right', zIndex: 2 }}>
-                          <h2 style={{ margin: 0, fontSize: '1.2rem', letterSpacing: '3px', fontWeight: '200' }}>TAX INVOICE</h2>
-                          <p style={{ margin: 0, fontSize: '0.6rem', opacity: 0.7, maxWidth: '200px', marginLeft: 'auto' }}>Mendarda-Sasan Road, Mendarda, 362260</p>
-                        </div>
-                      </div>
-
-                      {/* BILL TO & DETAILS */}
-                      <div style={{ padding: '25px 40px', display: 'flex', justifyContent: 'space-between' }}>
-                        <div>
-                          <label style={{ fontSize: '0.65rem', color: '#888', letterSpacing: '1px', fontWeight: 'bold' }}>BILL TO</label>
-                          <h3 style={{ margin: '5px 0 0 0', fontSize: '1.2rem', fontWeight: '900' }}>{invoiceProject.name.toUpperCase()}</h3>
-                          <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#555', maxWidth: '350px' }}>AT {getClientAddress(invoiceProject.name)}</p>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                           <label style={{ fontSize: '0.65rem', color: '#888', letterSpacing: '1px', display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>INVOICE DETAILS</label>
-                           <p style={{ margin: 0, fontSize: '0.9rem' }}><strong>Invoice #:</strong> {stableInvoiceNo}</p>
-                           <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem' }}><strong>Issue Date:</strong> {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
-                        </div>
-                      </div>
-
-                      {/* SERVICE TABLE - FIXED 6 ROWS */}
-                      <div style={{ padding: '0 40px', flex: 1, position: 'relative' }}>
-                        <div style={{ 
-                          position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%, -50%) rotate(-15deg)', 
-                          fontSize: '25rem', fontWeight: '900', color: 'rgba(0,0,0,0.02)', zIndex: 0, pointerEvents: 'none',
-                          fontFamily: 'Urbanist'
-                        }}>N</div>
-
-                        <table style={{ width: '100%', borderCollapse: 'collapse', position: 'relative', zIndex: 1 }}>
-                          <thead>
-                            <tr style={{ borderBottom: '2px solid #000', textAlign: 'left' }}>
-                              <th style={{ padding: '10px 0', fontSize: '0.75rem', color: '#000', fontWeight: '900' }}>SERVICE DESCRIPTION</th>
-                              <th style={{ padding: '10px 0', fontSize: '0.75rem', color: '#000', textAlign: 'center', fontWeight: '900' }}>QTY</th>
-                              <th style={{ padding: '10px 0', fontSize: '0.75rem', color: '#000', textAlign: 'right', fontWeight: '900' }}>RATE</th>
-                              <th style={{ padding: '10px 0', fontSize: '0.75rem', color: '#000', textAlign: 'center', fontWeight: '900' }}>DISC (%)</th>
-                              <th style={{ padding: '10px 0', fontSize: '0.75rem', color: '#000', textAlign: 'right', fontWeight: '900' }}>TOTAL</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {pageItems.map((item, idx) => {
-                              const discountPercent = item.quote > 0 ? Math.round((item.discount / item.quote) * 100) : 0;
-                              return (
-                                <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                                  <td style={{ padding: '15px 0' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                      <span style={{ color: '#d32f2f', fontSize: '1.2rem' }}>•</span>
-                                      <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{item.service}</span>
-                                    </div>
-                                  </td>
-                                  <td style={{ textAlign: 'center', fontSize: '0.9rem' }}>1</td>
-                                  <td style={{ textAlign: 'right', fontSize: '0.9rem' }}>₹{parseFloat(item.quote).toLocaleString()}</td>
-                                  <td style={{ textAlign: 'center', fontSize: '0.9rem', color: discountPercent > 0 ? '#2e7d32' : '#888', fontWeight: 'bold' }}>
-                                    {discountPercent > 0 ? `${discountPercent}%` : '-'}
-                                  </td>
-                                  <td style={{ textAlign: 'right', fontSize: '0.9rem', fontWeight: 'bold' }}>₹{(parseFloat(item.quote) - (parseFloat(item.discount) || 0)).toLocaleString()}</td>
-                                </tr>
-                              );
-                            })}
-                            {Array(blankRowsCount).fill(null).map((_, idx) => (
-                              <tr key={`blank-${idx}`} style={{ height: '40px', borderBottom: '1px solid #f9f9f9' }}>
-                                <td></td><td></td><td></td><td></td><td></td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* TOTALS & FOOTER - ONLY ON LAST PAGE */}
-                      {isLastPage ? (
-                        <div style={{ background: '#fff', borderTop: '1px solid #eee' }}>
-                          <div style={{ padding: '12px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            {/* Payment Instructions */}
-                            <div style={{ background: '#f8f9fa', padding: '12px', borderRadius: '8px', display: 'flex', gap: '10px', width: '58%', border: '1px solid #eee' }}>
-                               <div style={{ width: '80px', height: '80px', background: '#fff', padding: '4px', borderRadius: '4px', border: '1px solid #ddd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                 <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=hiraparasavan989@okaxis&pn=Netra%20Graphics&am=${parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0)}&cu=INR`} alt="UPI QR" style={{ width: '100%', height: '100%' }} />
-                               </div>
-                               <div style={{ flex: 1 }}>
-                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#546e7a', fontSize: '0.65rem', fontWeight: 'bold', marginBottom: '6px' }}>
-                                   🏠 PAYMENT INSTRUCTIONS
-                                 </div>
-                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.65rem' }}>
-                                    <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Bank Name</span><strong style={{fontSize: '0.65rem'}}>SBI</strong></div>
-                                    <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Account Name</span><strong style={{fontSize: '0.65rem'}}>Netra Graphics</strong></div>
-                                    <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Account Number</span><strong style={{fontSize: '0.65rem'}}>20198798116</strong></div>
-                                    <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>IFSC Code</span><strong style={{fontSize: '0.65rem'}}>SBIN0060152</strong></div>
-                                 </div>
-                               </div>
-                            </div>
-
-                            {/* Totals Section */}
-                            <div style={{ width: '38%', textAlign: 'right' }}>
-                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.8rem' }}>
-                                 <span style={{ color: '#666' }}>SUBTOTAL</span>
-                                 <span style={{ fontWeight: 'bold' }}>₹{parseFloat(invoiceProject.quote).toLocaleString()}.00</span>
-                               </div>
-                               {(parseFloat(invoiceProject.discount) || 0) > 0 && (
-                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.8rem' }}>
-                                   <span style={{ color: '#666' }}>DISCOUNT</span>
-                                   <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>-₹{parseFloat(invoiceProject.discount).toLocaleString()}.00</span>
-                                 </div>
-                               )}
-                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.8rem' }}>
-                                 <span style={{ color: '#666' }}>ADVANCE PAID</span>
-                                 <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>-₹{(parseFloat(invoiceProject.advanceAmount) || 0).toLocaleString()}.00</span>
-                               </div>
-                               
-                               <div style={{ 
-                                 background: '#3f51b5', padding: '10px 15px', color: '#fff', borderRadius: '6px', 
-                                 display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                               }}>
-                                 <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>GRAND TOTAL</span>
-                                 <span style={{ fontSize: '1.25rem', fontWeight: '900' }}>₹{(parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0)).toLocaleString()}.00</span>
-                               </div>
-                            </div>
-                          </div>
-
-                          <div style={{ padding: '0 40px 12px' }}>
-                            <div style={{ background: '#fcfcfc', border: '1px solid #f0f0f0', borderLeft: '3px solid #d32f2f', padding: '6px 12px' }}>
-                              <label style={{ fontSize: '0.5rem', color: '#888', fontWeight: '900', display: 'block' }}>AMOUNT IN WORDS</label>
-                              <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 'bold' }}>
-                                {amountInWords(parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0))}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Signatures Area */}
-                          <div style={{ padding: '0 40px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                             <div style={{ textAlign: 'center' }}>
-                               <div style={{ width: '130px', borderBottom: '1px solid #333', marginBottom: '4px' }}></div>
-                               <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#666' }}>Receiver's Sign</span>
-                             </div>
-                             <div style={{ textAlign: 'right' }}>
-                               <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: '900' }}>For Netra Graphics & Designing</h4>
-                               <p style={{ margin: '5px 0 0 0', fontSize: '0.6rem', color: '#999', fontStyle: 'italic' }}>
-                                 This is a computer generated invoice hence signatory not required.
-                               </p>
-                             </div>
-                          </div>
-
-                          {/* FOOTER CARDS */}
-                          <div style={{ padding: '0 40px 15px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                            <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
-                               <h4 style={{ margin: '0 0 4px 0', fontSize: '0.7rem', fontWeight: '900' }}>Follow Us on Instagram</h4>
-                               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                  <div style={{ width: '35px', height: '35px' }}>
-                                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://instagram.com/HIRAPARASAVANPHOTOGRAPHER" alt="IG QR" style={{ width: '100%' }} />
-                                  </div>
-                                  <div style={{ fontSize: '0.5rem', color: '#777' }}>
-                                    <strong style={{ color: '#333' }}>@HIRAPARASAVANPHOTOGRAPHER</strong>
-                                  </div>
-                               </div>
-                            </div>
-                            <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
-                               <h4 style={{ margin: '0 0 4px 0', fontSize: '0.7rem', fontWeight: '900' }}>Quality Assured Work</h4>
-                               <p style={{ fontSize: '0.55rem', color: '#777', margin: 0 }}>Every project is crafted with precision and passion.</p>
-                            </div>
-                            <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
-                               <h4 style={{ margin: '0 0 4px 0', fontSize: '0.7rem', fontWeight: '900' }}>Thank You</h4>
-                               <p style={{ fontSize: '0.55rem', color: '#777', margin: 0 }}>We value your trust in Netra Graphics.</p>
-                            </div>
-                          </div>
-                          
-                          <div style={{ textAlign: 'center', paddingBottom: '8px', fontSize: '0.6rem', color: '#bbb' }}>
-                            Page {pageIdx + 1} of {pages.length}
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ marginTop: 'auto', padding: '15px 40px', textAlign: 'center', color: '#bbb', fontSize: '0.7rem', borderTop: '1px solid #eee' }}>
-                          CONTINUED ON PAGE {pageIdx + 2}...
-                          <div style={{ textAlign: 'center', paddingTop: '6px', fontSize: '0.6rem', color: '#bbb' }}>
-                            Page {pageIdx + 1} of {pages.length}
-                          </div>
-                        </div>
-                      )}
+          )}
+          {/* Project Detail Drawer */}
+          <AnimatePresence>
+            {selectedKanbanProject && (
+              <div className="notification-drawer-overlay" onClick={() => setSelectedKanbanProject(null)}>
+                <motion.div
+                  className="project-detail-drawer"
+                  initial={{ x: "100%" }}
+                  animate={{ x: 0 }}
+                  exit={{ x: "100%" }}
+                  transition={{ type: "spring", damping: 30, stiffness: 200 }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="drawer-header">
+                    <div className="header-label">
+                      <span className="accent-bar orange"></span>
+                      <h2>PROJECT BLUEPRINT</h2>
                     </div>
-                  );
-                });
+                    <button className="close-notif" onClick={() => setSelectedKanbanProject(null)}>✕</button>
+                  </div>
 
-                return (
-                  <>
-                    {pageRenders}
-                    <div className="no-print invoice-actions-panel">
-                      <button 
-                        className="action-btn btn-pdf" 
-                        onClick={() => downloadMultiPageInvoicePDF(invoiceProject, stableInvoiceNo)}
-                      >
-                        Download PDF
-                      </button>
-                      <button 
-                        className="action-btn btn-whatsapp" 
-                        onClick={() => {
-                          saveInvoiceToVault(invoiceProject, stableInvoiceNo);
-                          const msg = `Namaste! Your Tax Invoice (${stableInvoiceNo}) from Netra Graphics is ready. Amount: ₹${(parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0)).toLocaleString()}. Thank you!`;
-                          
-                          // Look up client phone robustly
-                          const rawPhone = invoiceProject.phone || (invoiceProject.client && invoiceProject.client.phone) || (() => {
-                            const c = clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase());
-                            return c ? c.phone : '';
-                          })();
-                          
-                          // Clean phone and prepend country code
-                          const cleanedPhone = rawPhone.replace(/\D/g, '');
-                          const finalPhone = cleanedPhone.length === 10 ? '91' + cleanedPhone : cleanedPhone;
-                          
-                          window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, '_blank');
-                        }}
-                      >
-                        Send via WhatsApp
-                      </button>
-                      <button 
-                        className="action-btn btn-close" 
-                        onClick={() => {
-                          setIsInvoicePreviewOpen(false);
-                          setInvoiceProject(null);
-                          setSelectedBatchProjects([]);
-                        }}
-                      >
-                        Close Preview
-                      </button>
+                  <div className="drawer-body">
+                    <section className="client-profile-section">
+                      <div className="profile-header">
+                        <div className="p-avatar">{selectedKanbanProject.client.name.charAt(0)}</div>
+                        <div className="p-main">
+                          <h3>{selectedKanbanProject.client.name}</h3>
+                          <p className="p-location">{selectedKanbanProject.client.address}</p>
+                        </div>
+                      </div>
+                      <div className="profile-details-grid">
+                        <div className="pd-item">
+                          <span className="pd-label">WhatsApp</span>
+                          <span className="pd-value">{selectedKanbanProject.client.phone}</span>
+                        </div>
+                        <div className="pd-item">
+                          <span className="pd-label">Email</span>
+                          <span className="pd-value">{selectedKanbanProject.client.email}</span>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="drawer-sub-section">
+                      <h4 className="section-title">PROGRESS ROADMAP</h4>
+                      <div className="roadmap-list">
+                        {selectedKanbanProject.milestones.map((m, idx) => (
+                          <div key={idx} className={`roadmap-step ${selectedKanbanProject.completedMilestones.includes(m) ? 'done' : ''}`}>
+                            <div className="step-check">
+                              {selectedKanbanProject.completedMilestones.includes(m) && "✓"}
+                            </div>
+                            <span className="step-name">{m}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+
+                    <section className="drawer-sub-section">
+                      <h4 className="section-title">ACTIVITY LOG</h4>
+                      <div className="log-list">
+                        {selectedKanbanProject.activityLog.map((log, idx) => (
+                          <div key={idx} className="log-entry">
+                            <div className="log-dot"></div>
+                            <div className="log-info">
+                              <span className="log-time">{log.time}</span>
+                              <p className="log-action">{log.action}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  </div>
+
+                  <div className="drawer-footer">
+                    <div className="status-management">
+                      <span className="status-label">MANAGE PROJECT STATUS</span>
+                      <div className="status-buttons">
+                        {selectedKanbanProject.status !== "Ongoing" && (
+                          <button className="status-btn s-ongoing" onClick={() => updateProjectStatus(selectedKanbanProject.id, "Ongoing")}>RESTORE TO ONGOING</button>
+                        )}
+                        {selectedKanbanProject.status !== "Completed" && (
+                          <button className="status-btn s-completed" onClick={() => updateProjectStatus(selectedKanbanProject.id, "Completed")}>MARK COMPLETED</button>
+                        )}
+                        {selectedKanbanProject.status !== "Closed" && (
+                          <button className="status-btn s-closed" onClick={() => updateProjectStatus(selectedKanbanProject.id, "Closed")}>CLOSE PROJECT</button>
+                        )}
+                        {selectedKanbanProject.status !== "Dismissed" && (
+                          <button className="status-btn s-dismissed" onClick={() => updateProjectStatus(selectedKanbanProject.id, "Dismissed")}>DISMISS PROJECT</button>
+                        )}
+                      </div>
                     </div>
-                  </>
-                );
-              })()}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
-      <AnimatePresence>
-        {isCalibrationModalOpen && calibratingService && (
-          <div 
-            className="modal-overlay" 
-            onClick={() => { setIsCalibrationModalOpen(false); setCalibratingService(null); }}
-          >
-            <motion.div 
-              className="calibration-editor-modal"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="calibration-modal-header">
-                <h2>CALIBRATE: <span>{calibratingService.title}</span></h2>
-                <p>System ID: SC-{calibratingService.id.toString().padStart(3, '0')} | Modify parameters for local persistent storage</p>
+                    {selectedKanbanProject.stage < 4 && selectedKanbanProject.status === "Ongoing" && (
+                      <button
+                        className="move-stage-btn"
+                        onClick={() => moveProjectStage(selectedKanbanProject.id)}
+                      >
+                        IGNITE {kanbanColumns[selectedKanbanProject.stage].title}
+                      </button>
+                    )}
+                    <button className="vault-link-btn" onClick={() => setSelectedKanbanProject(null)}>CLOSE BLUEPRINT</button>
+                  </div>
+                </motion.div>
               </div>
+            )}
+          </AnimatePresence>
 
-              <div className="calibration-modal-body">
-                <div className="calibration-form-grid">
-                  <div className="calibration-form-row">
-                    <div className="calibration-input-group">
-                      <label>Card Title</label>
-                      <input 
-                        type="text" 
-                        value={calibratingService.title} 
-                        onChange={e => setCalibratingService({ ...calibratingService, title: e.target.value })} 
-                        placeholder="Service title"
-                        required
-                      />
+          {/* Notification Engine Drawer */}
+          <AnimatePresence>
+            {isNotificationOpen && (
+              <div className="notification-drawer-overlay" onClick={() => setIsNotificationOpen(false)}>
+                <motion.div
+                  className="notification-drawer"
+                  initial={{ x: "100%" }}
+                  animate={{ x: 0 }}
+                  exit={{ x: "100%" }}
+                  transition={{ type: "spring", damping: 30, stiffness: 200 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="drawer-header">
+                    <div className="header-label">
+                      <span className="accent-bar"></span>
+                      <h2>NOTIFICATIONS</h2>
                     </div>
-                    <div className="calibration-input-group">
-                      <label>Icon / Emoji</label>
-                      <input 
-                        type="text" 
-                        value={calibratingService.icon} 
-                        onChange={e => setCalibratingService({ ...calibratingService, icon: e.target.value })} 
-                        placeholder="🎨, 📖, etc."
-                        required
-                      />
+                    <button className="close-notif" onClick={() => setIsNotificationOpen(false)}>✕</button>
+                  </div>
+
+                  <div className="drawer-tabs">
+                    <button
+                      className={`tab-btn ${notifTab === 'SPARKS' ? 'active' : ''}`}
+                      onClick={() => setNotifTab('SPARKS')}
+                    >
+                      NEW SPARKS
+                      {sparks.length > 0 && <span className="tab-badge cyan">{sparks.length}</span>}
+                    </button>
+                    <button
+                      className={`tab-btn ${notifTab === 'FLAMES' ? 'active' : ''}`}
+                      onClick={() => setNotifTab('FLAMES')}
+                    >
+                      URGENT FLAMES
+                      {flames.length > 0 && <span className="tab-badge orange">{flames.length}</span>}
+                    </button>
+                  </div>
+
+                  <div className="drawer-content">
+                    {notifTab === 'SPARKS' ? (
+                      <div className="notif-list">
+                        {sparks.length > 0 ? sparks.map(s => (
+                          <div key={s.id} className="notif-card spark flex justify-between items-center" onClick={() => {
+                            setActiveAdminModule("INQUIRIES");
+                            setIsAdminGridActive(true);
+                            setIsNotificationOpen(false);
+                          }}>
+                            <div className="flex items-center gap-3">
+                              <div className="notif-icon-box cyan">✦</div>
+                              <div className="notif-info">
+                                <p className="notif-msg">New inquiry from <strong>{s.name}</strong></p>
+                                <span className="notif-time">{s.date}</span>
+                              </div>
+                            </div>
+                            <button
+                              className="text-3xs uppercase tracking-wider text-cyan-400 hover:text-cyan-300 font-extrabold px-2.5 py-1 rounded bg-cyan-400/10 border border-cyan-400/20 cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markInquiryAsRead(s.id);
+                              }}
+                            >
+                              MARK READ
+                            </button>
+                          </div>
+                        )) : (
+                          <div className="empty-state">
+                            <span className="empty-icon">✧</span>
+                            <p>No new sparks detected.</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="notif-list">
+                        {flames.length > 0 ? flames.map(f => (
+                          <div key={f.id} className="notif-card flame flex justify-between items-center" onClick={() => {
+                            setActiveAdminModule("DASHBOARD");
+                            setIsAdminGridActive(true);
+                            setIsNotificationOpen(false);
+                          }}>
+                            <div className="flex items-center gap-3">
+                              <div className="notif-icon-box orange">🔥</div>
+                              <div className="notif-info">
+                                <p className="notif-msg">
+                                  {new Date(f.deadline) - new Date() < 0 ? "Project Overdue: " : "Deadline approaching for "}
+                                  <strong>{f.name}</strong>
+                                </p>
+                                <span className="notif-time">{getFlameNotifText(f)}</span>
+                              </div>
+                            </div>
+                            <button
+                              className="text-3xs uppercase tracking-wider text-orange-400 hover:text-orange-300 font-extrabold px-2.5 py-1 rounded bg-orange-400/10 border border-orange-400/20 cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markFlameAsRead(f.id);
+                              }}
+                            >
+                              DISMISS
+                            </button>
+                          </div>
+                        )) : (
+                          <div className="empty-state">
+                            <span className="empty-icon">🕯️</span>
+                            <p>No urgent flames currently burning.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {customPaymentPrompt && (
+            <div className="modal-overlay" style={{ zIndex: 9999 }}>
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                style={{
+                  maxWidth: '400px', width: '90%', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto',
+                  background: 'rgba(5, 5, 5, 0.98)', border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderTop: '2px solid #00E5FF', borderRadius: '4px'
+                }}
+              >
+                <h2 className="modal-title" style={{ color: '#00e5ff', marginTop: '0', marginBottom: '0.8rem' }}>Log Payment</h2>
+                <p className="dim-text" style={{ marginBottom: '1rem', fontSize: '0.85rem', lineHeight: '1.4' }}>
+                  {customPaymentPrompt.adv > 0
+                    ? `Advance of ₹${customPaymentPrompt.adv} recorded. Enter remaining amount to log for `
+                    : `No advance recorded. Enter amount to log to cashbook for `}
+                  <strong>{customPaymentPrompt.p.service}</strong>:
+                  <br /><span style={{ fontSize: '0.75rem' }}>(Leave as is for full remaining amount)</span>
+                </p>
+
+                <div className="ignition-form">
+                  <div className="input-group" style={{ marginBottom: '1.2rem' }}>
+                    <label>Payment Mode</label>
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                      <button
+                        className="ignition-btn"
+                        style={{ flex: 1, padding: '0.6rem', fontSize: '0.8rem', background: customPaymentPrompt.paymentMode === 'UPI' ? 'rgba(0, 229, 255, 0.2)' : 'transparent', border: customPaymentPrompt.paymentMode === 'UPI' ? '1px solid #00E5FF' : '1px solid rgba(255,255,255,0.2)', color: customPaymentPrompt.paymentMode === 'UPI' ? '#00e5ff' : '#808080' }}
+                        onClick={() => setCustomPaymentPrompt({ ...customPaymentPrompt, paymentMode: 'UPI' })}
+                      >UPI</button>
+                      <button
+                        className="ignition-btn secondary"
+                        style={{ flex: 1, padding: '0.6rem', fontSize: '0.8rem', background: customPaymentPrompt.paymentMode === 'Cash' ? 'rgba(0, 229, 255, 0.2)' : 'transparent', border: customPaymentPrompt.paymentMode === 'Cash' ? '1px solid #00E5FF' : '1px solid rgba(255,255,255,0.2)', color: customPaymentPrompt.paymentMode === 'Cash' ? '#00e5ff' : '#808080' }}
+                        onClick={() => setCustomPaymentPrompt({ ...customPaymentPrompt, paymentMode: 'Cash' })}
+                      >CASH</button>
                     </div>
                   </div>
 
-                  <div className="calibration-form-row">
-                    <div className="calibration-input-group">
-                      <label>Tag / Category</label>
-                      <select 
-                        value={calibratingService.tag} 
-                        onChange={e => setCalibratingService({ ...calibratingService, tag: e.target.value })}
-                        required
-                        className="bg-[#0a0f1e] text-white border border-white/10 rounded p-2"
-                      >
-                        <option value="BRANDING">BRANDING</option>
-                        <option value="PRINT">PRINT</option>
-                        <option value="DIGITAL">DIGITAL</option>
-                        <option value="VIDEO">VIDEO</option>
-                        <option value="EVENT">EVENT</option>
-                        <option value="COMMERCIAL">COMMERCIAL</option>
-                      </select>
-                    </div>
-                    <div className="calibration-form-row" style={{ gap: '0.5rem', gridTemplateColumns: '1fr 1fr' }}>
-                      <div className="calibration-input-group">
-                        <label>Price</label>
-                        <input 
-                          type="text" 
-                          value={calibratingService.price} 
-                          onChange={e => setCalibratingService({ ...calibratingService, price: e.target.value })} 
-                          placeholder="₹ Price"
-                          required
-                        />
-                      </div>
-                      <div className="calibration-input-group">
-                        <label>Delivery Time</label>
-                        <input 
-                          type="text" 
-                          value={calibratingService.delivery} 
-                          onChange={e => setCalibratingService({ ...calibratingService, delivery: e.target.value })} 
-                          placeholder="e.g. 5 days"
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="calibration-input-group">
-                    <label>Card Description</label>
-                    <textarea 
-                      value={calibratingService.desc} 
-                      onChange={e => setCalibratingService({ ...calibratingService, desc: e.target.value })} 
-                      placeholder="Brief marketing narrative for this card"
-                      required
-                      style={{ minHeight: '80px', resize: 'vertical' }}
+                  <div className="input-group">
+                    <label>Amount (₹)</label>
+                    <input
+                      type="number"
+                      id="custom-payment-input"
+                      className="ignition-input"
+                      defaultValue={customPaymentPrompt.defaultAmt}
                     />
                   </div>
 
-                  <div>
-                    <div className="features-title-row">
-                      <label>Deliverable Features List</label>
-                      <button 
-                        type="button" 
-                        className="add-feature-inline-btn"
-                        onClick={() => setCalibratingService({
-                          ...calibratingService,
-                          features: [...(calibratingService.features || []), ""]
-                        })}
-                      >
-                        + ADD FEATURE ROW
-                      </button>
-                    </div>
-                    
-                    <div className="features-editor-list">
-                      {(calibratingService.features || []).map((feat, index) => (
-                        <div key={index} className="feature-input-row">
-                          <input 
-                            type="text" 
-                            value={feat} 
-                            onChange={e => {
-                              const newFeats = [...calibratingService.features];
-                              newFeats[index] = e.target.value;
-                              setCalibratingService({ ...calibratingService, features: newFeats });
-                            }} 
-                            placeholder={`Feature line #${index + 1}`}
-                            required
-                          />
-                          <button 
-                            type="button" 
-                            className="delete-feature-btn"
-                            onClick={() => {
-                              const newFeats = calibratingService.features.filter((_, idx) => idx !== index);
-                              setCalibratingService({ ...calibratingService, features: newFeats });
-                            }}
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-                      {(!calibratingService.features || calibratingService.features.length === 0) && (
-                        <p style={{ margin: '1rem 0', color: '#606060', fontSize: '0.8rem', textAlign: 'center', fontFamily: 'Poppins' }}>
-                          No features defined. Click add feature row above.
-                        </p>
-                      )}
-                    </div>
+                  <div style={{ display: 'flex', gap: '0.8rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+                    <button
+                      style={{
+                        fontSize: '0.75rem', padding: '0.5rem 1rem',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        color: '#fff', border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '4px', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif'
+                      }}
+                      onClick={() => document.getElementById('custom-payment-input').value = customPaymentPrompt.finalQuote}
+                    >
+                      Full (₹{customPaymentPrompt.finalQuote})
+                    </button>
+                    {customPaymentPrompt.adv > 0 && (
+                      <>
+                        <button
+                          style={{
+                            fontSize: '0.75rem', padding: '0.5rem 1rem',
+                            background: 'rgba(0, 229, 255, 0.1)',
+                            color: '#00e5ff', border: '1px solid rgba(0,229,255,0.3)',
+                            borderRadius: '4px', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif'
+                          }}
+                          onClick={() => document.getElementById('custom-payment-input').value = customPaymentPrompt.defaultAmt}
+                        >
+                          Remaining (₹{customPaymentPrompt.defaultAmt})
+                        </button>
+                        <button
+                          style={{
+                            fontSize: '0.75rem', padding: '0.5rem 1rem',
+                            background: 'rgba(255, 69, 0, 0.1)',
+                            color: '#ff4500', border: '1px solid rgba(255,69,0,0.3)',
+                            borderRadius: '4px', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif'
+                          }}
+                          onClick={() => document.getElementById('custom-payment-input').value = customPaymentPrompt.adv}
+                        >
+                          Advance (₹{customPaymentPrompt.adv})
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="modal-actions" style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
+                    <button
+                      style={{ flex: 1, padding: '0.8rem', background: 'transparent', color: '#808080', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
+                      onClick={() => setCustomPaymentPrompt(null)}
+                    >
+                      CANCEL
+                    </button>
+                    <button
+                      style={{ flex: 1, padding: '0.8rem', background: '#00e5ff', color: '#000', border: 'none', borderRadius: '4px', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
+                      onClick={() => {
+                        const inputVal = document.getElementById('custom-payment-input').value;
+                        const parsed = parseFloat(inputVal);
+                        const amt = (!isNaN(parsed) && parsed > 0) ? parsed : customPaymentPrompt.defaultAmt;
+
+                        if (amt > 0) {
+                          setCashbookEntries(prev => [...prev, {
+                            id: Date.now(),
+                            projectId: customPaymentPrompt.p.id,
+                            date: new Date().toISOString().split('T')[0],
+                            desc: `Payment: ${customPaymentPrompt.p.service} - ${customPaymentPrompt.p.name}`,
+                            amount: amt,
+                            type: "INCOME",
+                            mode: customPaymentPrompt.paymentMode,
+                            category: "Project"
+                          }]);
+                          alert(`Payment of ₹${amt} logged to Cashbook!`);
+                        }
+
+                        setIgnitionQueue(prev => prev.map(proj =>
+                          proj.id === customPaymentPrompt.p.id ? {
+                            ...proj,
+                            paymentStatus: 'paid',
+                            status: "Completed",
+                            stage: 4
+                          } : proj
+                        ));
+
+                        setCustomPaymentPrompt(null);
+                      }}>
+                      CONFIRM
+                    </button>
                   </div>
                 </div>
-              </div>
-
-              <div className="calibration-modal-footer" style={{ padding: '1rem 2rem 1.8rem 2rem', borderTop: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-                <button 
-                  type="button" 
-                  className="calibration-btn-secondary"
-                  onClick={() => {
-                    setIsCalibrationModalOpen(false);
-                    setCalibratingService(null);
+              </motion.div>
+            </div>
+          )}
+          <AnimatePresence>
+            {isInvoicePreviewOpen && invoiceProject && (
+              <div className="invoice-modal-overlay" style={{
+                position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+                background: 'rgba(0,0,0,0.9)', zIndex: 10000, display: 'flex',
+                justifyContent: 'center', alignItems: 'flex-start', overflowY: 'auto', padding: '40px 20px'
+              }}>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  className="invoice-paper"
+                  style={{
+                    width: '100%', maxWidth: '850px', background: 'transparent', color: '#000',
+                    padding: '0', borderRadius: '8px', overflow: 'visible'
                   }}
                 >
-                  DISCARD
-                </button>
-                <button 
-                  type="button" 
-                  className="calibration-btn-primary"
-                  onClick={handleIgniteCalibration}
-                >
-                  IGNITE CALIBRATION
-                </button>
+                  {(() => {
+                    const rowsPerPage = 6;
+                    const stableInvoiceNo = invoiceProject.invoiceNo || getInvoiceNumber(invoiceProject.createdAt, invoices.length + 1);
+
+                    // If it's a batch project, use its internal items, otherwise use single project as one item
+                    const allItems = (invoiceProject.items && invoiceProject.items.length > 0)
+                      ? invoiceProject.items.map(item => ({
+                        service: item.service,
+                        quote: item.quote,
+                        discount: item.discount || 0
+                      }))
+                      : [{
+                        service: invoiceProject.service,
+                        quote: invoiceProject.quote,
+                        discount: invoiceProject.discount || 0
+                      }];
+
+                    const pages = [];
+                    for (let i = 0; i < allItems.length; i += rowsPerPage) {
+                      pages.push(allItems.slice(i, i + rowsPerPage));
+                    }
+                    if (pages.length === 0) pages.push([]);
+
+                    const pageRenders = pages.map((pageItems, pageIdx) => {
+                      const isLastPage = pageIdx === pages.length - 1;
+                      const blankRowsCount = Math.max(0, rowsPerPage - pageItems.length);
+
+                      return (
+                        <div
+                          key={pageIdx}
+                          className="invoice-page-unit"
+                          style={{
+                            width: '800px', height: '1130px', background: '#fff',
+                            marginBottom: '30px', borderRadius: '4px', overflow: 'hidden',
+                            display: 'flex', flexDirection: 'column', position: 'relative',
+                            boxShadow: '0 10px 30px rgba(0,0,0,0.2)', margin: '0 auto 30px'
+                          }}
+                        >
+                          <div style={{
+                            background: 'linear-gradient(115deg, #d32f2f 58%, #222 58.2%)',
+                            padding: '12px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            color: '#fff', position: 'relative'
+                          }}>
+                            <img
+                              src="/logo.png"
+                              alt="Netra Logo"
+                              style={{
+                                position: 'absolute',
+                                left: '25px',
+                                top: '8px',
+                                bottom: '8px',
+                                height: 'calc(100% - 16px)',
+                                width: 'auto',
+                                objectFit: 'contain',
+                                zIndex: 3,
+                                filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.35))'
+                              }}
+                            />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', zIndex: 2 }}>
+                              {/* Spacer to prevent text overlapping the absolutely positioned logo */}
+                              <div style={{ width: '100px', flexShrink: 0 }} />
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <h1 style={{ margin: 0, fontSize: '2.0rem', fontWeight: '900', fontFamily: 'Urbanist, sans-serif', letterSpacing: '1px' }}>NETRA GRAPHICS</h1>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.85rem', opacity: 0.95, marginTop: '6px' }}>
+                                  <span>📞 73590 93035</span>
+                                  <span>📧 hiraparasavan989@gmail.com</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right', zIndex: 2 }}>
+                              <h2 style={{ margin: 0, fontSize: '2.0rem', letterSpacing: '3px', fontWeight: '900', fontFamily: 'Urbanist, sans-serif' }}>TAX INVOICE</h2>
+                              <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.9, maxWidth: '300px', marginLeft: 'auto' }}>Mendarda-Sasan Road, Mendarda, 362260</p>
+                            </div>
+                          </div>
+
+                          {/* BILL TO & DETAILS */}
+                          <div style={{ padding: '25px 40px', display: 'flex', justifyContent: 'space-between' }}>
+                            <div>
+                              <label style={{ fontSize: '0.65rem', color: '#888', letterSpacing: '1px', fontWeight: 'bold' }}>BILL TO</label>
+                              <h3 style={{ margin: '5px 0 0 0', fontSize: '1.2rem', fontWeight: '900' }}>{invoiceProject.name.toUpperCase()}</h3>
+                              <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#555', maxWidth: '350px' }}>AT {getClientAddress(invoiceProject.name)}</p>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <label style={{ fontSize: '0.65rem', color: '#888', letterSpacing: '1px', display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>INVOICE DETAILS</label>
+                              <p style={{ margin: 0, fontSize: '0.9rem' }}><strong>Invoice #:</strong> {stableInvoiceNo}</p>
+                              <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem' }}><strong>Issue Date:</strong> {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                            </div>
+                          </div>
+
+                          {/* SERVICE TABLE - FIXED 6 ROWS */}
+                          <div style={{ padding: '0 40px', flex: 1, position: 'relative' }}>
+                            <div style={{
+                              position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%, -50%) rotate(-15deg)',
+                              fontSize: '25rem', fontWeight: '900', color: 'rgba(0,0,0,0.02)', zIndex: 0, pointerEvents: 'none',
+                              fontFamily: 'Urbanist'
+                            }}>N</div>
+
+                            <table style={{ width: '100%', borderCollapse: 'collapse', position: 'relative', zIndex: 1 }}>
+                              <thead>
+                                <tr style={{ borderBottom: '2px solid #000', textAlign: 'left' }}>
+                                  <th style={{ padding: '10px 0', fontSize: '0.75rem', color: '#000', fontWeight: '900' }}>SERVICE DESCRIPTION</th>
+                                  <th style={{ padding: '10px 0', fontSize: '0.75rem', color: '#000', textAlign: 'center', fontWeight: '900' }}>QTY</th>
+                                  <th style={{ padding: '10px 0', fontSize: '0.75rem', color: '#000', textAlign: 'right', fontWeight: '900' }}>RATE</th>
+                                  <th style={{ padding: '10px 0', fontSize: '0.75rem', color: '#000', textAlign: 'center', fontWeight: '900' }}>DISC (%)</th>
+                                  <th style={{ padding: '10px 0', fontSize: '0.75rem', color: '#000', textAlign: 'right', fontWeight: '900' }}>TOTAL</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {pageItems.map((item, idx) => {
+                                  const discountPercent = item.quote > 0 ? Math.round((item.discount / item.quote) * 100) : 0;
+                                  return (
+                                    <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
+                                      <td style={{ padding: '15px 0' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                          <span style={{ color: '#d32f2f', fontSize: '1.2rem' }}>•</span>
+                                          <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{item.service}</span>
+                                        </div>
+                                      </td>
+                                      <td style={{ textAlign: 'center', fontSize: '0.9rem' }}>1</td>
+                                      <td style={{ textAlign: 'right', fontSize: '0.9rem' }}>₹{parseFloat(item.quote).toLocaleString()}</td>
+                                      <td style={{ textAlign: 'center', fontSize: '0.9rem', color: discountPercent > 0 ? '#2e7d32' : '#888', fontWeight: 'bold' }}>
+                                        {discountPercent > 0 ? `${discountPercent}%` : '-'}
+                                      </td>
+                                      <td style={{ textAlign: 'right', fontSize: '0.9rem', fontWeight: 'bold' }}>₹{(parseFloat(item.quote) - (parseFloat(item.discount) || 0)).toLocaleString()}</td>
+                                    </tr>
+                                  );
+                                })}
+                                {Array(blankRowsCount).fill(null).map((_, idx) => (
+                                  <tr key={`blank-${idx}`} style={{ height: '40px', borderBottom: '1px solid #f9f9f9' }}>
+                                    <td></td><td></td><td></td><td></td><td></td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* TOTALS & FOOTER - ONLY ON LAST PAGE */}
+                          {isLastPage ? (
+                            <div style={{ background: '#fff', borderTop: '1px solid #eee' }}>
+                              <div style={{ padding: '12px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                {/* Payment Instructions */}
+                                <div style={{ background: '#f8f9fa', padding: '12px', borderRadius: '8px', display: 'flex', gap: '10px', width: '58%', border: '1px solid #eee' }}>
+                                  <div style={{ width: '80px', height: '80px', background: '#fff', padding: '4px', borderRadius: '4px', border: '1px solid #ddd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=hiraparasavan989@okaxis&pn=Netra%20Graphics&am=${parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0)}&cu=INR`} alt="UPI QR" style={{ width: '100%', height: '100%' }} />
+                                  </div>
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#546e7a', fontSize: '0.65rem', fontWeight: 'bold', marginBottom: '6px' }}>
+                                      🏠 PAYMENT INSTRUCTIONS
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.65rem' }}>
+                                      <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Bank Name</span><strong style={{ fontSize: '0.65rem' }}>SBI</strong></div>
+                                      <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Account Name</span><strong style={{ fontSize: '0.65rem' }}>Netra Graphics</strong></div>
+                                      <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Account Number</span><strong style={{ fontSize: '0.65rem' }}>20198798116</strong></div>
+                                      <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>IFSC Code</span><strong style={{ fontSize: '0.65rem' }}>SBIN0060152</strong></div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Totals Section */}
+                                <div style={{ width: '38%', textAlign: 'right' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.8rem' }}>
+                                    <span style={{ color: '#666' }}>SUBTOTAL</span>
+                                    <span style={{ fontWeight: 'bold' }}>₹{parseFloat(invoiceProject.quote).toLocaleString()}.00</span>
+                                  </div>
+                                  {(parseFloat(invoiceProject.discount) || 0) > 0 && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.8rem' }}>
+                                      <span style={{ color: '#666' }}>DISCOUNT</span>
+                                      <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>-₹{parseFloat(invoiceProject.discount).toLocaleString()}.00</span>
+                                    </div>
+                                  )}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.8rem' }}>
+                                    <span style={{ color: '#666' }}>ADVANCE PAID</span>
+                                    <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>-₹{(parseFloat(invoiceProject.advanceAmount) || 0).toLocaleString()}.00</span>
+                                  </div>
+
+                                  <div style={{
+                                    background: '#3f51b5', padding: '10px 15px', color: '#fff', borderRadius: '6px',
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                                  }}>
+                                    <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>GRAND TOTAL</span>
+                                    <span style={{ fontSize: '1.25rem', fontWeight: '900' }}>₹{(parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0)).toLocaleString()}.00</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div style={{ padding: '0 40px 12px' }}>
+                                <div style={{ background: '#fcfcfc', border: '1px solid #f0f0f0', borderLeft: '3px solid #d32f2f', padding: '6px 12px' }}>
+                                  <label style={{ fontSize: '0.5rem', color: '#888', fontWeight: '900', display: 'block' }}>AMOUNT IN WORDS</label>
+                                  <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                    {amountInWords(parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0))}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Signatures Area */}
+                              <div style={{ padding: '0 40px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                                <div style={{ textAlign: 'center' }}>
+                                  <div style={{ width: '130px', borderBottom: '1px solid #333', marginBottom: '4px' }}></div>
+                                  <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#666' }}>Receiver's Sign</span>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                  <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: '900' }}>For Netra Graphics & Designing</h4>
+                                  <p style={{ margin: '5px 0 0 0', fontSize: '0.6rem', color: '#999', fontStyle: 'italic' }}>
+                                    This is a computer generated invoice hence signatory not required.
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* FOOTER CARDS */}
+                              <div style={{ padding: '0 40px 15px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                                <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
+                                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.7rem', fontWeight: '900' }}>Follow Us on Instagram</h4>
+                                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                    <div style={{ width: '35px', height: '35px' }}>
+                                      <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://instagram.com/HIRAPARASAVANPHOTOGRAPHER" alt="IG QR" style={{ width: '100%' }} />
+                                    </div>
+                                    <div style={{ fontSize: '0.5rem', color: '#777' }}>
+                                      <strong style={{ color: '#333' }}>@HIRAPARASAVANPHOTOGRAPHER</strong>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
+                                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.7rem', fontWeight: '900' }}>Quality Assured Work</h4>
+                                  <p style={{ fontSize: '0.55rem', color: '#777', margin: 0 }}>Every project is crafted with precision and passion.</p>
+                                </div>
+                                <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
+                                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.7rem', fontWeight: '900' }}>Thank You</h4>
+                                  <p style={{ fontSize: '0.55rem', color: '#777', margin: 0 }}>We value your trust in Netra Graphics.</p>
+                                </div>
+                              </div>
+
+                              <div style={{ textAlign: 'center', paddingBottom: '8px', fontSize: '0.6rem', color: '#bbb' }}>
+                                Page {pageIdx + 1} of {pages.length}
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ marginTop: 'auto', padding: '15px 40px', textAlign: 'center', color: '#bbb', fontSize: '0.7rem', borderTop: '1px solid #eee' }}>
+                              CONTINUED ON PAGE {pageIdx + 2}...
+                              <div style={{ textAlign: 'center', paddingTop: '6px', fontSize: '0.6rem', color: '#bbb' }}>
+                                Page {pageIdx + 1} of {pages.length}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+
+                    return (
+                      <>
+                        {pageRenders}
+                        <div className="no-print invoice-actions-panel">
+                          <button
+                            className="action-btn btn-pdf"
+                            onClick={() => downloadMultiPageInvoicePDF(invoiceProject, stableInvoiceNo)}
+                          >
+                            Download PDF
+                          </button>
+                          <button
+                            className="action-btn btn-whatsapp"
+                            onClick={() => {
+                              saveInvoiceToVault(invoiceProject, stableInvoiceNo);
+                              const msg = `Namaste! Your Tax Invoice (${stableInvoiceNo}) from Netra Graphics is ready. Amount: ₹${(parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0)).toLocaleString()}. Thank you!`;
+
+                              // Look up client phone robustly
+                              const rawPhone = invoiceProject.phone || (invoiceProject.client && invoiceProject.client.phone) || (() => {
+                                const c = clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase());
+                                return c ? c.phone : '';
+                              })();
+
+                              // Clean phone and prepend country code
+                              const cleanedPhone = rawPhone.replace(/\D/g, '');
+                              const finalPhone = cleanedPhone.length === 10 ? '91' + cleanedPhone : cleanedPhone;
+
+                              window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+                            }}
+                          >
+                            Send via WhatsApp
+                          </button>
+                          <button
+                            className="action-btn btn-close"
+                            onClick={() => {
+                              setIsInvoicePreviewOpen(false);
+                              setInvoiceProject(null);
+                              setSelectedBatchProjects([]);
+                            }}
+                          >
+                            Close Preview
+                          </button>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </motion.div>
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {isCalibrationModalOpen && calibratingService && (
+              <div
+                className="modal-overlay"
+                onClick={() => { setIsCalibrationModalOpen(false); setCalibratingService(null); }}
+              >
+                <motion.div
+                  className="calibration-editor-modal"
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="calibration-modal-header">
+                    <h2>CALIBRATE: <span>{calibratingService.title}</span></h2>
+                    <p>System ID: SC-{calibratingService.id.toString().padStart(3, '0')} | Modify parameters for local persistent storage</p>
+                  </div>
+
+                  <div className="calibration-modal-body">
+                    <div className="calibration-form-grid">
+                      <div className="calibration-form-row">
+                        <div className="calibration-input-group">
+                          <label>Card Title</label>
+                          <input
+                            type="text"
+                            value={calibratingService.title}
+                            onChange={e => setCalibratingService({ ...calibratingService, title: e.target.value })}
+                            placeholder="Service title"
+                            required
+                          />
+                        </div>
+                        <div className="calibration-input-group">
+                          <label>Icon / Emoji</label>
+                          <input
+                            type="text"
+                            value={calibratingService.icon}
+                            onChange={e => setCalibratingService({ ...calibratingService, icon: e.target.value })}
+                            placeholder="🎨, 📖, etc."
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="calibration-form-row">
+                        <div className="calibration-input-group">
+                          <label>Tag / Category</label>
+                          <select
+                            value={calibratingService.tag}
+                            onChange={e => setCalibratingService({ ...calibratingService, tag: e.target.value })}
+                            required
+                            className="bg-[#0a0f1e] text-white border border-white/10 rounded p-2"
+                          >
+                            <option value="BRANDING">BRANDING</option>
+                            <option value="PRINT">PRINT</option>
+                            <option value="DIGITAL">DIGITAL</option>
+                            <option value="VIDEO">VIDEO</option>
+                            <option value="EVENT">EVENT</option>
+                            <option value="COMMERCIAL">COMMERCIAL</option>
+                          </select>
+                        </div>
+                        <div className="calibration-form-row" style={{ gap: '0.5rem', gridTemplateColumns: '1fr 1fr' }}>
+                          <div className="calibration-input-group">
+                            <label>Price</label>
+                            <input
+                              type="text"
+                              value={calibratingService.price}
+                              onChange={e => setCalibratingService({ ...calibratingService, price: e.target.value })}
+                              placeholder="₹ Price"
+                              required
+                            />
+                          </div>
+                          <div className="calibration-input-group">
+                            <label>Delivery Time</label>
+                            <input
+                              type="text"
+                              value={calibratingService.delivery}
+                              onChange={e => setCalibratingService({ ...calibratingService, delivery: e.target.value })}
+                              placeholder="e.g. 5 days"
+                              required
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="calibration-input-group">
+                        <label>Card Description</label>
+                        <textarea
+                          value={calibratingService.desc}
+                          onChange={e => setCalibratingService({ ...calibratingService, desc: e.target.value })}
+                          placeholder="Brief marketing narrative for this card"
+                          required
+                          style={{ minHeight: '80px', resize: 'vertical' }}
+                        />
+                      </div>
+
+                      <div>
+                        <div className="features-title-row">
+                          <label>Deliverable Features List</label>
+                          <button
+                            type="button"
+                            className="add-feature-inline-btn"
+                            onClick={() => setCalibratingService({
+                              ...calibratingService,
+                              features: [...(calibratingService.features || []), ""]
+                            })}
+                          >
+                            + ADD FEATURE ROW
+                          </button>
+                        </div>
+
+                        <div className="features-editor-list">
+                          {(calibratingService.features || []).map((feat, index) => (
+                            <div key={index} className="feature-input-row">
+                              <input
+                                type="text"
+                                value={feat}
+                                onChange={e => {
+                                  const newFeats = [...calibratingService.features];
+                                  newFeats[index] = e.target.value;
+                                  setCalibratingService({ ...calibratingService, features: newFeats });
+                                }}
+                                placeholder={`Feature line #${index + 1}`}
+                                required
+                              />
+                              <button
+                                type="button"
+                                className="delete-feature-btn"
+                                onClick={() => {
+                                  const newFeats = calibratingService.features.filter((_, idx) => idx !== index);
+                                  setCalibratingService({ ...calibratingService, features: newFeats });
+                                }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                          {(!calibratingService.features || calibratingService.features.length === 0) && (
+                            <p style={{ margin: '1rem 0', color: '#606060', fontSize: '0.8rem', textAlign: 'center', fontFamily: 'Poppins' }}>
+                              No features defined. Click add feature row above.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="calibration-modal-footer" style={{ padding: '1rem 2rem 1.8rem 2rem', borderTop: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      className="calibration-btn-secondary"
+                      onClick={() => {
+                        setIsCalibrationModalOpen(false);
+                        setCalibratingService(null);
+                      }}
+                    >
+                      DISCARD
+                    </button>
+                    <button
+                      type="button"
+                      className="calibration-btn-primary"
+                      onClick={handleIgniteCalibration}
+                    >
+                      IGNITE CALIBRATION
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+        </div>
       </TooltipProvider>
     </QueryClientProvider>
   );
