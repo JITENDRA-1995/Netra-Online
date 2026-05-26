@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { updateInquiry, deleteInquiry } from "../supabase/database";
 
 interface Inquiry {
   id: number;
@@ -325,7 +326,10 @@ export default function Inquiries({
                         // 1. Auto-Ignite project and open Ignition Modal
                         handleIgniteFromInquiry(inq);
                         
-                        // 2. Update local inquiry status
+                        // 2. Update local and backend inquiry status to "Ignited"
+                        updateInquiry(inq.id, { status: "Ignited" }).catch(err => {
+                          console.error("Failed to update status in Supabase:", err);
+                        });
                         setInquiries(prev => prev.map(i => i.id === inq.id ? { ...i, status: "Ignited" } : i));
                         
                         // 3. Send positive WhatsApp greeting confirmation
@@ -354,7 +358,10 @@ export default function Inquiries({
                         const finalPhone = cleanedPhone.length === 10 ? "91" + cleanedPhone : cleanedPhone;
                         window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(sadMsg)}`, '_blank');
                         
-                        // 2. Dismiss/remove the spark from local state list
+                        // 2. Dismiss/remove the spark from local state list and delete from backend DB
+                        deleteInquiry(inq.id).catch(err => {
+                          console.error("Failed to delete inquiry from Supabase:", err);
+                        });
                         setInquiries(prev => prev.filter(i => i.id !== inq.id));
                         
                         toast({
