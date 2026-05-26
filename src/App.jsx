@@ -634,6 +634,11 @@ function App() {
   const [isProjectEditModalOpen, setIsProjectEditModalOpen] = useState(false);
 
   useEffect(() => {
+    // Clear any previous mock database states from local storage to ensure a clean launch
+    localStorage.removeItem("netra_db_state");
+    localStorage.removeItem("netra_clients");
+    localStorage.removeItem("netra_read_flames");
+
     const loadSupabaseData = async () => {
       try {
         const dbClients = await getClients();
