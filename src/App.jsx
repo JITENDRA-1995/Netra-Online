@@ -595,115 +595,12 @@ function App() {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [notifTab, setNotifTab] = useState("SPARKS");
   const [selectedKanbanProject, setSelectedKanbanProject] = useState(null);
-  const [ignitionQueue, setIgnitionQueue] = useState([
-    {
-      id: 1777000000001,
-      name: "Aura Boutique",
-      service: "Logo Designing & Identity",
-      stage: 2, // Moodboard phase
-      status: "Active",
-      createdAt: Date.now() - 5 * 24 * 60 * 60 * 1000,
-      deadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      isManual: true,
-      client: {
-        name: "Aura Boutique",
-        phone: "9876543210",
-        email: "aura.boutique@gmail.com",
-        address: "M.G. Road, Ahmedabad, 380001"
-      },
-      milestones: [
-        { name: "Discovery", completed: true },
-        { name: "Moodboard", completed: true },
-        { name: "Sketching", completed: false },
-        { name: "Final Flame", completed: false }
-      ],
-      activityLog: [
-        { action: "Project Ignited", time: "10:30 AM" },
-        { action: "Discovery Completed", time: "11:45 AM" },
-        { action: "Moodboard Approved by Client", time: "04:15 PM" }
-      ],
-      quote: 18000,
-      discountValue: "2000",
-      discountType: 'rs',
-      discountPercent: "11.11",
-      discount: 2000,
-      advanceAmount: 5000,
-      paymentStatus: 'part',
-      mediaVault: [],
-      collaborationStream: [
-        { id: 1, sender: "SYSTEM", text: "Project Ignited successfully.", time: "10:30 AM" },
-        { id: 2, sender: "ADMIN", text: "Moodboards uploaded to the portal.", time: "02:00 PM" },
-        { id: 3, sender: "CLIENT", text: "Wow, we absolutely love the second theme! Proceeding with that.", time: "04:15 PM" }
-      ]
-    },
-    {
-      id: 1777000000002,
-      name: "Apex Cybertech",
-      service: "3D Motion Graphics & Animation",
-      stage: 4, // Final Flame phase
-      status: "Completed",
-      createdAt: Date.now() - 15 * 24 * 60 * 60 * 1000,
-      deadline: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      isManual: true,
-      client: {
-        name: "Apex Cybertech",
-        phone: "9988776655",
-        email: "info@apexcyber.tech",
-        address: "Cyber City, Bangalore, 560001"
-      },
-      milestones: [
-        { name: "Discovery", completed: true },
-        { name: "Moodboard", completed: true },
-        { name: "Sketching", completed: true },
-        { name: "Final Flame", completed: true }
-      ],
-      activityLog: [
-        { action: "Project Ignited", time: "09:00 AM" },
-        { action: "Storyboard Finalized", time: "03:00 PM" },
-        { action: "3D Models Baked", time: "06:00 PM" },
-        { action: "Final Render Delivered", time: "11:00 AM" }
-      ],
-      quote: 45000,
-      discountValue: "5000",
-      discountType: 'rs',
-      discountPercent: "11.11",
-      discount: 5000,
-      advanceAmount: 20000,
-      paymentStatus: 'paid',
-      mediaVault: [],
-      collaborationStream: [
-        { id: 1, sender: "SYSTEM", text: "Project Ignited successfully.", time: "09:00 AM" },
-        { id: 2, sender: "ADMIN", text: "Draft rendering is complete.", time: "05:00 PM" },
-        { id: 3, sender: "CLIENT", text: "Stunning animation quality! Everything is perfect.", time: "10:30 AM" }
-      ]
-    }
-  ]);
+  const [ignitionQueue, setIgnitionQueue] = useState([]);
   const [selectedProjectTab, setSelectedProjectTab] = useState(null);
   const [projectFilter, setProjectFilter] = useState("Ongoing");
   const [expandedClientRev, setExpandedClientRev] = useState(null);
   const [chatMessage, setChatMessage] = useState("");
-  const [inquiries, setInquiries] = useState([
-    {
-      id: 20001,
-      name: "Rohan Sharma",
-      service: "Packaging Design",
-      email: "rohan@gmail.com",
-      phone: "98250 12345",
-      desc: "Looking for minimal, clean packaging designs for our organic honey brand.",
-      status: "New Spark",
-      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: 20002,
-      name: "Zoya Patel",
-      service: "UI/UX Branding",
-      email: "zoya@designstudio.in",
-      phone: "70430 98765",
-      desc: "Need full visual style guides and Figma designs for a travel startup app.",
-      status: "New Spark",
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-    }
-  ]);
+  const [inquiries, setInquiries] = useState([]);
   const [clients, setClients] = useState(() => {
     const saved = localStorage.getItem('netra_clients');
     if (saved) {
@@ -713,26 +610,7 @@ function App() {
         console.error("Failed to parse saved clients:", e);
       }
     }
-    return [
-      {
-        id: 10001,
-        name: "Aura Boutique",
-        email: "aura.boutique@gmail.com",
-        phone: "9876543210",
-        address: "M.G. Road, Ahmedabad, 380001",
-        status: 'Active',
-        joinedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toLocaleDateString()
-      },
-      {
-        id: 10002,
-        name: "Apex Cybertech",
-        email: "info@apexcyber.tech",
-        phone: "9988776655",
-        address: "Cyber City, Bangalore, 560001",
-        status: 'Active',
-        joinedDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toLocaleDateString()
-      }
-    ];
+    return [];
   });
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
@@ -759,22 +637,22 @@ function App() {
     const loadSupabaseData = async () => {
       try {
         const dbClients = await getClients();
-        if (dbClients && dbClients.length > 0) {
+        if (dbClients) {
           setClients(dbClients);
         }
 
         const dbInquiries = await getInquiries();
-        if (dbInquiries && dbInquiries.length > 0) {
+        if (dbInquiries) {
           setInquiries(dbInquiries);
         }
 
         const dbProjects = await getProjects();
-        if (dbProjects && dbProjects.length > 0) {
+        if (dbProjects) {
           setIgnitionQueue(dbProjects);
         }
 
         const dbInvoices = await getInvoices();
-        if (dbInvoices && dbInvoices.length > 0) {
+        if (dbInvoices) {
           setInvoices(dbInvoices);
         }
       } catch (error) {
@@ -863,26 +741,7 @@ function App() {
   const [isInvoicePreviewOpen, setIsInvoicePreviewOpen] = useState(false);
   const [ledgerSearch, setLedgerSearch] = useState('');
   const [invoiceProject, setInvoiceProject] = useState(null);
-  const [invoices, setInvoices] = useState([
-    {
-      id: 1777000000003,
-      invoiceNo: "NG/17052026/0001",
-      clientName: "Apex Cybertech",
-      projectService: "3D Motion Graphics & Animation",
-      issueDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-      grandTotal: 20000,
-      rawProject: {
-        id: 1777000000002,
-        name: "Apex Cybertech",
-        service: "3D Motion Graphics & Animation",
-        stage: 4,
-        status: "Completed",
-        quote: 45000,
-        discount: 5000,
-        advanceAmount: 20000
-      }
-    }
-  ]);
+  const [invoices, setInvoices] = useState([]);
   const [selectedBatchProjects, setSelectedBatchProjects] = useState([]);
   const [selectedVaultInvoices, setSelectedVaultInvoices] = useState([]);
 
