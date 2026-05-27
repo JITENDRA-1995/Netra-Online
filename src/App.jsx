@@ -14,7 +14,7 @@ import Financials from '@/pages/financials';
 import SettingsPage from '@/pages/settings';
 import { Portfolio } from '@/pages/Portfolio';
 import { useToast } from '@/hooks/use-toast';
-import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail, Menu } from 'lucide-react';
 
 const queryClient = new QueryClient();
 import { supabase } from './supabase/client';
@@ -572,6 +572,7 @@ function App() {
   const [selectedProject, setSelectedProject] = useState("");
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isLoginActive, setIsLoginActive] = useState(false);
   const [isAdminSelected, setIsAdminSelected] = useState(false);
   const [loginError, setLoginError] = useState("");
@@ -1144,6 +1145,34 @@ function App() {
       }
     };
 
+    let touchStartY = 0;
+    const handleTouchStart = (e) => {
+      touchStartY = e.touches[0].clientY;
+    };
+
+    const handleTouchEnd = (e) => {
+      if (isTransitioning || showConstruction) return;
+      
+      const touchEndY = e.changedTouches[0].clientY;
+      const deltaY = touchStartY - touchEndY; // Swiped up (scrolled down)
+
+      if (
+        !isVaultActive &&
+        !isContactActive &&
+        !isServicesActive &&
+        !isLoginActive &&
+        !isCommandCenterActive &&
+        !isClientVaultActive &&
+        !isAdminGridActive &&
+        deltaY > 50 && // Swipe threshold (50px)
+        missionActive
+      ) {
+        setIsTransitioning(true);
+        setIsVaultActive(true);
+        setTimeout(() => setIsTransitioning(false), 1200);
+      }
+    };
+
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
@@ -1152,11 +1181,15 @@ function App() {
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('wheel', handleWheel, { passive: false });
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd, { passive: true });
     document.addEventListener('mousedown', handleClickOutside);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('wheel', handleWheel);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchend', handleTouchEnd);
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [
@@ -1911,71 +1944,87 @@ function App() {
         <div className={`app-container ${isVaultActive ? 'vault-active' : ''}`} ref={containerRef}>
           {/* Side-aligned Sidebar (Only shown when a module is open) */}
           {isCommandCenterActive && isAdminGridActive && (
-            <aside className="admin-sidebar">
-              <div className="sidebar-branding">
-                <img src="/logo.png" alt="Netra Logo" className="sidebar-logo-img" />
-                <span className="sidebar-branding-text">NETRA</span>
-              </div>
+            <>
+              <button 
+                className="admin-mobile-toggle"
+                onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+                aria-label="Toggle Navigation Menu"
+              >
+                {isMobileSidebarOpen ? <LogOut className="w-5 h-5" style={{ transform: 'rotate(180deg)' }} /> : <Menu className="w-5 h-5" />}
+              </button>
+              {isMobileSidebarOpen && (
+                <div 
+                  className="sidebar-mobile-overlay"
+                  onClick={() => setIsMobileSidebarOpen(false)}
+                />
+              )}
+              <aside className={`admin-sidebar ${isMobileSidebarOpen ? 'mobile-open' : ''}`}>
+                <div className="sidebar-branding">
+                  <img src="/logo.png" alt="Netra Logo" className="sidebar-logo-img" />
+                  <span className="sidebar-branding-text">NETRA</span>
+                </div>
 
-              <nav className="sidebar-menu">
-                {[
-                  { id: "DASHBOARD", label: "Dashboard", icon: LayoutDashboard },
-                  { id: "PROJECTS", label: "Projects", icon: Folder },
-                  { id: "INQUIRIES", label: "Inquiries", icon: Inbox, badge: showInquiryBadge },
-                  { id: "CLIENTS", label: "Clients", icon: Users },
-                  { id: "FINANCIALS", label: "Financials", icon: FileText },
-                  { id: "SETTINGS", label: "Settings", icon: Settings }
-                ].map((link) => {
-                  const isActive = activeAdminModule === link.id;
-                  const Icon = link.icon;
-                  return (
-                    <a
-                      key={link.id}
-                      href="#"
-                      className={`sidebar-menu-link ${isActive ? 'active' : ''}`}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setActiveAdminModule(link.id);
-                        setIsAdminGridActive(true);
-                        setIsIgnitionModalOpen(false); // Auto-close modal on navigation
-                        if (link.id === "INQUIRIES") setShowInquiryBadge(false);
-                      }}
-                      data-testid={`link-sidebar-${link.label.toLowerCase()}`}
-                    >
-                      <Icon className={`sidebar-link-icon ${isActive ? 'text-[#00E5FF]' : ''}`} />
-                      <span className="sidebar-link-label">{link.label}</span>
-                      {link.badge && (
-                        <span className="sidebar-notification-dot"></span>
+                <nav className="sidebar-menu">
+                  {[
+                    { id: "DASHBOARD", label: "Dashboard", icon: LayoutDashboard },
+                    { id: "PROJECTS", label: "Projects", icon: Folder },
+                    { id: "INQUIRIES", label: "Inquiries", icon: Inbox, badge: showInquiryBadge },
+                    { id: "CLIENTS", label: "Clients", icon: Users },
+                    { id: "FINANCIALS", label: "Financials", icon: FileText },
+                    { id: "SETTINGS", label: "Settings", icon: Settings }
+                  ].map((link) => {
+                    const isActive = activeAdminModule === link.id;
+                    const Icon = link.icon;
+                    return (
+                      <a
+                        key={link.id}
+                        href="#"
+                        className={`sidebar-menu-link ${isActive ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setActiveAdminModule(link.id);
+                          setIsAdminGridActive(true);
+                          setIsIgnitionModalOpen(false); // Auto-close modal on navigation
+                          setIsMobileSidebarOpen(false); // Auto-close mobile sidebar drawer
+                          if (link.id === "INQUIRIES") setShowInquiryBadge(false);
+                        }}
+                        data-testid={`link-sidebar-${link.label.toLowerCase()}`}
+                      >
+                        <Icon className={`sidebar-link-icon ${isActive ? 'text-[#00E5FF]' : ''}`} />
+                        <span className="sidebar-link-label">{link.label}</span>
+                        {link.badge && (
+                          <span className="sidebar-notification-dot"></span>
+                        )}
+                      </a>
+                    );
+                  })}
+                </nav>
+
+                <div className="sidebar-footer">
+                  <div className="sidebar-notifications-trigger" onClick={() => { setIsNotificationOpen(true); setIsMobileSidebarOpen(false); }}>
+                    <div className={`notification-bell-wrapper ${((sparks.length + flames.length) > 0 || bellPulse) ? 'has-alerts' : ''}`}>
+                      <svg className="bell-icon" viewBox="0 0 24 24" width="20" height="20">
+                        <path fill="currentColor" d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+                      </svg>
+                      {(sparks.length + flames.length) > 0 && (
+                        <span className="bell-badge">{sparks.length + flames.length}</span>
                       )}
-                    </a>
-                  );
-                })}
-              </nav>
-
-              <div className="sidebar-footer">
-                <div className="sidebar-notifications-trigger" onClick={() => setIsNotificationOpen(true)}>
-                  <div className={`notification-bell-wrapper ${((sparks.length + flames.length) > 0 || bellPulse) ? 'has-alerts' : ''}`}>
-                    <svg className="bell-icon" viewBox="0 0 24 24" width="20" height="20">
-                      <path fill="currentColor" d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
-                    </svg>
-                    {(sparks.length + flames.length) > 0 && (
-                      <span className="bell-badge">{sparks.length + flames.length}</span>
-                    )}
+                    </div>
+                    <span className="notifications-label">SYSTEM ALERTS</span>
                   </div>
-                  <span className="notifications-label">SYSTEM ALERTS</span>
-                </div>
 
-                <a href="#" className="sidebar-logout-btn" onClick={handleLogout}>
-                  <LogOut className="w-4 h-4" />
-                  <span>LOGOUT</span>
-                </a>
+                  <a href="#" className="sidebar-logout-btn" onClick={(e) => { handleLogout(e); setIsMobileSidebarOpen(false); }}>
+                    <LogOut className="w-4 h-4" />
+                    <span>LOGOUT</span>
+                  </a>
 
-                <div className="sidebar-version-tag">
-                  <p className="v-title">Netra OS v2.4</p>
-                  <p className="v-status">Systems online.</p>
+                  <div className="sidebar-version-tag">
+                    <p className="v-title">Netra OS v2.4</p>
+                    <p className="v-status">Systems online.</p>
+                  </div>
                 </div>
-              </div>
-            </aside>
+              </aside>
+            </>
           )}
 
           {/* Fixed Public Header */}

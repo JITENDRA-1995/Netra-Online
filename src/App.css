@@ -6467,100 +6467,100 @@ input[type="number"] {
   }
 }
 
-/* ── Admin Sidebar Responsive Collapse ── */
+/* ── Admin Sidebar Responsive Collapse & Drawer ── */
 @media (max-width: 1024px) {
+  .admin-mobile-toggle {
+    display: flex !important;
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    width: 45px;
+    height: 45px;
+    border-radius: 8px;
+    background: rgba(4, 7, 16, 0.7);
+    border: 1px solid rgba(0, 229, 255, 0.2);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 9998; /* Below drawer, above content */
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 15px rgba(0, 229, 255, 0.1);
+  }
+
+  .admin-mobile-toggle:hover {
+    border-color: #00E5FF;
+    box-shadow: 0 0 20px rgba(0, 229, 255, 0.3);
+    color: #00E5FF;
+  }
+
+  .sidebar-mobile-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 9990; /* Under drawer */
+    transition: opacity 0.3s ease;
+  }
+
   .admin-sidebar {
-    width: 70px !important;
-    padding: 1.5rem 0.5rem !important;
-    align-items: center !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: -260px !important; /* Slide off-screen left by default */
+    width: 260px !important;
+    height: 100vh !important;
+    z-index: 9999 !important; /* Overlay everything */
+    padding: 2.2rem 1.2rem !important;
+    align-items: stretch !important;
+    display: flex !important;
+    transition: left 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
   }
 
-  .sidebar-branding {
-    justify-content: center !important;
-    margin-bottom: 2rem !important;
-    padding-left: 0 !important;
-    gap: 0 !important;
-  }
-
-  .sidebar-branding-text {
-    display: none !important; /* Hide branding text */
-  }
-
-  .sidebar-logo-img {
-    height: 30px !important;
-  }
-
-  .sidebar-menu {
-    gap: 0.8rem !important;
-    width: 100% !important;
-    align-items: center !important;
+  .admin-sidebar.mobile-open {
+    left: 0 !important; /* Slide in! */
+    box-shadow: 0 0 50px rgba(0, 229, 255, 0.2) !important;
   }
 
   .sidebar-menu-link {
-    width: 44px !important;
-    height: 44px !important;
-    padding: 0 !important;
-    justify-content: center !important;
-    border-radius: 10px !important;
-    gap: 0 !important;
-  }
-
-  .sidebar-menu-link:hover {
-    transform: none !important; /* Disable translate shift on small screens */
-  }
-
-  .sidebar-link-label {
-    display: none !important; /* Hide menu text labels */
-  }
-
-  .sidebar-notification-dot {
-    right: 6px !important;
-    top: 6px !important;
-    width: 6px !important;
-    height: 6px !important;
-  }
-
-  .sidebar-footer {
     width: 100% !important;
-    align-items: center !important;
-    gap: 1rem !important;
+    height: auto !important;
+    padding: 0.85rem 1rem !important;
+    justify-content: flex-start !important;
+    border-radius: 8px !important;
+    gap: 0.85rem !important;
   }
 
   .sidebar-notifications-trigger {
-    padding: 0 !important;
-    justify-content: center !important;
-    width: 44px !important;
-    height: 44px !important;
-  }
-
-  .notifications-label {
-    display: none !important; /* Hide systems alert label */
+    width: 100% !important;
+    padding: 0.85rem 1rem !important;
+    justify-content: flex-start !important;
+    height: auto !important;
+    border-radius: 8px !important;
+    gap: 0.85rem !important;
   }
 
   .sidebar-logout-btn {
-    width: 44px !important;
-    height: 44px !important;
-    padding: 0 !important;
-    justify-content: center !important;
-    border-radius: 10px !important;
-    gap: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 0.85rem 1rem !important;
+    justify-content: flex-start !important;
+    border-radius: 8px !important;
+    gap: 0.85rem !important;
   }
 
-  .sidebar-logout-btn span {
-    display: none !important; /* Hide LOGOUT text label */
-  }
-
-  .sidebar-version-tag {
-    display: none !important; /* Hide version and status panel */
-  }
-
-  /* Offset Spacing Adjustments */
+  /* Offset Spacing Adjustments - Remove sidebar padding on mobile for full width! */
   .admin-grid-screen.sidebar-active {
-    padding-left: 70px !important; /* Offset content exactly by the collapsed sidebar width */
+    padding-left: 0 !important; /* Open up full screen width */
   }
 
   .admin-grid-screen.sidebar-active .grid-layout {
-    padding: 120px 4% 80px !important; /* Safer vertical spaces */
+    padding: 100px 1.25rem 60px !important; /* Safe mobile grid margins */
   }
 }
 
