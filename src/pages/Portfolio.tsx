@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 const CATEGORY_COLORS: Record<string, string> = {
   BRANDING: "#00d4ff",
@@ -16,6 +17,7 @@ function DynamicSlideshow({ photos }: { photos: { url: string; title: string; du
   const [isHovered, setIsHovered] = useState(false);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [videoCurrentTime, setVideoCurrentTime] = useState<number>(0);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
   // Reset video progress state whenever the slide changes
   useEffect(() => {
@@ -36,8 +38,36 @@ function DynamicSlideshow({ photos }: { photos: { url: string; title: string; du
     ? currentPhoto.duration! * 1000 
     : 5000;
 
+  const handlePrev = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setIndex((prev) => (prev - 1 + photos.length) % photos.length);
+  };
+
+  const handleNext = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setIndex((prev) => (prev + 1) % photos.length);
+  };
+
+  // Lightbox keyboard controls
   useEffect(() => {
-    if (isHovered || !photos || photos.length <= 1 || !currentPhoto) return;
+    if (!isLightboxOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsLightboxOpen(false);
+      } else if (e.key === "ArrowLeft") {
+        handlePrev();
+      } else if (e.key === "ArrowRight") {
+        handleNext();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isLightboxOpen, photos.length]);
+
+  useEffect(() => {
+    if (isHovered || isLightboxOpen || !photos || photos.length <= 1 || !currentPhoto) return;
 
     // For videos with no custom duration, transition onEnded callback instead of timer
     if (isVideo && !hasCustomDuration) return;
@@ -47,7 +77,7 @@ function DynamicSlideshow({ photos }: { photos: { url: string; title: string; du
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [index, isHovered, photos, isVideo, hasCustomDuration, delay]);
+  }, [index, isHovered, isLightboxOpen, photos, isVideo, hasCustomDuration, delay]);
 
   if (!photos || photos.length === 0) {
     return (
@@ -63,6 +93,7 @@ function DynamicSlideshow({ photos }: { photos: { url: string; title: string; du
       className="w-full lg:w-2/3 h-[360px] rounded-3xl border border-white/5 relative overflow-hidden group/slide cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onClick={() => setIsLightboxOpen(true)}
       style={{
         background: "rgba(8, 8, 16, 0.4)",
         borderColor: "rgba(255, 255, 255, 0.04)"
@@ -139,7 +170,7 @@ function DynamicSlideshow({ photos }: { photos: { url: string; title: string; du
           <button 
             onClick={(e) => {
               e.stopPropagation();
-              setIndex((prev) => (prev - 1 + photos.length) % photos.length);
+              handlePrev(e);
             }}
             className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-white/10 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover/slide:opacity-100 transition-all duration-300 hover:bg-white hover:text-black z-10 hover:scale-105"
           >
@@ -148,7 +179,7 @@ function DynamicSlideshow({ photos }: { photos: { url: string; title: string; du
           <button 
             onClick={(e) => {
               e.stopPropagation();
-              setIndex((prev) => (prev + 1) % photos.length);
+              handleNext(e);
             }}
             className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-white/10 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover/slide:opacity-100 transition-all duration-300 hover:bg-white hover:text-black z-10 hover:scale-105"
           >
@@ -180,6 +211,96 @@ function DynamicSlideshow({ photos }: { photos: { url: string; title: string; du
           </div>
         )}
       </div>
+
+      {/* Lightbox Extended Preview Modal */}
+      <AnimatePresence>
+        {isLightboxOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsLightboxOpen(false);
+            }}
+          >
+            {/* Close Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsLightboxOpen(false);
+              }}
+              className="absolute top-6 right-6 w-12 h-12 rounded-full border border-white/10 bg-black/40 hover:bg-white hover:text-black flex items-center justify-center text-white transition-all hover:scale-105 duration-200 cursor-pointer z-50 animate-fadeSlideUp"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Navigation Controls */}
+            {photos.length > 1 && (
+              <>
+                <button
+                  onClick={handlePrev}
+                  className="absolute left-6 top-1/2 -translate-y-1/2 w-14 h-14 rounded-full border border-white/10 bg-black/40 text-white hover:bg-white hover:text-black flex items-center justify-center transition-all hover:scale-105 duration-200 cursor-pointer z-50"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button
+                  onClick={handleNext}
+                  className="absolute right-6 top-1/2 -translate-y-1/2 w-14 h-14 rounded-full border border-white/10 bg-black/40 text-white hover:bg-white hover:text-black flex items-center justify-center transition-all hover:scale-105 duration-200 cursor-pointer z-50"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              </>
+            )}
+
+            {/* Media Content Viewer */}
+            <div 
+              className="relative max-w-[90vw] max-h-[80vh] flex items-center justify-center select-none"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <AnimatePresence mode="wait">
+                {isVideo ? (
+                  <motion.video
+                    key={index}
+                    src={currentPhoto.url}
+                    autoPlay
+                    controls
+                    className="max-w-full max-h-[80vh] object-contain rounded-2xl border border-white/10 shadow-[0_0_50px_rgba(255,255,255,0.05)]"
+                  />
+                ) : (
+                  <motion.img
+                    key={index}
+                    src={currentPhoto.url}
+                    alt={currentPhoto.title || "Slideshow"}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.3 }}
+                    className="max-w-full max-h-[80vh] object-contain rounded-2xl border border-white/10 shadow-[0_0_50px_rgba(255,255,255,0.05)]"
+                  />
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Cyber Info Caption Overlay */}
+            <div 
+              className="absolute bottom-8 px-6 py-3 rounded-2xl bg-white/[0.02] border border-white/5 backdrop-blur-md flex flex-col items-center justify-center text-center select-none"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="text-[9px] font-mono text-cyan-400 uppercase tracking-widest mb-0.5">
+                Extended Calibration Preview
+              </span>
+              <h4 className="text-sm font-bold text-white tracking-wide">
+                {currentPhoto.title || "Showcase Asset"}
+              </h4>
+              <span className="text-[9px] font-mono text-muted-foreground/60 mt-1">
+                SLIDE {index + 1} OF {photos.length}
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
