@@ -368,3 +368,52 @@
   color: #08d9d6;
   box-shadow: 0 0 15px rgba(8, 217, 214, 0.15);
 }
+
+/* ── Responsive Overrides for Mobile Screens ── */
+@media (max-width: 480px) {
+  .netra-bg {
+    padding: 2rem 1rem !important;
+  }
+  
+  .glass-panel {
+    padding: 2.2rem 1.5rem !important;
+    border-radius: 0.75rem !important;
+  }
+  
+  .login-header-title {
+    font-size: 1.4rem !important;
+  }
+  
+  .login-header-icon-wrapper {
+    width: 3.5rem !important;
+    height: 3.5rem !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  .cyber-button {
+    padding: 0.8rem !important;
+    font-size: 0.8rem !important;
+    margin-top: 1rem !important;
+  }
+  
+  .netra-input {
+    padding: 0.8rem 1rem 0.8rem 2.6rem !important;
+    font-size: 0.85rem !important;
+  }
+  
+  .input-icon {
+    left: 0.8rem !important;
+  }
+  
+  .passphrase-toggle-btn {
+    right: 0.8rem !important;
+  }
+  
+  .login-mode-switcher {
+    margin-bottom: 1.5rem !important;
+  }
+  
+  .login-form-fields {
+    gap: 1.2rem !important;
+  }
+}

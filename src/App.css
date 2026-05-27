@@ -1604,21 +1604,188 @@ input[type="number"] {
 }
 
 @media (max-width: 768px) {
+  /* ── Original Contact Page Overrides ── */
+  .contact-page {
+    height: auto !important;
+    min-height: 100vh;
+    overflow-y: auto !important;
+    display: flex;
+    flex-direction: column;
+  }
+  .contact-content {
+    height: auto !important;
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    padding: 30px 8vw 80px !important;
+  }
   .split-narrative {
     flex-direction: column;
     height: auto;
-    gap: 4rem;
+    gap: 2.5rem;
   }
   .connection-side, .spark-side {
     width: 100%;
     padding: 0;
     border: none;
   }
-  .header-nav {
-    flex-direction: row-reverse;
-  }
   .contact-title {
     font-size: 3rem;
+  }
+  .footer-watermark {
+    display: none !important; /* Prevent overlap with centered footer text on narrow viewports */
+  }
+  .contact-footer {
+    position: relative !important;
+    bottom: auto !important;
+    left: auto !important;
+    margin-top: auto;
+    width: 100% !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    padding: 1.5rem 1rem !important;
+  }
+
+  /* ── Header Navigation Overrides ── */
+  .main-header {
+    padding: 0 4% !important;
+    height: 60px !important; /* Slightly more compact header on mobile */
+  }
+
+  .header-nav {
+    flex-direction: row !important; /* Normal horizontal alignment */
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+
+  .branding-text {
+    font-size: 1.05rem !important; /* Scale down brand text size */
+    letter-spacing: 2px !important;
+  }
+
+  .word-graphics {
+    display: none !important; /* Hide "GRAPHICS" text to save horizontal space on mobile */
+  }
+
+  .branding-logo {
+    height: 32px !important; /* Scale down header logo */
+  }
+
+  .radiant-glow {
+    width: 25px !important;
+    height: 25px !important;
+  }
+
+  .branding-container .logo-asset-wrapper {
+    margin-right: 0.4rem !important;
+  }
+
+  .menu-container {
+    gap: 0.5rem !important; /* Tighter navigation spacing on mobile */
+  }
+
+  .menu-text {
+    display: none !important; /* Hide long text labels on mobile */
+  }
+
+  .main-header .menu-icon {
+    display: block !important; /* Show crisp Lucide icons */
+    width: 20px !important;
+    height: 20px !important;
+    color: rgba(255, 255, 255, 0.7) !important;
+    transition: all 0.3s ease !important;
+  }
+
+  .menu-link {
+    padding: 0.2rem !important; /* Make link hits more compact */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .menu-divider {
+    display: none !important; /* Hide dividers to fit navigation icons */
+  }
+
+  /* ── Hero Page Overrides ── */
+  .main-headline {
+    font-size: 13vw !important; /* Dynamically scale down giant font size */
+    letter-spacing: 0.1em !important;
+  }
+
+  .hero-tagline {
+    font-size: 0.75rem !important;
+    letter-spacing: 3px !important;
+  }
+
+  .mission-statement {
+    font-size: 0.85rem !important;
+    line-height: 1.6 !important;
+    padding: 0 1rem !important;
+  }
+
+  /* ── Modals and Dialogs Overrides ── */
+  .ignition-modal {
+    padding: 1.5rem !important; /* Drop padding size to give form elements more room */
+    border-radius: 8px !important;
+    margin-bottom: 40px !important;
+  }
+
+  .modal-header {
+    margin-bottom: 1.5rem !important;
+  }
+
+  .modal-header h2 {
+    font-size: 1.4rem !important;
+    letter-spacing: 2px !important;
+  }
+
+  .service-detail-popup {
+    padding: 1.5rem !important; /* Prevent text clipping on service detail view click */
+  }
+
+  .popup-service-title {
+    font-size: 1.4rem !important;
+  }
+
+  .popup-service-desc {
+    font-size: 0.85rem !important;
+  }
+
+  /* ── Administrative Modules Overrides ── */
+  .modules-grid-layout {
+    width: 100% !important;
+    max-width: 100vw !important;
+    padding: 100px 1.25rem 40px !important;
+    align-items: stretch !important; /* Ensure content stretches to fill screen */
+  }
+
+  .modules-header {
+    margin-bottom: 1.8rem !important;
+    padding: 0 !important;
+  }
+
+  .modules-header h2 {
+    font-size: 1.45rem !important; /* Scale down title to prevent text-clipping overflow */
+    letter-spacing: 1px !important;
+  }
+
+  .header-bar {
+    height: 25px !important; /* Scale down match title height */
+  }
+
+  .admin-cards-grid {
+    grid-template-columns: 1fr !important; /* Force a single column stack to prevent horizontal scrolling */
+    gap: 1rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .admin-module-card {
+    padding: 1.5rem 1.25rem !important; /* Make card padding responsive */
+  }
+
+  .admin-module-card:hover {
+    transform: translateY(-4px) !important; /* Subtle translation transition */
   }
 }
 
@@ -2204,14 +2371,15 @@ input[type="number"] {
 
 /* Administrative Modules Grid */
 .modules-grid-layout {
-  padding: 40px 8%;
+  padding: 120px 8% 60px; /* Safe padding for header clearance */
   text-align: left;
   display: flex;
   flex-direction: column;
   align-items: center; /* Center horizontally */
-  height: 100vh;
-  justify-content: center; /* Center vertically */
-  overflow: hidden; /* Remove scrolling */
+  min-height: 100vh;
+  height: auto;
+  justify-content: flex-start; /* Fixed align issue */
+  overflow-y: auto; /* Enable scrolling */
   box-sizing: border-box;
 }
 
@@ -2244,7 +2412,7 @@ input[type="number"] {
 
 .admin-cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1.5rem; /* Tighter gap */
   width: 100%;
   max-width: 1200px;
@@ -2428,12 +2596,13 @@ input[type="number"] {
 }
 
 .modules-grid-layout {
-  padding: 40px 8%;
+  padding: 120px 8% 60px; /* Safe padding for header clearance */
   text-align: left;
   display: flex;
   flex-direction: column;
   align-items: center;
   min-height: 100vh;
+  height: auto;
   justify-content: flex-start; /* Fixed align issue */
   box-sizing: border-box;
   overflow-y: auto;
@@ -2468,7 +2637,7 @@ input[type="number"] {
 
 .admin-cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1.5rem; /* Tighter gap */
   width: 100%;
   max-width: 1200px;
@@ -3965,8 +4134,14 @@ input[type="number"] {
 
 .form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 1.5rem;
+}
+
+@media (min-width: 769px) {
+  .form-row {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .input-group {
@@ -5788,8 +5963,14 @@ input[type="number"] {
 
 .calibration-form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 1rem;
+}
+
+@media (min-width: 769px) {
+  .calibration-form-row {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .calibration-input-group {
@@ -6285,4 +6466,102 @@ input[type="number"] {
     max-width: 200px;
   }
 }
+
+/* ── Admin Sidebar Responsive Collapse ── */
+@media (max-width: 1024px) {
+  .admin-sidebar {
+    width: 70px !important;
+    padding: 1.5rem 0.5rem !important;
+    align-items: center !important;
+  }
+
+  .sidebar-branding {
+    justify-content: center !important;
+    margin-bottom: 2rem !important;
+    padding-left: 0 !important;
+    gap: 0 !important;
+  }
+
+  .sidebar-branding-text {
+    display: none !important; /* Hide branding text */
+  }
+
+  .sidebar-logo-img {
+    height: 30px !important;
+  }
+
+  .sidebar-menu {
+    gap: 0.8rem !important;
+    width: 100% !important;
+    align-items: center !important;
+  }
+
+  .sidebar-menu-link {
+    width: 44px !important;
+    height: 44px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+    border-radius: 10px !important;
+    gap: 0 !important;
+  }
+
+  .sidebar-menu-link:hover {
+    transform: none !important; /* Disable translate shift on small screens */
+  }
+
+  .sidebar-link-label {
+    display: none !important; /* Hide menu text labels */
+  }
+
+  .sidebar-notification-dot {
+    right: 6px !important;
+    top: 6px !important;
+    width: 6px !important;
+    height: 6px !important;
+  }
+
+  .sidebar-footer {
+    width: 100% !important;
+    align-items: center !important;
+    gap: 1rem !important;
+  }
+
+  .sidebar-notifications-trigger {
+    padding: 0 !important;
+    justify-content: center !important;
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .notifications-label {
+    display: none !important; /* Hide systems alert label */
+  }
+
+  .sidebar-logout-btn {
+    width: 44px !important;
+    height: 44px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+    border-radius: 10px !important;
+    gap: 0 !important;
+  }
+
+  .sidebar-logout-btn span {
+    display: none !important; /* Hide LOGOUT text label */
+  }
+
+  .sidebar-version-tag {
+    display: none !important; /* Hide version and status panel */
+  }
+
+  /* Offset Spacing Adjustments */
+  .admin-grid-screen.sidebar-active {
+    padding-left: 70px !important; /* Offset content exactly by the collapsed sidebar width */
+  }
+
+  .admin-grid-screen.sidebar-active .grid-layout {
+    padding: 120px 4% 80px !important; /* Safer vertical spaces */
+  }
+}
+
 

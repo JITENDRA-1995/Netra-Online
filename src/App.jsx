@@ -1245,7 +1245,7 @@ function App() {
   };
 
   useEffect(() => {
-    if ((isVaultActive && !isTransitioning) || isServicesActive) {
+    if ((isVaultActive && !isTransitioning) || isServicesActive || isContactActive) {
       document.body.style.overflow = 'auto';
       document.documentElement.style.overflow = 'auto';
     } else {
@@ -1256,7 +1256,14 @@ function App() {
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
     };
-  }, [isVaultActive, isServicesActive, isTransitioning]);
+  }, [isVaultActive, isServicesActive, isContactActive, isTransitioning]);
+
+  useEffect(() => {
+    if (isContactActive) {
+      const el = document.querySelector('.contact-page');
+      if (el) el.scrollTop = 0;
+    }
+  }, [isContactActive]);
 
   // Reset scroll positions of absolute-positioned sub-pages/panels to top when activated
   useEffect(() => {

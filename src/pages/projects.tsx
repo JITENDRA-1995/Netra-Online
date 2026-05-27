@@ -419,7 +419,7 @@ export default function Projects({
                 placeholder="Project objectives"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Status</label>
                 <select
@@ -450,7 +450,7 @@ export default function Projects({
                 </select>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1">
                 <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Budget (₹)</label>
                 <Input
@@ -489,7 +489,7 @@ export default function Projects({
               <label className="text-3xs uppercase tracking-widest text-cyan-400 font-extrabold flex items-center gap-1.5">
                 <span>🎁</span> SPECIAL CONTRACT DISCOUNT
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Discount Value</label>
                   <div className="relative">
