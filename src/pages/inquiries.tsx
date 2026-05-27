@@ -15,12 +15,12 @@ import {
   Calendar,
   MessageSquare
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Badge } from "../components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog";
+import { Textarea } from "../components/ui/textarea";
+import { useToast } from "../hooks/use-toast";
 import { updateInquiry, deleteInquiry } from "../supabase/database";
 
 interface Inquiry {
@@ -32,6 +32,7 @@ interface Inquiry {
   location: string;
   status: string;
   date: string;
+  createdAt?: string;
 }
 
 interface InquiriesProps {
@@ -244,7 +245,7 @@ export default function Inquiries({
             className="pl-9 bg-white/5 border-white/10 rounded-xl"
             placeholder="Search identity / mobile..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
           />
         </div>
 
@@ -252,7 +253,7 @@ export default function Inquiries({
           <select
             className="h-10 bg-white/5 border border-white/10 rounded-xl text-xs px-3 text-foreground outline-none focus:border-cyan-400"
             value={filterService}
-            onChange={(e) => setFilterService(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterService(e.target.value)}
           >
             <option value="all">All Services</option>
             {services.map(s => <option key={s.id} value={s.title}>{s.title}</option>)}
@@ -261,7 +262,7 @@ export default function Inquiries({
           <select
             className="h-10 bg-white/5 border border-white/10 rounded-xl text-xs px-3 text-foreground outline-none focus:border-cyan-400"
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterStatus(e.target.value)}
           >
             <option value="all">All Status</option>
             <option value="New Spark">New Spark</option>
@@ -274,7 +275,7 @@ export default function Inquiries({
             type="date"
             className="h-10 w-36 bg-white/5 border-white/10 rounded-xl text-xs text-muted-foreground"
             value={filterDate}
-            onChange={(e) => setFilterDate(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFilterDate(e.target.value)}
           />
         </div>
       </motion.div>
@@ -398,7 +399,7 @@ export default function Inquiries({
       </motion.div>
 
       {/* WhatsApp Status Remark Dialog */}
-      <Dialog open={remarkModal.open} onOpenChange={(open) => !open && setRemarkModal({ open: false, inquiryId: null, type: null })}>
+      <Dialog open={remarkModal.open} onOpenChange={(open: boolean) => !open && setRemarkModal({ open: false, inquiryId: null, type: null })}>
         <DialogContent className="bg-[#0a0f1e] border-white/10 max-w-md">
           <DialogHeader>
             <DialogTitle className="text-foreground flex items-center gap-2">
@@ -413,7 +414,7 @@ export default function Inquiries({
             <Textarea
               placeholder="Type your message to the client..."
               value={remarkText}
-              onChange={(e) => setRemarkText(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRemarkText(e.target.value)}
               className="bg-white/5 border-white/10 text-xs text-foreground min-h-[100px] rounded-xl"
             />
             <div className="flex gap-2">
