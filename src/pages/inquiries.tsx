@@ -121,7 +121,7 @@ export default function Inquiries({
 
     // Conversion rate
     const ignited = resolvedInquiries.filter(q => q.status.toLowerCase().includes("ignit") || q.status.toLowerCase() === "accepted").length;
-    const rate = resolvedInquiries.length > 0 ? Math.round((ignited / resolvedInquiries.length) * 100) : 84;
+    const rate = resolvedInquiries.length > 0 ? Math.round((ignited / resolvedInquiries.length) * 100) : 0;
 
     return { unread, topService, rate };
   }, [resolvedInquiries]);

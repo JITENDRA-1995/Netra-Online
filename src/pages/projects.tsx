@@ -246,17 +246,6 @@ export default function Projects({
 
       {/* Search & Filters */}
       <motion.div variants={itemVariants} className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            className="pl-9 bg-white/5 border-white/10 rounded-xl text-foreground bg-[#0a0f1e]/40"
-            placeholder="Search projects by name or client visionary..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            data-testid="input-search-projects"
-          />
-        </div>
-
         <div className="flex gap-1.5 p-1 rounded-xl bg-white/5 border border-white/10 flex-wrap">
           {["ALL", "ACTIVE", "COMPLETED", "ON_HOLD", "CANCELLED"].map(status => (
             <Button
@@ -269,6 +258,17 @@ export default function Projects({
               {status}
             </Button>
           ))}
+        </div>
+
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            className="pl-9 bg-white/5 border-white/10 rounded-xl text-foreground bg-[#0a0f1e]/40"
+            placeholder="Search projects by name or client visionary..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            data-testid="input-search-projects"
+          />
         </div>
       </motion.div>
 

@@ -2844,20 +2844,7 @@ function App() {
                         )}
                       </div>
 
-                      {/* Floating Action Button (Ignition Trigger) - Dashboard & Projects */}
-                      {(activeAdminModule === "DASHBOARD" || activeAdminModule === "PROJECTS") && (
-                        <>
-                          <motion.button
-                            className="ignition-fab"
-                            whileHover={{ width: '260px' }}
-                            onClick={() => { setPrefillData(null); setIsIgnitionModalOpen(true); }}
-                          >
-                            <span className="fab-icon">+</span>
-                            <span className="fab-text">START NEW IGNITION</span>
-                          </motion.button>
 
-                        </>
-                      )}
 
                       {/* Modals - Moved outside of specific module conditionals to be globally accessible in Admin */}
                       <AnimatePresence>
