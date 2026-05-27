@@ -93,6 +93,7 @@ export default function SettingsPage({
   // State arrays for inline new slide inputs per slot index (0 to 4)
   const [newSlideUrls, setNewSlideUrls] = useState<string[]>(["", "", "", "", ""]);
   const [newSlideTitles, setNewSlideTitles] = useState<string[]>(["", "", "", "", ""]);
+  const [newSlideDurations, setNewSlideDurations] = useState<string[]>(["", "", "", "", ""]);
 
   // High-fidelity UI feedback states
   const [isSaving, setIsSaving] = useState(false);
@@ -257,6 +258,7 @@ export default function SettingsPage({
   const handleAddSlideToSlot = async (slotIdx: number) => {
     const url = newSlideUrls[slotIdx].trim();
     const title = newSlideTitles[slotIdx].trim();
+    const durationStr = newSlideDurations[slotIdx].trim();
     if (!url) return;
 
     // Trigger high-tech countdown state tracking
@@ -274,7 +276,16 @@ export default function SettingsPage({
 
     const next = [...localVisionSettings];
     const currentPhotos = next[slotIdx].photos ? [...next[slotIdx].photos] : [];
-    currentPhotos.push({ url, title: title || "Slideshow Showcase" });
+    
+    // Parse duration (float or undefined if empty)
+    const duration = durationStr ? parseFloat(durationStr) : undefined;
+
+    currentPhotos.push({ 
+      url, 
+      title: title || "Slideshow Showcase",
+      duration
+    });
+    
     next[slotIdx] = {
       ...next[slotIdx],
       photos: currentPhotos
@@ -290,6 +301,10 @@ export default function SettingsPage({
     const titles = [...newSlideTitles];
     titles[slotIdx] = "";
     setNewSlideTitles(titles);
+
+    const durations = [...newSlideDurations];
+    durations[slotIdx] = "";
+    setNewSlideDurations(durations);
 
     setAddingSlideStatus(prev => ({ ...prev, isAdding: false }));
   };
@@ -569,7 +584,14 @@ export default function SettingsPage({
                                     />
                                   )}
                                   <div>
-                                    <div className="text-xs font-semibold text-white/90 line-clamp-1">{p.title}</div>
+                                    <div className="text-xs font-semibold text-white/90 line-clamp-1 flex items-center gap-1.5">
+                                      {p.title}
+                                      {p.duration !== undefined && p.duration > 0 && (
+                                        <span className="text-[8px] font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1 py-0.25 rounded-md">
+                                          {p.duration}s
+                                        </span>
+                                      )}
+                                    </div>
                                     <div className="text-[9px] font-mono text-muted-foreground/60 line-clamp-1 max-w-[240px]">{p.url.startsWith("data:") ? "[Local Binary Data]" : p.url}</div>
                                   </div>
                                 </div>
@@ -697,6 +719,23 @@ export default function SettingsPage({
                                 setNewSlideTitles(titles);
                               }}
                               placeholder="e.g., Luxe Branding Showcase"
+                              className="bg-black/40 border-white/10 text-xs rounded-lg py-1 px-3 text-white placeholder:text-white/20"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">Running Duration (seconds)</label>
+                            <Input
+                              type="number"
+                              min="0.5"
+                              step="0.5"
+                              value={newSlideDurations[slotIdx]}
+                              onChange={(e) => {
+                                const durations = [...newSlideDurations];
+                                durations[slotIdx] = e.target.value;
+                                setNewSlideDurations(durations);
+                              }}
+                              placeholder="e.g., 5 (Blank for default)"
                               className="bg-black/40 border-white/10 text-xs rounded-lg py-1 px-3 text-white placeholder:text-white/20"
                             />
                           </div>

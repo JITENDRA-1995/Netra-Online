@@ -11,17 +11,43 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 // Autoplay Slideshow for showcase photos of a service card
-function DynamicSlideshow({ photos }: { photos: { url: string; title: string }[] }) {
+function DynamicSlideshow({ photos }: { photos: { url: string; title: string; duration?: number }[] }) {
   const [index, setIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [videoDuration, setVideoDuration] = useState<number | null>(null);
+  const [videoCurrentTime, setVideoCurrentTime] = useState<number>(0);
+
+  // Reset video progress state whenever the slide changes
+  useEffect(() => {
+    setVideoCurrentTime(0);
+    setVideoDuration(null);
+  }, [index]);
+
+  const currentPhoto = photos && photos[index];
+  const isVideo = currentPhoto && (
+    currentPhoto.url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || 
+    currentPhoto.url.includes("video") || 
+    currentPhoto.url.startsWith("data:video/")
+  );
+  const hasCustomDuration = currentPhoto && currentPhoto.duration !== undefined && currentPhoto.duration > 0;
+
+  // Determine transition delay (fallback to 5000ms for photos)
+  const delay = hasCustomDuration 
+    ? currentPhoto.duration! * 1000 
+    : 5000;
 
   useEffect(() => {
-    if (isHovered || !photos || photos.length <= 1) return;
-    const timer = setInterval(() => {
+    if (isHovered || !photos || photos.length <= 1 || !currentPhoto) return;
+
+    // For videos with no custom duration, transition onEnded callback instead of timer
+    if (isVideo && !hasCustomDuration) return;
+
+    const timer = setTimeout(() => {
       setIndex((prev) => (prev + 1) % photos.length);
-    }, 3000);
-    return () => clearInterval(timer);
-  }, [isHovered, photos]);
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [index, isHovered, photos, isVideo, hasCustomDuration, delay]);
 
   if (!photos || photos.length === 0) {
     return (
@@ -31,8 +57,6 @@ function DynamicSlideshow({ photos }: { photos: { url: string; title: string }[]
       </div>
     );
   }
-
-  const currentPhoto = photos[index];
 
   return (
     <div 
@@ -47,27 +71,46 @@ function DynamicSlideshow({ photos }: { photos: { url: string; title: string }[]
       {/* Autoplay progress bar */}
       {photos.length > 1 && !isHovered && (
         <div className="absolute top-0 left-0 right-0 h-1 bg-white/10 z-20">
-          <motion.div 
-            key={index}
-            initial={{ width: "0%" }}
-            animate={{ width: "100%" }}
-            transition={{ duration: 3, ease: "linear" }}
-            className="h-full bg-gradient-to-r from-violet-500 to-cyan-400"
-          />
+          {isVideo && !hasCustomDuration ? (
+            <div 
+              className="h-full bg-gradient-to-r from-violet-500 to-cyan-400 transition-all duration-100 ease-out"
+              style={{ width: `${(videoCurrentTime / (videoDuration || 1)) * 100}%` }}
+            />
+          ) : (
+            <motion.div 
+              key={index}
+              initial={{ width: "0%" }}
+              animate={{ width: "100%" }}
+              transition={{ duration: delay / 1000, ease: "linear" }}
+              className="h-full bg-gradient-to-r from-violet-500 to-cyan-400"
+            />
+          )}
         </div>
       )}
 
       {/* Image / Video rendering with Framer Motion AnimatePresence */}
       <div className="absolute inset-0 z-0">
         <AnimatePresence mode="wait">
-          {currentPhoto.url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || currentPhoto.url.includes("video") || currentPhoto.url.startsWith("data:video/") ? (
+          {isVideo ? (
             <motion.video
               key={index}
               src={currentPhoto.url}
               autoPlay
-              loop
+              loop={photos.length === 1 || hasCustomDuration}
               muted
               playsInline
+              onTimeUpdate={(e) => {
+                const video = e.currentTarget;
+                if (video.duration) {
+                  setVideoCurrentTime(video.currentTime);
+                  setVideoDuration(video.duration);
+                }
+              }}
+              onEnded={() => {
+                if (!hasCustomDuration) {
+                  setIndex((prev) => (prev + 1) % photos.length);
+                }
+              }}
               initial={{ opacity: 0, scale: 1.05 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
