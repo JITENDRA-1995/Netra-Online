@@ -2116,6 +2116,32 @@ function App() {
             </>
           )}
 
+          {/* Floating Sound Controls — shown on login, admin & client vault pages where public header is hidden */}
+          {(isLoginActive || isCommandCenterActive || isClientVaultActive) && (
+            <div className="floating-sound-controls">
+              <button
+                className={`floating-sound-btn ${isPlaying ? 'active' : ''}`}
+                onClick={toggleSound}
+                title={isPlaying ? 'Mute Ambient Track' : 'Play Ambient Track'}
+              >
+                <div className={`sound-waves ${isPlaying ? 'playing' : ''}`}>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </button>
+              <div className="floating-sound-divider" />
+              <button
+                className={`floating-click-btn ${clickSoundEnabled ? 'active' : ''} ${!isPlaying ? 'disabled' : ''}`}
+                onClick={toggleClickSound}
+                title={!isPlaying ? 'Enable music first' : clickSoundEnabled ? 'Disable Click Sounds' : 'Enable Click Sounds'}
+              >
+                {clickSoundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          )}
+
           {/* Fixed Public Header */}
           {!isCommandCenterActive && !isClientVaultActive && !isLoginActive && (
             <header className={`main-header ${headerVisible ? 'header-reveal' : 'header-hidden'} ${isNavVertical ? 'vision-mode nav-vertical' : ''}`}>
