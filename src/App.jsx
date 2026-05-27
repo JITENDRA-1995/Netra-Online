@@ -399,9 +399,23 @@ function App() {
     return defaultVisionSettings;
   });
 
-  const handleSaveVisionSettings = (newSettings) => {
+  const handleSaveVisionSettings = async (newSettings) => {
     setVisionSettings(newSettings);
     localStorage.setItem('netra_vision_settings', JSON.stringify(newSettings));
+
+    // Save globally to Supabase special settings row
+    try {
+      const payload = {
+        address: JSON.stringify({ services: servicesList, vision: newSettings })
+      };
+      await supabase
+        .from('clients')
+        .update(payload)
+        .eq('email', 'settings@netra.graphics');
+    } catch (dbErr) {
+      console.error("Failed to save vision settings to database:", dbErr);
+    }
+
     toast({
       title: "Vision Settings Saved",
       description: "Successfully updated the VISION page categories and slideshow assets."
@@ -415,13 +429,26 @@ function App() {
     setIsCalibrationModalOpen(true);
   };
 
-  const handleIgniteCalibration = () => {
+  const handleIgniteCalibration = async () => {
     if (!calibratingService) return;
 
     // Save update to state and localStorage
     const nextList = servicesList.map(s => s.id === calibratingService.id ? calibratingService : s);
     setServicesList(nextList);
     localStorage.setItem("netra_services", JSON.stringify(nextList));
+
+    // Save globally to Supabase special settings row
+    try {
+      const payload = {
+        address: JSON.stringify({ services: nextList, vision: visionSettings })
+      };
+      await supabase
+        .from('clients')
+        .update(payload)
+        .eq('email', 'settings@netra.graphics');
+    } catch (dbErr) {
+      console.error("Failed to save calibrated services to database:", dbErr);
+    }
 
     toast({
       title: "Service Calibrated Successfully",
@@ -516,6 +543,49 @@ function App() {
       */
       window.removeEventListener('click', handleGlobalClick);
     };
+  }, []);
+
+  useEffect(() => {
+    const fetchGlobalSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('clients')
+          .select('*')
+          .eq('email', 'settings@netra.graphics')
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+          try {
+            const parsed = JSON.parse(data.address);
+            if (parsed.services && parsed.services.length > 0) {
+              setServicesList(parsed.services);
+              localStorage.setItem('netra_services', JSON.stringify(parsed.services));
+            }
+            if (parsed.vision && parsed.vision.length > 0) {
+              setVisionSettings(parsed.vision);
+              localStorage.setItem('netra_vision_settings', JSON.stringify(parsed.vision));
+            }
+          } catch (parseErr) {
+            console.error("Failed to parse global settings from database:", parseErr);
+          }
+        } else {
+          const defaultPayload = {
+            name: 'System Settings',
+            email: 'settings@netra.graphics',
+            phone: 'SYSTEM',
+            address: JSON.stringify({ services: servicesList, vision: visionSettings }),
+            status: 'Active',
+            access_key: 'SYSTEM'
+          };
+          await supabase.from('clients').insert([defaultPayload]);
+        }
+      } catch (err) {
+        console.warn("Failed to sync global settings from Supabase, running on local cache:", err);
+      }
+    };
+    fetchGlobalSettings();
   }, []);
 
   const toggleSound = () => {
