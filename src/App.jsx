@@ -14,7 +14,7 @@ import Financials from '@/pages/financials';
 import SettingsPage from '@/pages/settings';
 import { Portfolio } from '@/pages/Portfolio';
 import { useToast } from '@/hooks/use-toast';
-import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail, Menu } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail, Menu, Volume2, VolumeX } from 'lucide-react';
 
 const queryClient = new QueryClient();
 import { supabase } from './supabase/client';
@@ -467,6 +467,15 @@ function App() {
 
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [clickSoundEnabled, setClickSoundEnabled] = useState(false);
+
+  // Refs to make current values accessible inside static useEffect closures
+  const isPlayingRef = useRef(false);
+  const clickSoundEnabledRef = useRef(false);
+
+  // Keep refs in sync with state
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+  useEffect(() => { clickSoundEnabledRef.current = clickSoundEnabled; }, [clickSoundEnabled]);
 
   useEffect(() => {
     // Initialize standard Audio stream pointing to our high-fidelity, local loop MP3
@@ -510,6 +519,8 @@ function App() {
 
     // Setup global UI click sound effect handler
     const handleGlobalClick = (e) => {
+      // Only play click sounds when ambient music is on AND click sound is enabled by user
+      if (!clickSoundEnabledRef.current || !isPlayingRef.current) return;
       // Check if target or its parent is an interactive menu item or button
       const target = e.target.closest('button, a, .menu-link, .admin-menu-link, .sound-toggle-btn, .notification-bell-wrapper, .vision-back-btn, [role="button"]');
       if (target) {
@@ -602,6 +613,8 @@ function App() {
           clearInterval(fadeOut);
           audioRef.current.pause();
           setIsPlaying(false);
+          // When music stops, also disable click sounds
+          setClickSoundEnabled(false);
         }
       }, 30);
     } else {
@@ -622,6 +635,12 @@ function App() {
         console.log("Audio play blocked by browser policy:", err);
       });
     }
+  };
+
+  const toggleClickSound = () => {
+    // Click sounds can only be toggled when music is on
+    if (!isPlaying) return;
+    setClickSoundEnabled(prev => !prev);
   };
 
   const [logoDrawn, setLogoDrawn] = useState(false);
@@ -2145,6 +2164,17 @@ function App() {
                       <span></span>
                       <span></span>
                     </div>
+                  </button>
+                  <button
+                    className={`click-sound-toggle-btn ${clickSoundEnabled ? 'active' : ''} ${!isPlaying ? 'disabled' : ''}`}
+                    onClick={toggleClickSound}
+                    title={!isPlaying ? "Enable music first to use click sounds" : clickSoundEnabled ? "Disable Click Sounds" : "Enable Click Sounds"}
+                  >
+                    {clickSoundEnabled ? (
+                      <Volume2 className="w-4 h-4" />
+                    ) : (
+                      <VolumeX className="w-4 h-4" />
+                    )}
                   </button>
                 </div>
               </nav>

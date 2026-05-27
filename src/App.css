@@ -5595,7 +5595,48 @@ input[type="number"] {
   }
 }
 
-/* --- PREMIUM CALIBRATION EDITOR STYLES --- */
+/* --- Click Sound Toggle Button --- */
+.click-sound-toggle-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 7px;
+  height: 24px;
+  color: rgba(255, 255, 255, 0.35);
+  outline: none;
+  transition: all 0.25s ease;
+  margin-left: 2px;
+}
+
+.click-sound-toggle-btn:hover:not(.disabled) {
+  color: #00E5FF;
+  border-color: rgba(0, 229, 255, 0.4);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
+}
+
+.click-sound-toggle-btn.active {
+  color: #00E5FF;
+  border-color: rgba(0, 229, 255, 0.6);
+  background: rgba(0, 229, 255, 0.08);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.3), inset 0 0 8px rgba(0, 229, 255, 0.05);
+  animation: click-pulse 2s ease infinite;
+}
+
+.click-sound-toggle-btn.disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+
+@keyframes click-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(0, 229, 255, 0.2); }
+  50% { box-shadow: 0 0 16px rgba(0, 229, 255, 0.5); }
+}
+
+
 .calibration-header-container {
   display: flex;
   flex-direction: column;
