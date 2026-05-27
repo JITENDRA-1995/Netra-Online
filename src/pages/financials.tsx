@@ -116,7 +116,7 @@ export default function Financials({
       className="space-y-6"
     >
       {/* Header */}
-      <motion.div variants={itemVariants} className="flex items-center justify-between">
+      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-4xl font-black tracking-tight bg-gradient-to-r from-teal-400 to-emerald-400 bg-clip-text text-transparent" data-testid="heading-financials">
             Financial Ledger
@@ -125,11 +125,11 @@ export default function Financials({
             Netra Empire Accounts Calibration
           </p>
         </div>
-        <div className="flex gap-1.5 p-1 rounded-xl bg-white/5 border border-white/10">
+        <div className="flex w-full sm:w-auto overflow-x-auto scrollbar-none gap-1.5 p-1 rounded-xl bg-white/5 border border-white/10 max-w-full shrink-0">
           <Button
             size="sm"
             variant={financialTab === "PROJECTS" ? "secondary" : "ghost"}
-            className={`rounded-lg text-xs font-semibold tracking-wider ${financialTab === "PROJECTS" ? "bg-white/10 text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
+            className={`rounded-lg text-xs font-semibold tracking-wider shrink-0 ${financialTab === "PROJECTS" ? "bg-white/10 text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
             onClick={() => setFinancialTab("PROJECTS")}
           >
             IGNITION QUEUE
@@ -137,7 +137,7 @@ export default function Financials({
           <Button
             size="sm"
             variant={financialTab === "CASHBOOK" ? "secondary" : "ghost"}
-            className={`rounded-lg text-xs font-semibold tracking-wider ${financialTab === "CASHBOOK" ? "bg-white/10 text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
+            className={`rounded-lg text-xs font-semibold tracking-wider shrink-0 ${financialTab === "CASHBOOK" ? "bg-white/10 text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
             onClick={() => setFinancialTab("CASHBOOK")}
           >
             CASHBOOK ENTRIES
@@ -145,7 +145,7 @@ export default function Financials({
           <Button
             size="sm"
             variant={financialTab === "INVOICES" ? "secondary" : "ghost"}
-            className={`rounded-lg text-xs font-semibold tracking-wider ${financialTab === "INVOICES" ? "bg-white/10 text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
+            className={`rounded-lg text-xs font-semibold tracking-wider shrink-0 ${financialTab === "INVOICES" ? "bg-white/10 text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
             onClick={() => setFinancialTab("INVOICES")}
           >
             INVOICE VAULT
