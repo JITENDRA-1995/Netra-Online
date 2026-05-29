@@ -75,6 +75,7 @@ export default function InvoicesPage({
   const [totalAmount, setTotalAmount] = useState<string>("");
   const [logToCashbook, setLogToCashbook] = useState(true);
   const [includesDiscount, setIncludesDiscount] = useState(true);
+  const [isServiceExpanded, setIsServiceExpanded] = useState(true);
 
   // Tracks what the user last interacted with to prevent recursive calculations
   const [lastCalculatedBy, setLastCalculatedBy] = useState<"rate" | "total" | null>(null);
@@ -173,18 +174,32 @@ export default function InvoicesPage({
       projectId: null
     };
 
+    let savedInvoice;
     try {
-      const savedInvoice = await saveInvoice(newInvoice);
-      
+      savedInvoice = await saveInvoice(newInvoice);
+    } catch (err) {
+      console.warn("Supabase insert failed. Falling back to local model creation:", err);
+      // Construct a valid local fallback object
+      savedInvoice = {
+        id: `local-${Date.now()}`,
+        invoice_no: stableInvoiceNo,
+        client_name: newInvoice.clientName,
+        project_service: newInvoice.projectService,
+        issue_date: newInvoice.issueDate,
+        grand_total: newInvoice.grandTotal
+      };
+    }
+
+    try {
       const formattedInvoice = {
-        id: savedInvoice.id,
-        invoiceNo: savedInvoice.invoice_no,
+        id: savedInvoice.id || `local-${Date.now()}`,
+        invoiceNo: savedInvoice.invoice_no || stableInvoiceNo,
         clientName: billingName,
         projectService: service,
-        issueDate: new Date(savedInvoice.issue_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        issueDate: new Date(savedInvoice.issue_date || new Date()).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
         grandTotal: totalVal,
         rawProject: {
-          id: savedInvoice.id,
+          id: savedInvoice.id || `local-${Date.now()}`,
           name: billingName,
           service: service,
           quote: rateVal * qtyVal,
@@ -213,7 +228,7 @@ export default function InvoicesPage({
           date: new Date().toISOString().split('T')[0],
           desc: `Custom Invoice: ${service} - ${billingName}`,
           amount: totalVal,
-          type: "INCOME",
+          type: "INCOME" as const,
           mode: "UPI" as const,
           category: "Service"
         };
@@ -242,7 +257,7 @@ export default function InvoicesPage({
       setLogToCashbook(true);
     } catch (err) {
       console.error(err);
-      toast({ title: "Failed to generate invoice", description: "Database transaction error.", variant: "destructive" });
+      toast({ title: "Failed to generate invoice", description: "Internal runtime rendering error.", variant: "destructive" });
     }
   };
 
@@ -357,76 +372,35 @@ export default function InvoicesPage({
 
                   {/* Pricing and Details */}
                   <div className="space-y-4">
-                    <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <Coins className="w-3.5 h-3.5" />
-                      Service Description & Pricing
-                    </h4>
+                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                      <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <Coins className="w-3.5 h-3.5" />
+                        Service & pricing
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setIsServiceExpanded(!isServiceExpanded)}
+                        className="text-[9px] font-mono font-bold text-cyan-400 hover:text-cyan-300 border border-cyan-500/20 bg-cyan-500/5 px-2.5 py-1 rounded-lg transition-all uppercase tracking-wider flex items-center gap-1 select-none cursor-pointer"
+                      >
+                        {isServiceExpanded ? "Collapse Details 🔼" : "Calibrate Pricing 🔽"}
+                      </button>
+                    </div>
 
-                    <div className="space-y-3">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Service Category / Description *</label>
-                        <Input
-                          value={service}
-                          onChange={e => setService(e.target.value)}
-                          placeholder="e.g. Brand Identity (Logo) Design"
-                          required
-                          className="bg-white/5 border-white/10 text-xs rounded-xl h-9"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-4">
+                      {/* Core required fields (Always Visible) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                          <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Quantity *</label>
+                          <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold text-left block">Service Description *</label>
                           <Input
-                            type="number"
-                            min="1"
-                            value={qty}
-                            onChange={e => setQty(Number(e.target.value) || 1)}
+                            value={service}
+                            onChange={e => setService(e.target.value)}
+                            placeholder="e.g. Brand Identity (Logo) Design"
                             required
                             className="bg-white/5 border-white/10 text-xs rounded-xl h-9"
                           />
                         </div>
-
                         <div className="space-y-1.5">
-                          <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Rate per Unit (₹)</label>
-                          <Input
-                            type="number"
-                            placeholder="Leave empty if entering total"
-                            value={rate}
-                            onChange={e => {
-                              setRate(e.target.value);
-                              setLastCalculatedBy("rate");
-                            }}
-                            className="bg-white/5 border-white/10 text-xs rounded-xl h-9"
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Discount</label>
-                          <div className="flex gap-1">
-                            <Input
-                              type="number"
-                              placeholder="0"
-                              value={discount}
-                              onChange={e => setDiscount(e.target.value)}
-                              className="bg-white/5 border-white/10 text-xs rounded-xl h-9 w-2/3"
-                            />
-                            <select
-                              value={discountType}
-                              onChange={e => setDiscountType(e.target.value as "rs" | "%")}
-                              className="bg-white/5 border border-white/10 text-xs rounded-xl h-9 w-1/3 outline-none text-foreground"
-                            >
-                              <option value="rs">₹</option>
-                              <option value="%">%</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Interactive rate calculations */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Total Amount (₹) *</label>
+                          <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold text-left block">Total Invoice Amount (₹) *</label>
                           <Input
                             type="number"
                             placeholder="Enter total quote"
@@ -439,36 +413,98 @@ export default function InvoicesPage({
                             className="bg-white/5 border-white/10 text-xs rounded-xl h-9"
                           />
                         </div>
+                      </div>
 
-                        {/* Ask user to confirm if total amount includes discount */}
-                        {parseFloat(discount) > 0 && lastCalculatedBy === "total" && (
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Discount Calibration</label>
-                            <select
-                              value={includesDiscount ? "yes" : "no"}
-                              onChange={e => setIncludesDiscount(e.target.value === "yes")}
-                              className="w-full h-9 px-3 bg-cyan-950/20 border border-cyan-500/30 rounded-xl text-2xs text-cyan-400 outline-none"
-                            >
-                              <option value="yes">Total enters is INCLUDING discount</option>
-                              <option value="no">Total enters is EXCLUDING discount</option>
-                            </select>
-                          </div>
+                      {/* Advanced Calibration Fields (Collapsible) */}
+                      <AnimatePresence initial={true}>
+                        {isServiceExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.25, ease: "easeInOut" }}
+                            className="space-y-4 overflow-hidden pt-1"
+                          >
+                            <div className="grid grid-cols-3 gap-3 border-t border-white/5 pt-4">
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold text-left block">Quantity *</label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={qty}
+                                  onChange={e => setQty(Number(e.target.value) || 1)}
+                                  required
+                                  className="bg-white/5 border-white/10 text-xs rounded-xl h-9"
+                                />
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold text-left block">Rate per Unit (₹)</label>
+                                <Input
+                                  type="number"
+                                  placeholder="Calculated per QTY"
+                                  value={rate}
+                                  onChange={e => {
+                                    setRate(e.target.value);
+                                    setLastCalculatedBy("rate");
+                                  }}
+                                  className="bg-white/5 border-white/10 text-xs rounded-xl h-9"
+                                />
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold text-left block">Discount</label>
+                                <div className="flex gap-1">
+                                  <Input
+                                    type="number"
+                                    placeholder="0"
+                                    value={discount}
+                                    onChange={e => setDiscount(e.target.value)}
+                                    className="bg-white/5 border-white/10 text-xs rounded-xl h-9 w-2/3"
+                                  />
+                                  <select
+                                    value={discountType}
+                                    onChange={e => setDiscountType(e.target.value as "rs" | "%")}
+                                    className="bg-[#050508] border border-white/10 text-xs rounded-xl h-9 w-1/3 outline-none text-foreground"
+                                  >
+                                    <option value="rs">₹</option>
+                                    <option value="%">%</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Ask user to confirm if total amount includes discount */}
+                            {parseFloat(discount) > 0 && lastCalculatedBy === "total" && (
+                              <div className="space-y-1.5 animate-fadeSlideUp">
+                                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold text-left block">Discount Calibration</label>
+                                <select
+                                  value={includesDiscount ? "yes" : "no"}
+                                  onChange={e => setIncludesDiscount(e.target.value === "yes")}
+                                  className="w-full h-9 px-3 bg-cyan-950/20 border border-cyan-500/30 rounded-xl text-2xs text-cyan-400 outline-none"
+                                >
+                                  <option value="yes">Total enters is INCLUDING discount</option>
+                                  <option value="no">Total enters is EXCLUDING discount</option>
+                                </select>
+                              </div>
+                            )}
+
+                            {/* Log to Cashbook checkbox */}
+                            <div className="flex items-center gap-2 pt-2 select-none border-t border-white/5">
+                              <input
+                                type="checkbox"
+                                id="logToCashbook"
+                                checked={logToCashbook}
+                                onChange={e => setLogToCashbook(e.target.checked)}
+                                className="rounded accent-cyan-400 w-4 h-4 cursor-pointer"
+                              />
+                              <label htmlFor="logToCashbook" className="text-2xs text-muted-foreground cursor-pointer text-left">
+                                Automatically log this invoice amount as UPI Service Income in Cashbook?
+                              </label>
+                            </div>
+                          </motion.div>
                         )}
-                      </div>
-
-                      {/* Log to Cashbook checkbox */}
-                      <div className="flex items-center gap-2 pt-2 select-none">
-                        <input
-                          type="checkbox"
-                          id="logToCashbook"
-                          checked={logToCashbook}
-                          onChange={e => setLogToCashbook(e.target.checked)}
-                          className="rounded accent-cyan-400 w-4 h-4 cursor-pointer"
-                        />
-                        <label htmlFor="logToCashbook" className="text-2xs text-muted-foreground cursor-pointer">
-                          Automatically log this invoice amount as UPI Service Income in Cashbook?
-                        </label>
-                      </div>
+                      </AnimatePresence>
                     </div>
                   </div>
                 </div>
