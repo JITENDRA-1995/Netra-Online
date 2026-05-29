@@ -36,6 +36,7 @@ interface SettingsProps {
   onOpenCalibrate: (s: Service) => void;
   visionSettings: any[];
   onSaveVisionSettings: (newSettings: any[]) => void;
+  onClearAllDemoData: () => void;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -73,7 +74,8 @@ export default function SettingsPage({
   servicesList,
   onOpenCalibrate,
   visionSettings,
-  onSaveVisionSettings
+  onSaveVisionSettings,
+  onClearAllDemoData
 }: SettingsProps) {
   const [activeTab, setActiveTab] = useState("CATALOG"); // CATALOG, VISION
   const [search, setSearch] = useState("");
@@ -342,7 +344,7 @@ export default function SettingsPage({
       className="space-y-6 text-white"
     >
       {/* Header */}
-      <motion.div variants={itemVariants} className="flex justify-between items-start">
+      <motion.div variants={itemVariants} className="flex justify-between items-start flex-wrap gap-4">
         <div>
           <h1 className="text-4xl font-black tracking-tight bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent" data-testid="heading-settings">
             System Control Panel
@@ -351,9 +353,21 @@ export default function SettingsPage({
             Pricing, Service calibration and VISION page settings
           </p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-indigo-500/20 bg-indigo-500/5">
-          <Sliders className="w-4 h-4 text-indigo-400" />
-          <span className="text-xs text-indigo-400 font-bold tracking-wider">SYSTEM CONFIGURATION</span>
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={() => {
+              if (window.confirm("🔴 CRITICAL SECURITY DISPATCH 🔴\n\nAre you absolutely certain you want to purge all demo data?\n\nThis will permanently delete all projects, inquiries, custom invoices, clients (except System Settings), and cashbook entries from Supabase and local storage.\n\nTHIS ACTION CANNOT BE UNDONE!")) {
+                onClearAllDemoData();
+              }
+            }}
+            className="bg-red-500/10 hover:bg-red-500/25 border border-red-500/30 text-red-400 font-extrabold text-xs rounded-xl px-4 py-2 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] transition-all duration-300 select-none cursor-pointer"
+          >
+            Clear System Demo Data
+          </Button>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-indigo-500/20 bg-indigo-500/5">
+            <Sliders className="w-4 h-4 text-indigo-400" />
+            <span className="text-xs text-indigo-400 font-bold tracking-wider">SYSTEM CONFIGURATION</span>
+          </div>
         </div>
       </motion.div>
 

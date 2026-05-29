@@ -142,14 +142,7 @@ export default function Financials({
           >
             CASHBOOK ENTRIES
           </Button>
-          <Button
-            size="sm"
-            variant={financialTab === "INVOICES" ? "secondary" : "ghost"}
-            className={`rounded-lg text-xs font-semibold tracking-wider shrink-0 ${financialTab === "INVOICES" ? "bg-white/10 text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
-            onClick={() => setFinancialTab("INVOICES")}
-          >
-            INVOICE VAULT
-          </Button>
+
         </div>
       </motion.div>
 
@@ -688,133 +681,7 @@ export default function Financials({
         </motion.div>
       )}
 
-      {financialTab === "INVOICES" && (
-        <motion.div variants={containerVariants} className="space-y-4">
-          <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <h3 className="font-bold text-foreground text-lg">Invoice Vault</h3>
-                <p className="text-xs text-muted-foreground">Secure repository for generated tax invoice documents</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="relative w-64">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                  <Input
-                    className="pl-9 h-9 bg-white/5 border-white/10 text-xs rounded-xl"
-                    placeholder="Search invoices..."
-                    value={ledgerSearch}
-                    onChange={(e) => setLedgerSearch(e.target.value)}
-                  />
-                </div>
-                {selectedVaultInvoices.length > 0 && (
-                  <Button
-                    size="sm"
-                    className="bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 font-bold text-xs"
-                    onClick={() => {
-                      if (window.confirm(`Delete ${selectedVaultInvoices.length} selected invoices? This action cannot be undone.`)) {
-                        setInvoices(prev => prev.filter(inv => !selectedVaultInvoices.includes(inv.id)));
-                        setSelectedVaultInvoices([]);
-                        toast({ title: "Invoices deleted" });
-                      }
-                    }}
-                  >
-                    DELETE SELECTED ({selectedVaultInvoices.length})
-                  </Button>
-                )}
-              </div>
-            </div>
 
-            <div className="overflow-x-auto border border-white/5 rounded-xl">
-              <table className="w-full text-sm text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-white/5 bg-white/[0.01] text-xs text-muted-foreground uppercase tracking-wider font-semibold">
-                    <th style={{ width: "40px" }} className="p-4 text-center">
-                      <input
-                        type="checkbox"
-                        className="rounded accent-emerald-400"
-                        onChange={(e) => {
-                          if (e.target.checked) setSelectedVaultInvoices(filteredInvoices.map(inv => inv.id));
-                          else setSelectedVaultInvoices([]);
-                        }}
-                      />
-                    </th>
-                    <th className="p-4">Invoice No</th>
-                    <th className="p-4">Client / Project</th>
-                    <th className="p-4 text-center">Issue Date</th>
-                    <th className="p-4 text-right">Grand Total</th>
-                    <th className="p-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 text-xs">
-                  {filteredInvoices.length > 0 ? (
-                    filteredInvoices.map(inv => (
-                      <tr key={inv.id} className="hover:bg-white/[0.01] transition-colors">
-                        <td className="p-4 text-center">
-                          <input
-                            type="checkbox"
-                            checked={selectedVaultInvoices.includes(inv.id)}
-                            className="rounded accent-emerald-400"
-                            onChange={(e) => {
-                              if (e.target.checked) setSelectedVaultInvoices(prev => [...prev, inv.id]);
-                              else setSelectedVaultInvoices(prev => prev.filter(id => id !== inv.id));
-                            }}
-                          />
-                        </td>
-                        <td className="p-4 font-bold text-cyan-400">{inv.invoiceNo}</td>
-                        <td className="p-4">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-foreground">{inv.clientName}</span>
-                            <span className="text-3xs text-muted-foreground mt-0.5">{inv.projectService}</span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-center text-muted-foreground">{inv.issueDate}</td>
-                        <td className="p-4 text-right font-bold text-foreground">₹{inv.grandTotal.toLocaleString()}</td>
-                        <td className="p-4 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="w-7 h-7 hover:bg-cyan-500/10 hover:text-cyan-400"
-                              title="View Invoice Document"
-                              onClick={() => {
-                                setInvoiceProject({ ...inv.rawProject, invoiceNo: inv.invoiceNo });
-                                setIsInvoicePreviewOpen(true);
-                              }}
-                            >
-                              <FileText className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="w-7 h-7 hover:bg-red-500/10 hover:text-red-400"
-                              title="Delete Record"
-                              onClick={() => {
-                                if (window.confirm("Remove this invoice record from vault?")) {
-                                  setInvoices(prev => prev.filter(i => i.id !== inv.id));
-                                  setSelectedVaultInvoices(prev => prev.filter(id => id !== inv.id));
-                                  toast({ title: "Invoice deleted" });
-                                }
-                              }}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-muted-foreground uppercase tracking-widest text-3xs font-semibold">
-                        NO INVOICES MATCHING YOUR SEARCH
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
     </motion.div>
   );
 }

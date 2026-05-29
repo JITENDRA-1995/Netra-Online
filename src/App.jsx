@@ -14,7 +14,8 @@ import Financials from '@/pages/financials';
 import SettingsPage from '@/pages/settings';
 import { Portfolio } from '@/pages/Portfolio';
 import { useToast } from '@/hooks/use-toast';
-import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail, Menu, Volume2, VolumeX } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail, Menu, Volume2, VolumeX, Coins } from 'lucide-react';
+import InvoicesPage from '@/pages/invoices';
 
 const queryClient = new QueryClient();
 import { supabase } from './supabase/client';
@@ -33,8 +34,8 @@ const defaultServices = [
     desc: "Crafting the soul of your business through iconic marks.",
     icon: "🎨",
     tag: "BRANDING",
-    price: "₹24,999",
-    delivery: "5 days",
+    price: "",
+    delivery: "",
     features: [
       "3 Unique Design Concepts",
       "Vector Source Files (AI, SVG, PDF)",
@@ -48,8 +49,8 @@ const defaultServices = [
     desc: "Tangible narratives that tell your brand story in print.",
     icon: "📖",
     tag: "PRINT",
-    price: "₹11,999",
-    delivery: "4 days",
+    price: "",
+    delivery: "",
     features: [
       "Bi-fold or tri-fold layouts",
       "Print-ready CMYK files",
@@ -63,8 +64,8 @@ const defaultServices = [
     desc: "Immersive, clickable experiences for the modern era.",
     icon: "🖱️",
     tag: "DIGITAL",
-    price: "₹15,999",
-    delivery: "5 days",
+    price: "",
+    delivery: "",
     features: [
       "Immersive Clickable Layouts",
       "Embedded Rich Media Support",
@@ -78,8 +79,8 @@ const defaultServices = [
     desc: "Building authority through professional structural design.",
     icon: "🏢",
     tag: "BRANDING",
-    price: "₹19,999",
-    delivery: "6 days",
+    price: "",
+    delivery: "",
     features: [
       "Professional Structured Design",
       "Corporate Color Coordination",
@@ -93,8 +94,8 @@ const defaultServices = [
     desc: "High-impact graphics designed for digital engagement.",
     icon: "📱",
     tag: "DIGITAL",
-    price: "₹7,999",
-    delivery: "3 days",
+    price: "",
+    delivery: "",
     features: [
       "High-Impact Social Graphics",
       "Custom Brand Color Theme",
@@ -108,8 +109,8 @@ const defaultServices = [
     desc: "Bold visual statements for hoardings and wall graphics.",
     icon: "🏙️",
     tag: "PRINT",
-    price: "₹31,999",
-    delivery: "7 days",
+    price: "",
+    delivery: "",
     features: [
       "Hoardings & Wall Graphics Layouts",
       "Ultra-High Resolution Formats",
@@ -123,8 +124,8 @@ const defaultServices = [
     desc: "Motion design and production for a visual revolution.",
     icon: "🎥",
     tag: "VIDEO",
-    price: "₹39,999",
-    delivery: "10 days",
+    price: "",
+    delivery: "",
     features: [
       "3D Motion Graphics & Animation",
       "High-Fidelity Audio Integration",
@@ -138,8 +139,8 @@ const defaultServices = [
     desc: "Modern, elegant WhatsApp-ready invites for every event.",
     icon: "✉️",
     tag: "DIGITAL",
-    price: "₹5,999",
-    delivery: "2 days",
+    price: "",
+    delivery: "",
     features: [
       "Elegant Modern Art Styles",
       "WhatsApp & Social-Ready Formats",
@@ -153,8 +154,8 @@ const defaultServices = [
     desc: "Professional layouts for magazines and corporate newsletters.",
     icon: "📰",
     tag: "PRINT",
-    price: "₹21,999",
-    delivery: "6 days",
+    price: "",
+    delivery: "",
     features: [
       "Magazine & Newsletter Layouts",
       "Advanced Typography Grid System",
@@ -168,8 +169,8 @@ const defaultServices = [
     desc: "High-resolution visual art for physical spaces.",
     icon: "🖼️",
     tag: "PRINT",
-    price: "₹9,999",
-    delivery: "3 days",
+    price: "",
+    delivery: "",
     features: [
       "High-Resolution Gallery Art Quality",
       "Cyberpunk, Modern, or Classic Themes",
@@ -183,8 +184,8 @@ const defaultServices = [
     desc: "Strategic designs to spark immediate consumer interest.",
     icon: "🚀",
     tag: "PRINT",
-    price: "₹6,999",
-    delivery: "2 days",
+    price: "",
+    delivery: "",
     features: [
       "Conversion-Optimized Layouts",
       "Bold Call-to-Actions (CTAs)",
@@ -198,8 +199,8 @@ const defaultServices = [
     desc: "365 days of your brand presence on every desk.",
     icon: "📅",
     tag: "PRINT",
-    price: "₹13,999",
-    delivery: "5 days",
+    price: "",
+    delivery: "",
     features: [
       "12 Months of Custom Visual Themes",
       "Coordinated Brand Layout Grid",
@@ -213,8 +214,8 @@ const defaultServices = [
     desc: "Designing excellence for your milestones and awards.",
     icon: "🏆",
     tag: "BRANDING",
-    price: "₹4,999",
-    delivery: "2 days",
+    price: "",
+    delivery: "",
     features: [
       "Elegant Vectors & Border Layouts",
       "Anti-forgery Micro-texture Details",
@@ -228,8 +229,8 @@ const defaultServices = [
     desc: "Visual appetizing designs for restaurants and cafes.",
     icon: "🍴",
     tag: "PRINT",
-    price: "₹12,999",
-    delivery: "4 days",
+    price: "",
+    delivery: "",
     features: [
       "Appetizing & Clear Visual Layouts",
       "Coordinated Cuisine Styling",
@@ -243,8 +244,8 @@ const defaultServices = [
     desc: "Cultural heritage meets high-tech celebratory art.",
     icon: "✨",
     tag: "DIGITAL",
-    price: "₹4,999",
-    delivery: "2 days",
+    price: "",
+    delivery: "",
     features: [
       "Cultural Heritage Meets Tech",
       "Premium Animation Effects Support",
@@ -258,8 +259,8 @@ const defaultServices = [
     desc: "Bespoke invitation cards for every significant gathering.",
     icon: "🎫",
     tag: "EVENT",
-    price: "₹10,999",
-    delivery: "4 days",
+    price: "",
+    delivery: "",
     features: [
       "Coordinated Bespoke Invitations",
       "Seating Charts & Place Cards Theme",
@@ -273,8 +274,8 @@ const defaultServices = [
     desc: "Transforming your most precious memories into a visual epic.",
     icon: "💍",
     tag: "EVENT",
-    price: "₹27,999",
-    delivery: "8 days",
+    price: "",
+    delivery: "",
     features: [
       "Premium Cinematic Story Telling Layouts",
       "Advanced Professional Photo Retouching",
@@ -288,8 +289,8 @@ const defaultServices = [
     desc: "Capturing moments with cinematic precision and artistic flair.",
     icon: "📸",
     tag: "DIGITAL",
-    price: "₹23,999",
-    delivery: "5 days",
+    price: "",
+    delivery: "",
     features: [
       "Cinematic Camera Precision Hooks",
       "Premium Post-processing Styling",
@@ -303,8 +304,8 @@ const defaultServices = [
     desc: "Precision engineering for all your commercial printing needs.",
     icon: "🖨️",
     tag: "COMMERCIAL",
-    price: "₹15,999",
-    delivery: "4 days",
+    price: "",
+    delivery: "",
     features: [
       "Precision Engineering Output Specs",
       "Industrial High-Volume Processing Prep",
@@ -318,8 +319,8 @@ const defaultServices = [
     desc: "Professional documentation and data services with meticulous accuracy.",
     icon: "⌨️",
     tag: "COMMERCIAL",
-    price: "₹3,999",
-    delivery: "2 days",
+    price: "",
+    delivery: "",
     features: [
       "Meticulous Data Entry Accuracy Check",
       "Professional Multi-format Documentation",
@@ -421,6 +422,87 @@ function App() {
       description: "Successfully updated the VISION page categories and slideshow assets."
     });
   };
+
+  const handleClearAllDemoData = async () => {
+    try {
+      // 1. Purge Supabase Invoices
+      const { error: invoiceErr } = await supabase
+        .from('invoices')
+        .delete()
+        .not('id', 'is', null);
+
+      // 2. Purge Supabase Projects
+      const { error: projectErr } = await supabase
+        .from('projects')
+        .delete()
+        .not('id', 'is', null);
+
+      // 3. Purge Supabase Inquiries
+      const { error: inquiriesErr } = await supabase
+        .from('inquiries')
+        .delete()
+        .not('id', 'is', null);
+
+      // 4. Purge Supabase Clients (excluding settings@netra.graphics)
+      const { error: clientsErr } = await supabase
+        .from('clients')
+        .delete()
+        .neq('email', 'settings@netra.graphics');
+
+      if (invoiceErr || projectErr || inquiriesErr || clientsErr) {
+        console.error("Purge error details:", { invoiceErr, projectErr, inquiriesErr, clientsErr });
+        throw new Error("One or more database tables failed to purge.");
+      }
+
+      // Reset to original default state for services
+      setServicesList(defaultServices);
+      localStorage.setItem('netra_services', JSON.stringify(defaultServices));
+
+      // Reset vision settings to defaults
+      setVisionSettings(defaultVisionSettings);
+      localStorage.setItem('netra_vision_settings', JSON.stringify(defaultVisionSettings));
+
+      // Clean local states
+      setInvoices([]);
+      setIgnitionQueue([]);
+      setInquiries([]);
+      setClients(prev => prev.filter(c => c.email === 'settings@netra.graphics'));
+      setCashbookEntries([]);
+      localStorage.setItem('netra_cashbook', JSON.stringify([]));
+
+      // Clear local storages
+      localStorage.removeItem('netra_clients');
+      localStorage.removeItem('netra_inquiries');
+      localStorage.removeItem('netra_projects');
+      localStorage.removeItem('netra_invoices');
+
+      // Update global Supabase settings row back to defaults
+      try {
+        const payload = {
+          address: JSON.stringify({ services: defaultServices, vision: defaultVisionSettings })
+        };
+        await supabase
+          .from('clients')
+          .update(payload)
+          .eq('email', 'settings@netra.graphics');
+      } catch (dbErr) {
+        console.error("Failed to reset database settings row:", dbErr);
+      }
+
+      toast({
+        title: "Database Purged Successfully",
+        description: "All projects, inquiries, custom invoices, clients, and cashbook records have been cleared from Supabase."
+      });
+    } catch (err) {
+      console.error("Failed to purge demo data:", err);
+      toast({
+        title: "Purge Failed",
+        description: "Database transaction error occurred. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const [calibratingService, setCalibratingService] = useState(null);
   const [isCalibrationModalOpen, setIsCalibrationModalOpen] = useState(false);
 
@@ -679,8 +761,12 @@ function App() {
     }));
   }, []);
 
-  const [isCommandCenterActive, setIsCommandCenterActive] = useState(false);
-  const [isClientVaultActive, setIsClientVaultActive] = useState(false);
+  const [isCommandCenterActive, setIsCommandCenterActive] = useState(() => {
+    return localStorage.getItem('netra_admin_active') === 'true';
+  });
+  const [isClientVaultActive, setIsClientVaultActive] = useState(() => {
+    return localStorage.getItem('netra_client_active') === 'true';
+  });
   const [isIgnitionModalOpen, setIsIgnitionModalOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [notifTab, setNotifTab] = useState("SPARKS");
@@ -714,9 +800,16 @@ function App() {
   const [prefillData, setPrefillData] = useState(null);
   const [passphrase, setPassphrase] = useState("");
   const [showPassphrase, setShowPassphrase] = useState(false);
-  const [activeAdminModule, setActiveAdminModule] = useState("DASHBOARD");
+  const [activeAdminModule, setActiveAdminModule] = useState(() => {
+    return localStorage.getItem('netra_active_admin_module') || "DASHBOARD";
+  });
   const [showInquiryBadge, setShowInquiryBadge] = useState(false);
-  const [isAdminGridActive, setIsAdminGridActive] = useState(false);
+  const [isAdminGridActive, setIsAdminGridActive] = useState(() => {
+    return localStorage.getItem('netra_admin_grid_active') === 'true';
+  });
+  const [saveLoginInfo, setSaveLoginInfo] = useState(() => {
+    return localStorage.getItem('netra_save_login_info') === 'true';
+  });
   const [unreadSparksCount, setUnreadSparksCount] = useState(0);
   const [showSparkToast, setShowSparkToast] = useState(false);
   const [bellPulse, setBellPulse] = useState(false);
@@ -724,16 +817,41 @@ function App() {
   const [isProjectEditModalOpen, setIsProjectEditModalOpen] = useState(false);
 
   useEffect(() => {
+    localStorage.setItem('netra_admin_active', isCommandCenterActive);
+  }, [isCommandCenterActive]);
+
+  useEffect(() => {
+    localStorage.setItem('netra_client_active', isClientVaultActive);
+  }, [isClientVaultActive]);
+
+  useEffect(() => {
+    localStorage.setItem('netra_active_admin_module', activeAdminModule);
+  }, [activeAdminModule]);
+
+  useEffect(() => {
+    localStorage.setItem('netra_admin_grid_active', isAdminGridActive);
+  }, [isAdminGridActive]);
+
+  useEffect(() => {
+    localStorage.setItem('netra_save_login_info', saveLoginInfo);
+  }, [saveLoginInfo]);
+
+  useEffect(() => {
     // Clear any previous mock database states from local storage to ensure a clean launch
     localStorage.removeItem("netra_db_state");
-    localStorage.removeItem("netra_clients");
     localStorage.removeItem("netra_read_flames");
 
     const loadSupabaseData = async () => {
       try {
         const dbClients = await getClients();
         if (dbClients) {
-          setClients(dbClients);
+          const mapped = dbClients.map(c => ({
+            ...c,
+            joinedDate: c.joined_date || c.joinedDate,
+            accessKey: c.access_key || c.accessKey
+          }));
+          setClients(mapped);
+          localStorage.setItem('netra_clients', JSON.stringify(mapped));
         }
 
         const dbInquiries = await getInquiries();
@@ -748,7 +866,41 @@ function App() {
 
         const dbInvoices = await getInvoices();
         if (dbInvoices) {
-          setInvoices(dbInvoices);
+          const mappedInvoices = dbInvoices.map(inv => {
+            if (inv.clientName && inv.clientName.startsWith("JSON_MOCK:")) {
+              try {
+                const parsed = JSON.parse(inv.clientName.substring(10));
+                return {
+                  ...inv,
+                  clientName: parsed.name,
+                  projectService: parsed.service,
+                  rawProject: {
+                    id: inv.id,
+                    name: parsed.name,
+                    service: parsed.service,
+                    quote: parsed.rate * parsed.qty,
+                    discount: parsed.discount,
+                    advanceAmount: 0,
+                    phone: parsed.phone,
+                    email: parsed.email,
+                    address: parsed.address,
+                    gst: parsed.gst,
+                    items: [{
+                      service: parsed.service,
+                      quote: parsed.rate * parsed.qty,
+                      discount: parsed.discount,
+                      qty: parsed.qty,
+                      rate: parsed.rate
+                    }]
+                  }
+                };
+              } catch (parseErr) {
+                console.error("Failed to parse JSON_MOCK custom invoice:", parseErr);
+              }
+            }
+            return inv;
+          });
+          setInvoices(mappedInvoices);
         }
       } catch (error) {
         console.error("Failed to load data from Supabase:", error);
@@ -898,6 +1050,9 @@ function App() {
   };
 
   const getClientAddress = (name) => {
+    if (invoiceProject && invoiceProject.name === name && invoiceProject.address) {
+      return invoiceProject.address;
+    }
     const client = clients.find(c => c.name === name);
     return client ? client.address : "Location N/A";
   };
@@ -1128,10 +1283,7 @@ function App() {
         console.error("Failed to parse cashbook entries from localStorage:", e);
       }
     }
-    return [
-      { id: 1, date: new Date().toISOString().split('T')[0], desc: "Adobe CC Subscription", amount: 4500, type: "EXPENSE", mode: "UPI", category: "Software" },
-      { id: 2, date: new Date().toISOString().split('T')[0], desc: "Studio Equipment Maintenance", amount: 2500, type: "EXPENSE", mode: "CASH", category: "Hardware" }
-    ];
+    return [];
   });
 
   useEffect(() => {
@@ -1416,23 +1568,67 @@ function App() {
     }
   }, [isClientVaultActive]);
 
+  const pushPageToHistory = (pageName, additional = {}) => {
+    const currentState = window.history.state;
+    if (!currentState || currentState.page !== pageName || (pageName === 'admin' && currentState.activeAdminModule !== additional.activeAdminModule)) {
+      window.history.pushState({ page: pageName, ...additional }, '');
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = (event) => {
+      const state = event.state;
+      if (state && state.page) {
+        setIsVaultActive(state.page === 'vision');
+        setIsServicesActive(state.page === 'services');
+        setIsContactActive(state.page === 'contact');
+        setIsLoginActive(state.page === 'login');
+        setIsCommandCenterActive(state.page === 'admin');
+        setIsClientVaultActive(state.page === 'client-vault');
+        setIsAdminGridActive(state.page === 'admin' || !!state.isAdminGridActive);
+        if (state.activeAdminModule) {
+          setActiveAdminModule(state.activeAdminModule);
+        }
+      } else {
+        setIsVaultActive(false);
+        setIsServicesActive(false);
+        setIsContactActive(false);
+        setIsLoginActive(false);
+        setIsCommandCenterActive(false);
+        setIsClientVaultActive(false);
+        setIsAdminGridActive(false);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    if (!window.history.state) {
+      window.history.replaceState({ page: 'home' }, '');
+    }
+
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const goHome = () => triggerInstantTransition(() => {
     clearAllPages();
+    pushPageToHistory('home');
   });
 
   const goToServices = () => triggerInstantTransition(() => {
     clearAllPages();
     setIsServicesActive(true);
+    pushPageToHistory('services');
   });
 
   const goToVision = () => triggerInstantTransition(() => {
     clearAllPages();
     setIsVaultActive(true);
+    pushPageToHistory('vision');
   });
 
   const goToContact = () => triggerInstantTransition(() => {
     clearAllPages();
     setIsContactActive(true);
+    pushPageToHistory('contact');
   });
 
   const goToLogin = () => triggerInstantTransition(() => {
@@ -1441,6 +1637,7 @@ function App() {
     setAccessKey("");
     setPassphrase("");
     setLoginError("");
+    pushPageToHistory('login');
   });
 
   const handleLogin = (e) => {
@@ -1448,9 +1645,18 @@ function App() {
     setLoginError("");
     if (isAdminSelected) {
       if (accessKey === "savan@netra.com" && passphrase === "revolution2026") {
+        if (saveLoginInfo) {
+          localStorage.setItem('netra_saved_admin_key', accessKey);
+          localStorage.setItem('netra_saved_admin_pass', passphrase);
+        } else {
+          localStorage.removeItem('netra_saved_admin_key');
+          localStorage.removeItem('netra_saved_admin_pass');
+        }
         triggerInstantTransition(() => {
           clearAllPages();
           setIsCommandCenterActive(true);
+          setIsAdminGridActive(false);
+          pushPageToHistory('admin', { activeAdminModule: 'DASHBOARD', isAdminGridActive: false });
           setShowSparkToast(unreadSparksCount > 0);
         });
       } else {
@@ -1459,9 +1665,17 @@ function App() {
     } else {
       // Client Access
       if (accessKey && passphrase) {
+        if (saveLoginInfo) {
+          localStorage.setItem('netra_saved_client_key', accessKey);
+          localStorage.setItem('netra_saved_client_pass', passphrase);
+        } else {
+          localStorage.removeItem('netra_saved_client_key');
+          localStorage.removeItem('netra_saved_client_pass');
+        }
         triggerInstantTransition(() => {
           clearAllPages();
           setIsClientVaultActive(true);
+          pushPageToHistory('client-vault');
         });
       } else {
         setLoginError("Please enter your Client Access Key and Passphrase.");
@@ -1471,8 +1685,13 @@ function App() {
 
   const handleLogout = (e) => {
     e.preventDefault();
+    localStorage.removeItem('netra_admin_active');
+    localStorage.removeItem('netra_client_active');
+    localStorage.removeItem('netra_active_admin_module');
+    localStorage.removeItem('netra_admin_grid_active');
     triggerInstantTransition(() => {
       clearAllPages();
+      pushPageToHistory('home');
     });
   };
 
@@ -2059,7 +2278,8 @@ function App() {
                     { id: "PROJECTS", label: "Projects", icon: Folder },
                     { id: "INQUIRIES", label: "Inquiries", icon: Inbox, badge: showInquiryBadge },
                     { id: "CLIENTS", label: "Clients", icon: Users },
-                    { id: "FINANCIALS", label: "Financials", icon: FileText },
+                    { id: "INVOICES", label: "Invoice Vault", icon: FileText },
+                    { id: "FINANCIALS", label: "Financials", icon: Coins },
                     { id: "SETTINGS", label: "Settings", icon: Settings }
                   ].map((link) => {
                     const isActive = activeAdminModule === link.id;
@@ -2608,25 +2828,85 @@ function App() {
                   <div className={`scan-line-overlay ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`} />
 
                   {/* Header */}
-                  <div className="login-header-group">
-                    <motion.div
-                      className="login-header-icon-wrapper"
-                      animate={{
-                        boxShadow: !isAdminSelected
-                          ? ['0 0 0px #08d9d6', '0 0 20px #08d9d6', '0 0 0px #08d9d6']
-                          : ['0 0 0px #ff2e63', '0 0 20px #ff2e63', '0 0 0px #ff2e63']
-                      }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    >
-                      {!isAdminSelected ? <Sparkles className="w-8 h-8 text-[#08d9d6]" /> : <Terminal className="w-8 h-8 text-[#ff2e63]" />}
-                    </motion.div>
-                    <h1 className="login-header-title">
-                      NETRA GRAPHICS
-                    </h1>
-                    <p className={`login-header-subtitle ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}>
-                      {!isAdminSelected ? 'CLIENT PORTAL' : 'SECURE ADMIN ACCESS'}
-                    </p>
-                  </div>
+                  {(() => {
+                    const savedAdminKey = localStorage.getItem('netra_saved_admin_key');
+                    const savedAdminPass = localStorage.getItem('netra_saved_admin_pass');
+                    const savedClientKey = localStorage.getItem('netra_saved_client_key');
+                    const savedClientPass = localStorage.getItem('netra_saved_client_pass');
+                    const hasSavedCredentials = isAdminSelected 
+                      ? (!!savedAdminKey && !!savedAdminPass)
+                      : (!!savedClientKey && !!savedClientPass);
+
+                    const handleAutoLogin = () => {
+                      if (isAdminSelected) {
+                        const k = localStorage.getItem('netra_saved_admin_key');
+                        const p = localStorage.getItem('netra_saved_admin_pass');
+                        if (k && p) {
+                          setAccessKey(k);
+                          setPassphrase(p);
+                          setTimeout(() => {
+                            if (k === "savan@netra.com" && p === "revolution2026") {
+                              triggerInstantTransition(() => {
+                                clearAllPages();
+                                setIsCommandCenterActive(true);
+                                setIsAdminGridActive(false);
+                                pushPageToHistory('admin', { activeAdminModule: 'DASHBOARD', isAdminGridActive: false });
+                                setShowSparkToast(unreadSparksCount > 0);
+                              });
+                            } else {
+                              setLoginError("ACCESS DENIED: Credentials do not match the Architect's records.");
+                            }
+                          }, 100);
+                        }
+                      } else {
+                        const k = localStorage.getItem('netra_saved_client_key');
+                        const p = localStorage.getItem('netra_saved_client_pass');
+                        if (k && p) {
+                          setAccessKey(k);
+                          setPassphrase(p);
+                          setTimeout(() => {
+                            triggerInstantTransition(() => {
+                              clearAllPages();
+                              setIsClientVaultActive(true);
+                              pushPageToHistory('client-vault');
+                            });
+                          }, 100);
+                        }
+                      }
+                    };
+
+                    return (
+                      <div className="login-header-group">
+                        <motion.div
+                          className={`login-header-icon-wrapper ${hasSavedCredentials ? 'auto-login-glow cursor-pointer' : ''}`}
+                          onClick={hasSavedCredentials ? handleAutoLogin : undefined}
+                          title={hasSavedCredentials ? 'Click to Sign In Automatically' : ''}
+                          animate={{
+                            boxShadow: hasSavedCredentials
+                              ? (!isAdminSelected ? ['0 0 5px #08d9d6', '0 0 25px #08d9d6', '0 0 5px #08d9d6'] : ['0 0 5px #ff2e63', '0 0 25px #ff2e63', '0 0 5px #ff2e63'])
+                              : (!isAdminSelected ? ['0 0 0px #08d9d6', '0 0 20px #08d9d6', '0 0 0px #08d9d6'] : ['0 0 0px #ff2e63', '0 0 20px #ff2e63', '0 0 0px #ff2e63'])
+                          }}
+                          transition={{ duration: 1.5, repeat: Infinity }}
+                        >
+                          {!isAdminSelected ? <Sparkles className="w-8 h-8 text-[#08d9d6]" /> : <Terminal className="w-8 h-8 text-[#ff2e63]" />}
+                        </motion.div>
+                        <h1 className="login-header-title">
+                          NETRA GRAPHICS
+                        </h1>
+                        <p className={`login-header-subtitle ${!isAdminSelected ? 'mode-client' : 'mode-admin'}`}>
+                          {!isAdminSelected ? 'CLIENT PORTAL' : 'SECURE ADMIN ACCESS'}
+                        </p>
+                        {hasSavedCredentials && (
+                          <p 
+                            className="text-[10px] text-emerald-400 mt-2 font-bold cursor-pointer hover:underline tracking-widest uppercase"
+                            onClick={handleAutoLogin}
+                          >
+                            ⚡ Click Avatar for Instant Auto Sign-in
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Mode Switcher */}
                   <div className="login-mode-switcher">
@@ -2689,6 +2969,21 @@ function App() {
                       >
                         {showPassphrase ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
+                    </div>
+
+                    {/* Offer to Save Login checkbox */}
+                    <div className="flex items-center gap-2 px-1 pb-2 select-none">
+                      <input
+                        type="checkbox"
+                        id="saveLoginCheckbox"
+                        checked={saveLoginInfo}
+                        onChange={e => setSaveLoginInfo(e.target.checked)}
+                        className="rounded border-white/10 bg-white/5 cursor-pointer"
+                        style={{ accentColor: !isAdminSelected ? '#08d9d6' : '#ff2e63' }}
+                      />
+                      <label htmlFor="saveLoginCheckbox" className="text-2xs text-white/50 cursor-pointer hover:text-white/80 transition-colors">
+                        Save my login information
+                      </label>
                     </div>
 
                     <AnimatePresence>
@@ -2767,8 +3062,9 @@ function App() {
                           { id: "PROJECTS", title: "PROJECTS", desc: "Active project management and media vault.", icon: "📁" },
                           { id: "INQUIRIES", title: "INQUIRIES", desc: "Managing 'Sparks' from the contact portal.", icon: "📥" },
                           { id: "CLIENTS", title: "CLIENTS", desc: "Full CRM database of the Netra network.", icon: "👥" },
-                          { id: "FINANCIALS", title: "FINANCIALS", desc: "Invoice generation and revenue ignition.", icon: "💰" },
-                          { id: "SETTINGS", title: "SETTINGS", desc: "Calibrating the 17 service cards and pricing.", icon: "⚙️" },
+                          { id: "INVOICES", title: "INVOICE VAULT", desc: "Interactive standalone invoice workspace & documents ledger.", icon: "📄" },
+                          { id: "FINANCIALS", title: "FINANCIALS", desc: "Cashbook ledger, profit analytics and revenue ignition.", icon: "💰" },
+                          { id: "SETTINGS", title: "SETTINGS", desc: "Calibrating the 20 service cards and pricing.", icon: "⚙️" },
                           { id: "LOGOUT", title: "LOGOUT", desc: "Safe session termination and return to Home.", icon: "🚪" }
                         ].map((card) => (
                           <div
@@ -2862,6 +3158,20 @@ function App() {
                           />
                         )}
 
+                         {activeAdminModule === "INVOICES" && (
+                          <InvoicesPage
+                            invoices={invoices}
+                            setInvoices={setInvoices}
+                            clients={clients}
+                            cashbookEntries={cashbookEntries}
+                            setCashbookEntries={setCashbookEntries}
+                            setIsInvoicePreviewOpen={setIsInvoicePreviewOpen}
+                            setInvoiceProject={setInvoiceProject}
+                            selectedVaultInvoices={selectedVaultInvoices}
+                            setSelectedVaultInvoices={setSelectedVaultInvoices}
+                          />
+                        )}
+
                         {activeAdminModule === "FINANCIALS" && (
                           <Financials
                             ignitionQueue={ignitionQueue}
@@ -2896,6 +3206,7 @@ function App() {
                             onOpenCalibrate={handleOpenCalibrate}
                             visionSettings={visionSettings}
                             onSaveVisionSettings={handleSaveVisionSettings}
+                            onClearAllDemoData={handleClearAllDemoData}
                           />
                         )}
                       </div>
@@ -3735,6 +4046,17 @@ function App() {
                               <label style={{ fontSize: '0.65rem', color: '#888', letterSpacing: '1px', fontWeight: 'bold' }}>BILL TO</label>
                               <h3 style={{ margin: '5px 0 0 0', fontSize: '1.2rem', fontWeight: '900' }}>{invoiceProject.name.toUpperCase()}</h3>
                               <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#555', maxWidth: '350px' }}>AT {getClientAddress(invoiceProject.name)}</p>
+                              {(() => {
+                                const clientObj = clients.find(c => c.name.trim().toLowerCase() === invoiceProject.name.trim().toLowerCase()) || invoiceProject.client;
+                                const phone = invoiceProject.phone || clientObj?.phone;
+                                const email = invoiceProject.email || clientObj?.email;
+                                return (
+                                  <>
+                                    {phone && <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#555' }}>📞 {phone}</p>}
+                                    {email && <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#555' }}>📧 {email}</p>}
+                                  </>
+                                );
+                              })()}
                             </div>
                             <div style={{ textAlign: 'right' }}>
                               <label style={{ fontSize: '0.65rem', color: '#888', letterSpacing: '1px', display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>INVOICE DETAILS</label>
@@ -3913,8 +4235,11 @@ function App() {
                           </button>
                           <button
                             className="action-btn btn-whatsapp"
-                            onClick={() => {
+                            onClick={async () => {
                               saveInvoiceToVault(invoiceProject, stableInvoiceNo);
+                              // Trigger automatic PDF download first so it's ready for drag-and-drop
+                              await downloadMultiPageInvoicePDF(invoiceProject, stableInvoiceNo);
+                              
                               const msg = `Namaste! Your Tax Invoice (${stableInvoiceNo}) from Netra Graphics is ready. Amount: ₹${(parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0)).toLocaleString()}. Thank you!`;
 
                               // Look up client phone robustly
