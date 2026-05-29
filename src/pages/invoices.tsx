@@ -257,37 +257,42 @@ export default function InvoicesPage({
           <p className="text-muted-foreground text-sm mt-1 tracking-widest uppercase">{filteredInvoices.length} total generated documents</p>
         </div>
         <Button
-          onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)}
+          onClick={() => setIsWorkspaceOpen(true)}
           className="bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 gap-2 font-bold text-xs rounded-xl"
         >
-          {isWorkspaceOpen ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-          {isWorkspaceOpen ? "CANCEL WORKSPACE" : "CREATE NEW INVOICE"}
+          <Plus className="w-4 h-4" />
+          CREATE NEW INVOICE
         </Button>
       </motion.div>
 
-      {/* Slide-out Create Invoice Workspace */}
+      {/* Standalone Create Invoice Workspace Modal */}
       <AnimatePresence>
         {isWorkspaceOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-          >
+          <div className="modal-overlay z-50">
             <motion.div
-              variants={itemVariants}
-              className="rounded-2xl border border-cyan-500/20 bg-[#0a0f1e]/40 backdrop-blur-sm p-6 space-y-6"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="ignition-modal max-w-4xl w-[90vw] max-h-[90vh] overflow-y-auto"
             >
-              <div className="border-b border-white/5 pb-4">
-                <h3 className="font-extrabold text-foreground text-lg flex items-center gap-2">
+              <button
+                type="button"
+                className="close-modal"
+                onClick={() => setIsWorkspaceOpen(false)}
+              >
+                ×
+              </button>
+
+              <div className="modal-header border-b border-white/5 pb-4 mb-5">
+                <h2 className="font-extrabold text-foreground text-lg flex items-center gap-2">
                   <FileText className="w-5 h-5 text-cyan-400" />
                   Standalone Invoicing Workspace
-                </h3>
+                </h2>
                 <p className="text-xs text-muted-foreground">Generate complete tax invoices on-the-fly without registering clients or projects beforehand</p>
               </div>
 
               <form onSubmit={handleCreateInvoice} className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
                   {/* Bill To section */}
                   <div className="space-y-4 border-r border-white/5 pr-0 md:pr-5">
                     <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
@@ -468,7 +473,7 @@ export default function InvoicesPage({
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-3 pt-3 border-t border-white/5">
+                <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
                   <Button
                     type="button"
                     variant="ghost"
@@ -486,7 +491,7 @@ export default function InvoicesPage({
                 </div>
               </form>
             </motion.div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
