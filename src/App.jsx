@@ -15,6 +15,7 @@ import SettingsPage from '@/pages/settings';
 import { Portfolio } from '@/pages/Portfolio';
 import { useToast } from '@/hooks/use-toast';
 import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail, Menu, Volume2, VolumeX, Coins } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 import InvoicesPage from '@/pages/invoices';
 
 const queryClient = new QueryClient();
@@ -4576,6 +4577,7 @@ function App() {
           </AnimatePresence>
         </div>
       </TooltipProvider>
+      <Analytics />
     </QueryClientProvider>
   );
 }
