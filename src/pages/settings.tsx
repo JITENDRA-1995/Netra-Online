@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -13,7 +13,10 @@ import {
   Eye,
   Loader2,
   CheckCircle2,
-  ShieldCheck
+  ShieldCheck,
+  QrCode,
+  Coins,
+  User
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +40,10 @@ interface SettingsProps {
   visionSettings: any[];
   onSaveVisionSettings: (newSettings: any[]) => void;
   onClearAllDemoData: () => void;
+  bankingDetails: any;
+  onSaveBankingDetails: (details: any) => void;
+  adminProfile: any;
+  onSaveAdminProfile: (details: any) => void;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -75,9 +82,13 @@ export default function SettingsPage({
   onOpenCalibrate,
   visionSettings,
   onSaveVisionSettings,
-  onClearAllDemoData
+  onClearAllDemoData,
+  bankingDetails,
+  onSaveBankingDetails,
+  adminProfile,
+  onSaveAdminProfile
 }: SettingsProps) {
-  const [activeTab, setActiveTab] = useState("CATALOG"); // CATALOG, VISION
+  const [activeTab, setActiveTab] = useState("CATALOG"); // CATALOG, VISION, BANKING, PROFILE
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("ALL");
 
@@ -96,6 +107,42 @@ export default function SettingsPage({
   const [newSlideUrls, setNewSlideUrls] = useState<string[]>(["", "", "", "", ""]);
   const [newSlideTitles, setNewSlideTitles] = useState<string[]>(["", "", "", "", ""]);
   const [newSlideDurations, setNewSlideDurations] = useState<string[]>(["", "", "", "", ""]);
+
+  // State for Banking calibration
+  const [bankName, setBankName] = useState(bankingDetails?.bankName || "");
+  const [accountName, setAccountName] = useState(bankingDetails?.accountName || "");
+  const [accountNumber, setAccountNumber] = useState(bankingDetails?.accountNumber || "");
+  const [ifscCode, setIfscCode] = useState(bankingDetails?.ifscCode || "");
+  const [upiId, setUpiId] = useState(bankingDetails?.upiId || "");
+  const [isBankingSaving, setIsBankingSaving] = useState(false);
+
+  // State for Profile calibration
+  const [profileName, setProfileName] = useState(adminProfile?.businessName || "");
+  const [profileAddress, setProfileAddress] = useState(adminProfile?.address || "");
+  const [profilePhone, setProfilePhone] = useState(adminProfile?.phone || "");
+  const [profileEmail, setProfileEmail] = useState(adminProfile?.email || "");
+  const [profileGst, setProfileGst] = useState(adminProfile?.gst || "");
+  const [isProfileSaving, setIsProfileSaving] = useState(false);
+
+  useEffect(() => {
+    if (bankingDetails) {
+      setBankName(bankingDetails.bankName || "");
+      setAccountName(bankingDetails.accountName || "");
+      setAccountNumber(bankingDetails.accountNumber || "");
+      setIfscCode(bankingDetails.ifscCode || "");
+      setUpiId(bankingDetails.upiId || "");
+    }
+  }, [bankingDetails]);
+
+  useEffect(() => {
+    if (adminProfile) {
+      setProfileName(adminProfile.businessName || "");
+      setProfileAddress(adminProfile.address || "");
+      setProfilePhone(adminProfile.phone || "");
+      setProfileEmail(adminProfile.email || "");
+      setProfileGst(adminProfile.gst || "");
+    }
+  }, [adminProfile]);
 
   // High-fidelity UI feedback states
   const [isSaving, setIsSaving] = useState(false);
@@ -137,6 +184,42 @@ export default function SettingsPage({
       setTimeout(() => {
         setShowSavedSuccess(false);
       }, 3500);
+    }
+  };
+
+  const handleSaveBankingDetailsLocal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsBankingSaving(true);
+    try {
+      await onSaveBankingDetails({
+        bankName,
+        accountName,
+        accountNumber,
+        ifscCode,
+        upiId
+      });
+    } catch (err) {
+      console.error("Save banking error:", err);
+    } finally {
+      setIsBankingSaving(false);
+    }
+  };
+
+  const handleSaveProfileLocal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsProfileSaving(true);
+    try {
+      await onSaveAdminProfile({
+        businessName: profileName,
+        address: profileAddress,
+        phone: profilePhone,
+        email: profileEmail,
+        gst: profileGst
+      });
+    } catch (err) {
+      console.error("Save profile error:", err);
+    } finally {
+      setIsProfileSaving(false);
     }
   };
 
@@ -398,9 +481,31 @@ export default function SettingsPage({
           <Eye className="w-3.5 h-3.5" />
           Vision Tab calibration
         </button>
+        <button
+          onClick={() => setActiveTab("BANKING")}
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-all duration-300 outline-none select-none cursor-pointer flex items-center gap-2 ${
+            activeTab === "BANKING" 
+              ? "bg-indigo-500 text-white font-black shadow-[0_0_15px_rgba(99,102,241,0.35)] border border-indigo-400/20 scale-[0.98]" 
+              : "border border-transparent text-muted-foreground hover:text-foreground hover:bg-white/[0.03] hover:scale-[1.02]"
+          }`}
+        >
+          <Coins className="w-3.5 h-3.5" />
+          Banking & Payments
+        </button>
+        <button
+          onClick={() => setActiveTab("PROFILE")}
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-all duration-300 outline-none select-none cursor-pointer flex items-center gap-2 ${
+            activeTab === "PROFILE" 
+              ? "bg-indigo-500 text-white font-black shadow-[0_0_15px_rgba(99,102,241,0.35)] border border-indigo-400/20 scale-[0.98]" 
+              : "border border-transparent text-muted-foreground hover:text-foreground hover:bg-white/[0.03] hover:scale-[1.02]"
+          }`}
+        >
+          <User className="w-3.5 h-3.5" />
+          Admin Profile Settings
+        </button>
       </motion.div>
 
-      {activeTab === "CATALOG" ? (
+      {activeTab === "CATALOG" && (
         <>
           {/* Filter / Search Bar */}
           <motion.div variants={itemVariants} className="flex gap-3 flex-wrap items-center">
@@ -487,7 +592,9 @@ export default function SettingsPage({
             )}
           </motion.div>
         </>
-      ) : (
+      )}
+
+      {activeTab === "VISION" && (
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -784,6 +891,369 @@ export default function SettingsPage({
               {isSaving ? "SYNCHRONIZING..." : "SAVE VISION SETTINGS"}
             </Button>
           </motion.div>
+        </motion.div>
+      )}
+
+      {activeTab === "BANKING" && (
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="space-y-6"
+        >
+          {/* Explanation panel */}
+          <motion.div 
+            variants={itemVariants} 
+            className="p-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.02] backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
+          >
+            <div>
+              <h2 className="text-lg font-bold text-indigo-400 flex items-center gap-2 text-left">
+                <Coins className="w-5 h-5 text-indigo-400" />
+                Banking & Unified Payments Interface (UPI) Calibration
+              </h2>
+              <p className="text-xs text-muted-foreground leading-relaxed mt-2 max-w-2xl text-left">
+                Configure your official business settlement credentials. The systems will dynamically compile interactive payment gateways and UPI QR codes on all future generated tax invoices using these parameters.
+              </p>
+            </div>
+          </motion.div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            {/* Left side Form */}
+            <motion.div 
+              variants={itemVariants} 
+              className="rounded-2xl border border-white/5 bg-[#08080f]/80 backdrop-blur-sm p-6 space-y-4"
+            >
+              <h3 className="font-bold text-sm uppercase tracking-widest text-indigo-400 flex items-center gap-2 mb-2">
+                <Sliders className="w-4 h-4" />
+                Settlement Credentials
+              </h3>
+              
+              <form onSubmit={handleSaveBankingDetailsLocal} className="space-y-4 text-left">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Bank Name</label>
+                  <Input 
+                    value={bankName}
+                    onChange={e => setBankName(e.target.value)}
+                    placeholder="e.g. STATE BANK OF INDIA"
+                    className="bg-white/5 border-white/10 text-xs rounded-xl h-10 text-foreground"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Account Holder Name</label>
+                  <Input 
+                    value={accountName}
+                    onChange={e => setAccountName(e.target.value)}
+                    placeholder="e.g. NETRA GRAPHICS & DESIGNING"
+                    className="bg-white/5 border-white/10 text-xs rounded-xl h-10 text-foreground"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Account Number</label>
+                    <Input 
+                      value={accountNumber}
+                      onChange={e => setAccountNumber(e.target.value)}
+                      placeholder="e.g. 20198798116"
+                      className="bg-white/5 border-white/10 text-xs rounded-xl h-10 font-mono text-foreground"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">IFSC Code</label>
+                    <Input 
+                      value={ifscCode}
+                      onChange={e => setIfscCode(e.target.value)}
+                      placeholder="e.g. SBIN0060152"
+                      className="bg-white/5 border-white/10 text-xs rounded-xl h-10 font-mono text-foreground"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">UPI ID (VPA) *</label>
+                  <Input 
+                    value={upiId}
+                    onChange={e => setUpiId(e.target.value)}
+                    placeholder="e.g. netragraphics@sbi"
+                    className="bg-white/5 border-white/10 text-xs rounded-xl h-10 font-mono text-foreground"
+                    required
+                  />
+                  <p className="text-[9px] text-muted-foreground">CRITICAL: Double-check VPA address. Mismatches will route payments to invalid endpoints.</p>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={isBankingSaving}
+                  className="w-full bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-black font-extrabold text-xs rounded-xl py-5 shadow-lg shadow-indigo-500/10 mt-2"
+                >
+                  {isBankingSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-2" />
+                  )}
+                  {isBankingSaving ? "SYNCHRONIZING..." : "SAVE BANKING DETAILS"}
+                </Button>
+              </form>
+            </motion.div>
+
+            {/* Right side QR Preview and Details */}
+            <motion.div 
+              variants={itemVariants} 
+              className="rounded-2xl border border-white/5 bg-[#08080f]/80 backdrop-blur-sm p-6 flex flex-col items-center justify-between min-h-[440px]"
+            >
+              <div className="w-full">
+                <h3 className="font-bold text-sm uppercase tracking-widest text-cyan-400 flex items-center gap-2 mb-2 text-left">
+                  <QrCode className="w-4 h-4" />
+                  QR Gateway Calibration Preview
+                </h3>
+                <p className="text-2xs text-muted-foreground text-left mb-6">
+                  Live verification layout simulating UPI payment flow. Enter a test calibration quote to visually inspect the payload.
+                </p>
+              </div>
+
+              {/* QR display card */}
+              <div className="relative p-6 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col items-center gap-4 w-full max-w-xs shadow-2xl">
+                <div className="absolute top-2 right-2 flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[8px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                  <span>LIVE</span>
+                </div>
+                
+                <div className="w-40 h-40 bg-white p-2 rounded-xl flex items-center justify-center shadow-inner relative group overflow-hidden">
+                  {upiId ? (
+                    <img 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=${accountName || 'Netra Graphics'}&am=100.00&cu=INR`)}`}
+                      alt="UPI QR Code Calibration" 
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <div className="text-center p-4">
+                      <QrCode className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2 animate-bounce" />
+                      <span className="text-[9px] text-muted-foreground uppercase font-mono block">Awaiting VPA Calibration...</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-center space-y-1 w-full">
+                  <div className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Dynamic Payee Gateway</div>
+                  <div className="text-xs font-bold text-white truncate max-w-[200px] mx-auto">{accountName || "NETRA GRAPHICS"}</div>
+                  <div className="text-[10px] font-mono text-cyan-400 truncate max-w-[200px] mx-auto">{upiId || "address@upi"}</div>
+                </div>
+
+                <div className="w-full border-t border-white/5 pt-3 mt-1 flex justify-between items-center text-[9px] font-mono text-muted-foreground">
+                  <span>SIMULATED TOTAL:</span>
+                  <span className="font-extrabold text-emerald-400">₹100.00</span>
+                </div>
+              </div>
+
+              {/* Instructions checklist */}
+              <div className="w-full border-t border-white/5 pt-4 mt-6 text-left space-y-2 font-mono text-[9px] text-white/50">
+                <div className="flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1 flex-shrink-0 animate-pulse" />
+                  <span>Interactive dynamic payload: Uses `upi://pay` protocol specification.</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1 flex-shrink-0 animate-pulse" />
+                  <span>Complies fully with NPCI (National Payments Corporation of India) standards.</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1 flex-shrink-0 animate-pulse" />
+                  <span>Visual QR verification compiled dynamically on edge endpoints.</span>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      )}
+
+      {activeTab === "PROFILE" && (
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="space-y-6"
+        >
+          {/* Explanation panel */}
+          <motion.div 
+            variants={itemVariants} 
+            className="p-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.02] backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
+          >
+            <div>
+              <h2 className="text-lg font-bold text-indigo-400 flex items-center gap-2 text-left">
+                <User className="w-5 h-5 text-indigo-400" />
+                Admin Profile Settings
+              </h2>
+              <p className="text-xs text-muted-foreground leading-relaxed mt-2 max-w-2xl text-left">
+                Configure your official studio brand credentials. This will customize printed invoice headers, physical address lines, GST records, and support email signatures globally.
+              </p>
+            </div>
+          </motion.div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start text-left">
+            {/* Left Column: Form */}
+            <motion.div 
+              variants={itemVariants} 
+              className="rounded-2xl border border-white/5 bg-[#08080f]/80 backdrop-blur-sm p-6 space-y-4"
+            >
+              <h3 className="font-bold text-sm uppercase tracking-widest text-indigo-400 flex items-center gap-2 mb-2">
+                <Sliders className="w-4 h-4" />
+                Physical & Identity Calibration
+              </h3>
+
+              <form onSubmit={handleSaveProfileLocal} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Studio / Business Name *</label>
+                  <Input 
+                    value={profileName}
+                    onChange={e => setProfileName(e.target.value)}
+                    placeholder="e.g. Netra Graphics"
+                    className="bg-white/5 border-white/10 text-xs rounded-xl h-10 text-foreground"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Physical Address *</label>
+                  <Input 
+                    value={profileAddress}
+                    onChange={e => setProfileAddress(e.target.value)}
+                    placeholder="e.g. Shreeji Complex, Opp. Sasan Road, Mendarda"
+                    className="bg-white/5 border-white/10 text-xs rounded-xl h-10 text-foreground"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Official Contact Phone *</label>
+                    <Input 
+                      value={profilePhone}
+                      onChange={e => setProfilePhone(e.target.value)}
+                      placeholder="e.g. +91 90161 60152"
+                      className="bg-white/5 border-white/10 text-xs rounded-xl h-10 font-mono text-foreground"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Official Contact Email *</label>
+                    <Input 
+                      type="email"
+                      value={profileEmail}
+                      onChange={e => setProfileEmail(e.target.value)}
+                      placeholder="e.g. info@netragraphics.com"
+                      className="bg-white/5 border-white/10 text-xs rounded-xl h-10 font-mono text-foreground"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">GSTIN Tax Registration Code (Optional)</label>
+                  <Input 
+                    value={profileGst}
+                    onChange={e => setProfileGst(e.target.value)}
+                    placeholder="e.g. 24AAAAA0000A1Z5"
+                    className="bg-white/5 border-white/10 text-xs rounded-xl h-10 font-mono text-foreground"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={isProfileSaving}
+                  className="w-full bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-black font-extrabold text-xs rounded-xl py-5 shadow-lg shadow-indigo-500/10 mt-2"
+                >
+                  {isProfileSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-2" />
+                  )}
+                  {isProfileSaving ? "SYNCHRONIZING..." : "SAVE PROFILE DETAILS"}
+                </Button>
+              </form>
+            </motion.div>
+
+            {/* Right Column: Live Mockup Business Card */}
+            <motion.div 
+              variants={itemVariants} 
+              className="rounded-2xl border border-white/5 bg-[#08080f]/80 backdrop-blur-sm p-6 flex flex-col items-center justify-between min-h-[440px]"
+            >
+              <div className="w-full">
+                <h3 className="font-bold text-sm uppercase tracking-widest text-cyan-400 flex items-center gap-2 mb-2 text-left">
+                  <ShieldCheck className="w-4 h-4" />
+                  Calibrated Brand Card Preview
+                </h3>
+                <p className="text-2xs text-muted-foreground text-left mb-6 font-sans">
+                  Live glassmorphism preview panel displaying your business identity block as it will be loaded dynamically on dynamic nodes.
+                </p>
+              </div>
+
+              {/* Glass Business Card */}
+              <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-cyan-500/10 p-6 shadow-2xl relative overflow-hidden group select-none">
+                {/* Aura circles */}
+                <div className="absolute -top-10 -right-10 w-24 h-24 bg-cyan-400/10 rounded-full blur-xl group-hover:scale-150 transition-all duration-700" />
+                <div className="absolute -bottom-10 -left-10 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl group-hover:scale-150 transition-all duration-700" />
+                
+                <div className="space-y-6 relative z-10 text-left">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] font-mono text-cyan-400 font-extrabold tracking-widest uppercase block">OFFICIAL CONTRACT CARD</span>
+                      <h4 className="text-lg font-black text-white tracking-wide truncate max-w-[240px] mt-1">{profileName || "NETRA GRAPHICS"}</h4>
+                    </div>
+                    <div className="w-8 h-8 rounded-full border border-indigo-400/30 bg-indigo-500/10 flex items-center justify-center text-xs">
+                      🌐
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 font-mono text-[9px] text-white/70">
+                    <div className="flex items-center gap-2">
+                      <span className="text-indigo-400">📞</span>
+                      <span>{profilePhone || "+91 00000 00000"}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-indigo-400">📧</span>
+                      <span className="truncate max-w-[260px]">{profileEmail || "contact@business.com"}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-indigo-400">🏠</span>
+                      <span className="truncate max-w-[260px]">{profileAddress || "Office address, City"}</span>
+                    </div>
+                    {profileGst && (
+                      <div className="flex items-center gap-2 border-t border-white/5 pt-2 mt-2">
+                        <span className="text-cyan-400 font-bold uppercase">GSTIN:</span>
+                        <span className="font-bold text-white tracking-widest">{profileGst}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center text-[8px] font-mono text-white/30 border-t border-white/5 pt-3">
+                    <span>SYSTEM ID: settings@netra.graphics</span>
+                    <span className="text-emerald-400 animate-pulse font-extrabold">● SECURE SYNCED</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status parameters */}
+              <div className="w-full border-t border-white/5 pt-4 mt-6 text-left space-y-2 font-mono text-[9px] text-white/40">
+                <div className="flex justify-between">
+                  <span>Supabase Edge Pipeline:</span>
+                  <span className="text-emerald-400">ONLINE</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Configuration Table Reference:</span>
+                  <span>settings@netra.graphics</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Dynamic Invoice Sync status:</span>
+                  <span className="text-cyan-400 font-extrabold animate-pulse">ACTIVE & ARMED</span>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         </motion.div>
       )}
 

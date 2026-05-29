@@ -373,6 +373,22 @@ const defaultVisionSettings = [
   }
 ];
 
+const defaultBankingDetails = {
+  bankName: "SBI",
+  accountName: "Netra Graphics",
+  accountNumber: "20198798116",
+  ifscCode: "SBIN0060152",
+  upiId: "hiraparasavan989@okaxis"
+};
+
+const defaultAdminProfile = {
+  businessName: "Netra Graphics & Designing",
+  address: "Shreeji Complex, Opp. AaramGruh, Mendarda-Sasan Road, Mendarda-362260",
+  phone: "+91 90161 60152",
+  email: "info@netragraphics.com",
+  gst: "24AAAAA0000A1Z5"
+};
+
 function App() {
   const [servicesList, setServicesList] = useState(() => {
     const saved = localStorage.getItem('netra_services');
@@ -400,6 +416,76 @@ function App() {
     return defaultVisionSettings;
   });
 
+  const [bankingDetails, setBankingDetails] = useState(() => {
+    const saved = localStorage.getItem('netra_banking_details');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved banking details:", e);
+      }
+    }
+    return defaultBankingDetails;
+  });
+
+  const [adminProfile, setAdminProfile] = useState(() => {
+    const saved = localStorage.getItem('netra_admin_profile');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved admin profile:", e);
+      }
+    }
+    return defaultAdminProfile;
+  });
+
+  const handleSaveBankingDetails = async (newBanking) => {
+    setBankingDetails(newBanking);
+    localStorage.setItem('netra_banking_details', JSON.stringify(newBanking));
+
+    // Save globally to Supabase special settings row
+    try {
+      const payload = {
+        address: JSON.stringify({ services: servicesList, vision: visionSettings, banking: newBanking, profile: adminProfile })
+      };
+      await supabase
+        .from('clients')
+        .update(payload)
+        .eq('email', 'settings@netra.graphics');
+    } catch (dbErr) {
+      console.error("Failed to save banking details to database:", dbErr);
+    }
+
+    toast({
+      title: "Payment Details Calibrated",
+      description: "Successfully updated payment instructions and digital UPI QR settings."
+    });
+  };
+
+  const handleSaveAdminProfile = async (newProfile) => {
+    setAdminProfile(newProfile);
+    localStorage.setItem('netra_admin_profile', JSON.stringify(newProfile));
+
+    // Save globally to Supabase special settings row
+    try {
+      const payload = {
+        address: JSON.stringify({ services: servicesList, vision: visionSettings, banking: bankingDetails, profile: newProfile })
+      };
+      await supabase
+        .from('clients')
+        .update(payload)
+        .eq('email', 'settings@netra.graphics');
+    } catch (dbErr) {
+      console.error("Failed to save admin profile to database:", dbErr);
+    }
+
+    toast({
+      title: "Admin Profile Updated",
+      description: "Successfully updated admin basic details globally."
+    });
+  };
+
   const handleSaveVisionSettings = async (newSettings) => {
     setVisionSettings(newSettings);
     localStorage.setItem('netra_vision_settings', JSON.stringify(newSettings));
@@ -407,7 +493,7 @@ function App() {
     // Save globally to Supabase special settings row
     try {
       const payload = {
-        address: JSON.stringify({ services: servicesList, vision: newSettings })
+        address: JSON.stringify({ services: servicesList, vision: newSettings, banking: bankingDetails, profile: adminProfile })
       };
       await supabase
         .from('clients')
@@ -462,6 +548,14 @@ function App() {
       setVisionSettings(defaultVisionSettings);
       localStorage.setItem('netra_vision_settings', JSON.stringify(defaultVisionSettings));
 
+      // Reset banking details to defaults
+      setBankingDetails(defaultBankingDetails);
+      localStorage.setItem('netra_banking_details', JSON.stringify(defaultBankingDetails));
+
+      // Reset admin profile to defaults
+      setAdminProfile(defaultAdminProfile);
+      localStorage.setItem('netra_admin_profile', JSON.stringify(defaultAdminProfile));
+
       // Clean local states
       setInvoices([]);
       setIgnitionQueue([]);
@@ -475,11 +569,13 @@ function App() {
       localStorage.removeItem('netra_inquiries');
       localStorage.removeItem('netra_projects');
       localStorage.removeItem('netra_invoices');
+      localStorage.removeItem('netra_banking_details');
+      localStorage.removeItem('netra_admin_profile');
 
       // Update global Supabase settings row back to defaults
       try {
         const payload = {
-          address: JSON.stringify({ services: defaultServices, vision: defaultVisionSettings })
+          address: JSON.stringify({ services: defaultServices, vision: defaultVisionSettings, banking: defaultBankingDetails, profile: defaultAdminProfile })
         };
         await supabase
           .from('clients')
@@ -522,7 +618,7 @@ function App() {
     // Save globally to Supabase special settings row
     try {
       const payload = {
-        address: JSON.stringify({ services: nextList, vision: visionSettings })
+        address: JSON.stringify({ services: nextList, vision: visionSettings, banking: bankingDetails, profile: adminProfile })
       };
       await supabase
         .from('clients')
@@ -660,6 +756,14 @@ function App() {
               setVisionSettings(parsed.vision);
               localStorage.setItem('netra_vision_settings', JSON.stringify(parsed.vision));
             }
+            if (parsed.banking) {
+              setBankingDetails(parsed.banking);
+              localStorage.setItem('netra_banking_details', JSON.stringify(parsed.banking));
+            }
+            if (parsed.profile) {
+              setAdminProfile(parsed.profile);
+              localStorage.setItem('netra_admin_profile', JSON.stringify(parsed.profile));
+            }
           } catch (parseErr) {
             console.error("Failed to parse global settings from database:", parseErr);
           }
@@ -668,7 +772,7 @@ function App() {
             name: 'System Settings',
             email: 'settings@netra.graphics',
             phone: 'SYSTEM',
-            address: JSON.stringify({ services: servicesList, vision: visionSettings }),
+            address: JSON.stringify({ services: servicesList, vision: visionSettings, banking: bankingDetails, profile: adminProfile }),
             status: 'Active',
             access_key: 'SYSTEM'
           };
@@ -997,6 +1101,12 @@ function App() {
     const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '');
     const serialStr = serial.toString().padStart(4, '0');
     return `NG/${dateStr}/${serialStr}`;
+  };
+
+  const formatCurrencyValue = (val) => {
+    const parsed = parseFloat(val);
+    if (isNaN(parsed)) return "0.00";
+    return parsed.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   const amountInWords = (price) => {
@@ -2267,10 +2377,19 @@ function App() {
                 />
               )}
               <aside className={`admin-sidebar ${isMobileSidebarOpen ? 'mobile-open' : ''}`}>
-                <div className="sidebar-branding">
+                <button
+                  className="sidebar-branding"
+                  onClick={() => {
+                    setIsAdminGridActive(false);
+                    setIsMobileSidebarOpen(false);
+                    pushPageToHistory('admin', { activeAdminModule: 'DASHBOARD', isAdminGridActive: false });
+                  }}
+                  title="Return to Administrative Modules"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                >
                   <img src="/logo.png" alt="Netra Logo" className="sidebar-logo-img" />
                   <span className="sidebar-branding-text">NETRA</span>
-                </div>
+                </button>
 
                 <nav className="sidebar-menu">
                   {[
@@ -3158,7 +3277,7 @@ function App() {
                           />
                         )}
 
-                         {activeAdminModule === "INVOICES" && (
+                        {activeAdminModule === "INVOICES" && (
                           <InvoicesPage
                             invoices={invoices}
                             setInvoices={setInvoices}
@@ -3169,6 +3288,7 @@ function App() {
                             setInvoiceProject={setInvoiceProject}
                             selectedVaultInvoices={selectedVaultInvoices}
                             setSelectedVaultInvoices={setSelectedVaultInvoices}
+                            bankingDetails={bankingDetails}
                           />
                         )}
 
@@ -3207,6 +3327,10 @@ function App() {
                             visionSettings={visionSettings}
                             onSaveVisionSettings={handleSaveVisionSettings}
                             onClearAllDemoData={handleClearAllDemoData}
+                            bankingDetails={bankingDetails}
+                            onSaveBankingDetails={handleSaveBankingDetails}
+                            adminProfile={adminProfile}
+                            onSaveAdminProfile={handleSaveAdminProfile}
                           />
                         )}
                       </div>
@@ -3969,12 +4093,16 @@ function App() {
                       ? invoiceProject.items.map(item => ({
                         service: item.service,
                         quote: item.quote,
-                        discount: item.discount || 0
+                        discount: item.discount || 0,
+                        qty: item.qty,
+                        rate: item.rate
                       }))
                       : [{
                         service: invoiceProject.service,
                         quote: invoiceProject.quote,
-                        discount: invoiceProject.discount || 0
+                        discount: invoiceProject.discount || 0,
+                        qty: invoiceProject.qty,
+                        rate: invoiceProject.rate
                       }];
 
                     const pages = [];
@@ -4022,21 +4150,21 @@ function App() {
                               {/* Spacer to prevent text overlapping the absolutely positioned logo */}
                               <div style={{ width: '100px', flexShrink: 0 }} />
                               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <h1 style={{ margin: 0, fontSize: '2.0rem', fontWeight: '900', fontFamily: 'Urbanist, sans-serif', letterSpacing: '1px' }}>NETRA GRAPHICS</h1>
+                                <h1 style={{ margin: 0, fontSize: '2.0rem', fontWeight: '900', fontFamily: 'Urbanist, sans-serif', letterSpacing: '1px' }}>{adminProfile.businessName.toUpperCase()}</h1>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.85rem', opacity: 0.95, marginTop: '6px' }}>
                                   <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.83a16 16 0 0 0 5.92 5.92l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7a2 2 0 0 1 1.72 2.02z"/>
                                     </svg>
-                                    73590 93035
+                                    {adminProfile.phone}
                                   </span>
-                                  <span>📧 hiraparasavan989@gmail.com</span>
+                                  <span>📧 {adminProfile.email}</span>
                                 </div>
                               </div>
                             </div>
                             <div style={{ textAlign: 'right', zIndex: 2 }}>
                               <h2 style={{ margin: 0, fontSize: '2.0rem', letterSpacing: '3px', fontWeight: '900', fontFamily: 'Urbanist, sans-serif' }}>TAX INVOICE</h2>
-                              <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.9, maxWidth: '300px', marginLeft: 'auto' }}>Mendarda-Sasan Road, Mendarda, 362260</p>
+                              <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.9, maxWidth: '300px', marginLeft: 'auto' }}>{adminProfile.address}</p>
                             </div>
                           </div>
 
@@ -4094,12 +4222,12 @@ function App() {
                                           <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{item.service}</span>
                                         </div>
                                       </td>
-                                      <td style={{ textAlign: 'center', fontSize: '0.9rem' }}>1</td>
-                                      <td style={{ textAlign: 'right', fontSize: '0.9rem' }}>₹{parseFloat(item.quote).toLocaleString()}</td>
+                                      <td style={{ textAlign: 'center', fontSize: '0.9rem' }}>{item.qty || 1}</td>
+                                      <td style={{ textAlign: 'right', fontSize: '0.9rem' }}>₹{formatCurrencyValue(item.rate || item.quote)}</td>
                                       <td style={{ textAlign: 'center', fontSize: '0.9rem', color: discountPercent > 0 ? '#2e7d32' : '#888', fontWeight: 'bold' }}>
                                         {discountPercent > 0 ? `${discountPercent}%` : '-'}
                                       </td>
-                                      <td style={{ textAlign: 'right', fontSize: '0.9rem', fontWeight: 'bold' }}>₹{(parseFloat(item.quote) - (parseFloat(item.discount) || 0)).toLocaleString()}</td>
+                                      <td style={{ textAlign: 'right', fontSize: '0.9rem', fontWeight: 'bold' }}>₹{formatCurrencyValue(parseFloat(item.rate || item.quote) * (item.qty || 1) - (parseFloat(item.discount) || 0))}</td>
                                     </tr>
                                   );
                                 })}
@@ -4111,7 +4239,7 @@ function App() {
                               </tbody>
                             </table>
                           </div>
-
+ 
                           {/* TOTALS & FOOTER - ONLY ON LAST PAGE */}
                           {isLastPage ? (
                             <div style={{ background: '#fff', borderTop: '1px solid #eee' }}>
@@ -4119,44 +4247,44 @@ function App() {
                                 {/* Payment Instructions */}
                                 <div style={{ background: '#f8f9fa', padding: '12px', borderRadius: '8px', display: 'flex', gap: '10px', width: '58%', border: '1px solid #eee' }}>
                                   <div style={{ width: '80px', height: '80px', background: '#fff', padding: '4px', borderRadius: '4px', border: '1px solid #ddd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=hiraparasavan989@okaxis&pn=Netra%20Graphics&am=${parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0)}&cu=INR`} alt="UPI QR" style={{ width: '100%', height: '100%' }} />
+                                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=${encodeURIComponent(bankingDetails.upiId)}&pn=${encodeURIComponent(bankingDetails.accountName)}&am=${parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0)}&cu=INR`} alt="UPI QR" style={{ width: '100%', height: '100%' }} />
                                   </div>
                                   <div style={{ flex: 1 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#546e7a', fontSize: '0.65rem', fontWeight: 'bold', marginBottom: '6px' }}>
                                       🏠 PAYMENT INSTRUCTIONS
                                     </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.65rem' }}>
-                                      <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Bank Name</span><strong style={{ fontSize: '0.65rem' }}>SBI</strong></div>
-                                      <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Account Name</span><strong style={{ fontSize: '0.65rem' }}>Netra Graphics</strong></div>
-                                      <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Account Number</span><strong style={{ fontSize: '0.65rem' }}>20198798116</strong></div>
-                                      <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>IFSC Code</span><strong style={{ fontSize: '0.65rem' }}>SBIN0060152</strong></div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.65rem', textTransform: 'uppercase' }}>
+                                      <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Bank Name</span><strong style={{ fontSize: '0.65rem' }}>{bankingDetails.bankName}</strong></div>
+                                      <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Account Name</span><strong style={{ fontSize: '0.65rem' }}>{bankingDetails.accountName}</strong></div>
+                                      <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Account Number</span><strong style={{ fontSize: '0.65rem', fontFamily: 'monospace' }}>{bankingDetails.accountNumber}</strong></div>
+                                      <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>IFSC Code</span><strong style={{ fontSize: '0.65rem', fontFamily: 'monospace' }}>{bankingDetails.ifscCode}</strong></div>
                                     </div>
                                   </div>
                                 </div>
-
+ 
                                 {/* Totals Section */}
                                 <div style={{ width: '38%', textAlign: 'right' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.8rem' }}>
                                     <span style={{ color: '#666' }}>SUBTOTAL</span>
-                                    <span style={{ fontWeight: 'bold' }}>₹{parseFloat(invoiceProject.quote).toLocaleString()}.00</span>
+                                    <span style={{ fontWeight: 'bold' }}>₹{formatCurrencyValue(invoiceProject.quote)}</span>
                                   </div>
                                   {(parseFloat(invoiceProject.discount) || 0) > 0 && (
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.8rem' }}>
                                       <span style={{ color: '#666' }}>DISCOUNT</span>
-                                      <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>-₹{parseFloat(invoiceProject.discount).toLocaleString()}.00</span>
+                                      <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>-₹{formatCurrencyValue(invoiceProject.discount)}</span>
                                     </div>
                                   )}
                                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.8rem' }}>
                                     <span style={{ color: '#666' }}>ADVANCE PAID</span>
-                                    <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>-₹{(parseFloat(invoiceProject.advanceAmount) || 0).toLocaleString()}.00</span>
+                                    <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>-₹{formatCurrencyValue(invoiceProject.advanceAmount)}</span>
                                   </div>
-
+ 
                                   <div style={{
                                     background: '#3f51b5', padding: '10px 15px', color: '#fff', borderRadius: '6px',
                                     display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                                   }}>
                                     <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>GRAND TOTAL</span>
-                                    <span style={{ fontSize: '1.25rem', fontWeight: '900' }}>₹{(parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0)).toLocaleString()}.00</span>
+                                    <span style={{ fontSize: '1.25rem', fontWeight: '900' }}>₹{formatCurrencyValue(parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0))}</span>
                                   </div>
                                 </div>
                               </div>
@@ -4177,7 +4305,7 @@ function App() {
                                   <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#666' }}>Receiver's Sign</span>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
-                                  <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: '900' }}>For Netra Graphics & Designing</h4>
+                                  <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: '900' }}>For {adminProfile.businessName}</h4>
                                   <p style={{ margin: '5px 0 0 0', fontSize: '0.6rem', color: '#999', fontStyle: 'italic' }}>
                                     This is a computer generated invoice hence signatory not required.
                                   </p>

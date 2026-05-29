@@ -15,7 +15,9 @@ import {
   Mail,
   Phone,
   Percent,
-  Coins
+  Coins,
+  ShieldCheck,
+  QrCode
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +35,7 @@ interface InvoicesPageProps {
   setInvoiceProject: (p: any) => void;
   selectedVaultInvoices: any[];
   setSelectedVaultInvoices: React.Dispatch<React.SetStateAction<any[]>>;
+  bankingDetails: any;
 }
 
 const containerVariants = {
@@ -54,11 +57,13 @@ export default function InvoicesPage({
   setIsInvoicePreviewOpen,
   setInvoiceProject,
   selectedVaultInvoices,
-  setSelectedVaultInvoices
+  setSelectedVaultInvoices,
+  bankingDetails
 }: InvoicesPageProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
+  const [formStep, setFormStep] = useState(1); // 1 = Client details, 2 = Service Details, 3 = Gateway Review
 
   // Form States
   const [billingName, setBillingName] = useState("");
@@ -243,6 +248,7 @@ export default function InvoicesPage({
       
       // Reset form
       setIsWorkspaceOpen(false);
+      setFormStep(1);
       setBillingName("");
       setBillingAddress("");
       setBillingEmail("");
@@ -306,224 +312,398 @@ export default function InvoicesPage({
                 <p className="text-xs text-muted-foreground">Generate complete tax invoices on-the-fly without registering clients or projects beforehand</p>
               </div>
 
-              <form onSubmit={handleCreateInvoice} className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
-                  {/* Bill To section */}
-                  <div className="space-y-4 border-r border-white/5 pr-0 md:pr-5">
-                    <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5" />
-                      Client (Bill To) Information
-                    </h4>
+              {/* Glowing Wizard Stepper Progress Bar */}
+              <div className="mb-8">
+                <div className="flex justify-between items-center relative max-w-xl mx-auto px-4">
+                  {/* Background Progress line */}
+                  <div className="absolute top-4 left-0 right-0 h-[2px] bg-white/5 z-0" />
+                  {/* Glowing active line */}
+                  <motion.div 
+                    className="absolute top-4 left-0 h-[2px] bg-gradient-to-r from-cyan-400 to-indigo-400 z-0"
+                    animate={{ width: formStep === 1 ? "0%" : formStep === 2 ? "50%" : "100%" }}
+                    transition={{ duration: 0.3 }}
+                  />
 
-                    <div className="space-y-3">
-                      <div className="space-y-1.5">
+                  {/* Step Buttons */}
+                  {[
+                    { step: 1, label: "Client Details", desc: "Credentials" },
+                    { step: 2, label: "Service Pricing", desc: "Calibration" },
+                    { step: 3, label: "Gateway Preview", desc: "Settlement" }
+                  ].map((s) => {
+                    const isActive = formStep >= s.step;
+                    const isCurrent = formStep === s.step;
+                    return (
+                      <button
+                        key={s.step}
+                        type="button"
+                        onClick={() => {
+                          // Validate transitions
+                          if (s.step === 2 && (!billingName || !billingAddress)) {
+                            toast({ title: "Incomplete Client Credentials", description: "Name and address are required.", variant: "destructive" });
+                            return;
+                          }
+                          if (s.step === 3 && (!billingName || !billingAddress || !service || !totalAmount)) {
+                            toast({ title: "Awaiting Service Calibration", description: "Complete Step 1 & 2 details first.", variant: "destructive" });
+                            return;
+                          }
+                          setFormStep(s.step);
+                        }}
+                        className="flex flex-col items-center z-10 relative focus:outline-none select-none cursor-pointer"
+                      >
+                        <motion.div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border transition-all duration-300 ${
+                            isCurrent 
+                              ? "bg-cyan-400 border-cyan-300 text-black shadow-[0_0_15px_rgba(6,182,212,0.5)] scale-110" 
+                              : isActive 
+                                ? "bg-indigo-500/20 border-indigo-400 text-indigo-400" 
+                                : "bg-[#0b0f1e] border-white/10 text-muted-foreground"
+                          }`}
+                        >
+                          {s.step}
+                        </motion.div>
+                        <span className={`text-[9px] font-bold uppercase mt-2 tracking-widest ${isCurrent ? "text-cyan-400" : isActive ? "text-indigo-400" : "text-muted-foreground"}`}>
+                          {s.label}
+                        </span>
+                        <span className="text-[8px] font-mono text-muted-foreground/45 uppercase mt-0.5">
+                          {s.desc}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <form onSubmit={handleCreateInvoice} className="space-y-5">
+                {/* Step 1: Client Credentials */}
+                {formStep === 1 && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -15 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 15 }}
+                    className="space-y-4 text-left min-h-[300px]"
+                  >
+                    <div className="p-4 rounded-xl border border-cyan-500/10 bg-cyan-500/[0.01] backdrop-blur-sm flex items-center gap-3">
+                      <User className="w-5 h-5 text-cyan-400" />
+                      <div>
+                        <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-widest">Step 1: Client Billing Credentials</h4>
+                        <p className="text-3xs text-muted-foreground mt-0.5">Fill out office physical credentials and contacts for the printed invoice Bill-To segment.</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5 col-span-1 md:col-span-2">
                         <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Client Name / Business Name *</label>
                         <Input
                           value={billingName}
                           onChange={e => setBillingName(e.target.value)}
                           placeholder="e.g. Dhaval Koyani / Event Stationery"
                           required
-                          className="bg-white/5 border-white/10 text-xs rounded-xl h-9"
+                          className="bg-white/5 border-white/10 text-xs rounded-xl h-10 text-foreground"
                         />
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="space-y-1.5 col-span-1 md:col-span-2">
                         <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Billing Address *</label>
                         <Input
                           value={billingAddress}
                           onChange={e => setBillingAddress(e.target.value)}
                           placeholder="e.g. Shreeji Complex, Mendarda"
                           required
-                          className="bg-white/5 border-white/10 text-xs rounded-xl h-9"
+                          className="bg-white/5 border-white/10 text-xs rounded-xl h-10 text-foreground"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Email Address</label>
-                          <Input
-                            type="email"
-                            value={billingEmail}
-                            onChange={e => setBillingEmail(e.target.value)}
-                            placeholder="client@mail.com"
-                            className="bg-white/5 border-white/10 text-xs rounded-xl h-9"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Mobile / Whatsapp Number</label>
-                          <Input
-                            type="tel"
-                            value={billingPhone}
-                            onChange={e => setBillingPhone(e.target.value)}
-                            placeholder="+91 XXXXX XXXXX"
-                            className="bg-white/5 border-white/10 text-xs rounded-xl h-9"
-                          />
-                        </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Email Address</label>
+                        <Input
+                          type="email"
+                          value={billingEmail}
+                          onChange={e => setBillingEmail(e.target.value)}
+                          placeholder="client@mail.com"
+                          className="bg-white/5 border-white/10 text-xs rounded-xl h-10 text-foreground"
+                        />
                       </div>
                       <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Mobile / Whatsapp Number</label>
+                        <Input
+                          type="tel"
+                          value={billingPhone}
+                          onChange={e => setBillingPhone(e.target.value)}
+                          placeholder="+91 XXXXX XXXXX"
+                          className="bg-white/5 border-white/10 text-xs rounded-xl h-10 text-foreground"
+                        />
+                      </div>
+                      <div className="space-y-1.5 col-span-1 md:col-span-2">
                         <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">GSTIN (Optional)</label>
                         <Input
                           value={billingGst}
                           onChange={e => setBillingGst(e.target.value)}
                           placeholder="24AAAAA0000A1Z5"
-                          className="bg-white/5 border-white/10 text-xs rounded-xl h-9"
+                          className="bg-white/5 border-white/10 text-xs rounded-xl h-10 text-foreground"
                         />
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
+                )}
 
-                  {/* Pricing and Details */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                      <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-1.5">
-                        <Coins className="w-3.5 h-3.5" />
-                        Service & pricing
-                      </h4>
-                      <button
-                        type="button"
-                        onClick={() => setIsServiceExpanded(!isServiceExpanded)}
-                        className="text-[9px] font-mono font-bold text-cyan-400 hover:text-cyan-300 border border-cyan-500/20 bg-cyan-500/5 px-2.5 py-1 rounded-lg transition-all uppercase tracking-wider flex items-center gap-1 select-none cursor-pointer"
-                      >
-                        {isServiceExpanded ? "Collapse Details 🔼" : "Calibrate Pricing 🔽"}
-                      </button>
+                {/* Step 2: Service Details & Calculation */}
+                {formStep === 2 && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -15 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 15 }}
+                    className="space-y-4 text-left min-h-[300px]"
+                  >
+                    <div className="p-4 rounded-xl border border-cyan-500/10 bg-cyan-500/[0.01] backdrop-blur-sm flex items-center gap-3">
+                      <Coins className="w-5 h-5 text-cyan-400" />
+                      <div>
+                        <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-widest">Step 2: Service & Price Calibration</h4>
+                        <p className="text-3xs text-muted-foreground mt-0.5">Define service catalog, total checkout amount, and dynamic pricing metrics.</p>
+                      </div>
                     </div>
 
-                    <div className="space-y-4">
-                      {/* Core required fields (Always Visible) */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold text-left block">Service Description *</label>
-                          <Input
-                            value={service}
-                            onChange={e => setService(e.target.value)}
-                            placeholder="e.g. Brand Identity (Logo) Design"
-                            required
-                            className="bg-white/5 border-white/10 text-xs rounded-xl h-9"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold text-left block">Total Invoice Amount (₹) *</label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Service Description *</label>
+                        <Input
+                          value={service}
+                          onChange={e => setService(e.target.value)}
+                          placeholder="e.g. Brand Identity (Logo) Design"
+                          required
+                          className="bg-white/5 border-white/10 text-xs rounded-xl h-10 text-foreground"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Total Invoice Amount (₹) *</label>
+                        <Input
+                          type="number"
+                          placeholder="Enter total quote"
+                          value={totalAmount}
+                          onChange={e => {
+                            setTotalAmount(e.target.value);
+                            setLastCalculatedBy("total");
+                          }}
+                          required
+                          className="bg-white/5 border-white/10 text-xs rounded-xl h-10 text-foreground"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Quantity *</label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={qty}
+                          onChange={e => setQty(Number(e.target.value) || 1)}
+                          required
+                          className="bg-white/5 border-white/10 text-xs rounded-xl h-10 text-foreground"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Rate per Unit (₹)</label>
+                        <Input
+                          type="number"
+                          placeholder="Calculated per QTY"
+                          value={rate}
+                          onChange={e => {
+                            setRate(e.target.value);
+                            setLastCalculatedBy("rate");
+                          }}
+                          className="bg-white/5 border-white/10 text-xs rounded-xl h-10 text-foreground"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5 col-span-1 md:col-span-2">
+                        <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Discount</label>
+                        <div className="flex gap-2">
                           <Input
                             type="number"
-                            placeholder="Enter total quote"
-                            value={totalAmount}
-                            onChange={e => {
-                              setTotalAmount(e.target.value);
-                              setLastCalculatedBy("total");
-                            }}
-                            required
-                            className="bg-white/5 border-white/10 text-xs rounded-xl h-9"
+                            placeholder="0"
+                            value={discount}
+                            onChange={e => setDiscount(e.target.value)}
+                            className="bg-white/5 border-white/10 text-xs rounded-xl h-10 w-3/4 text-foreground"
                           />
+                          <select
+                            value={discountType}
+                            onChange={e => setDiscountType(e.target.value as "rs" | "%")}
+                            className="bg-[#050508] border border-white/10 text-xs rounded-xl h-10 w-1/4 outline-none text-foreground px-3 font-semibold"
+                          >
+                            <option value="rs">₹</option>
+                            <option value="%">%</option>
+                          </select>
                         </div>
                       </div>
 
-                      {/* Advanced Calibration Fields (Collapsible) */}
-                      <AnimatePresence initial={true}>
-                        {isServiceExpanded && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.25, ease: "easeInOut" }}
-                            className="space-y-4 overflow-hidden pt-1"
+                      {/* Ask user to confirm if total amount includes discount */}
+                      {parseFloat(discount) > 0 && lastCalculatedBy === "total" && (
+                        <div className="space-y-1.5 col-span-1 md:col-span-2 animate-fadeSlideUp">
+                          <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Discount Calibration</label>
+                          <select
+                            value={includesDiscount ? "yes" : "no"}
+                            onChange={e => setIncludesDiscount(e.target.value === "yes")}
+                            className="w-full h-10 px-3 bg-cyan-955/20 border border-cyan-500/30 rounded-xl text-xs text-cyan-400 outline-none"
                           >
-                            <div className="grid grid-cols-3 gap-3 border-t border-white/5 pt-4">
-                              <div className="space-y-1.5">
-                                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold text-left block">Quantity *</label>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  value={qty}
-                                  onChange={e => setQty(Number(e.target.value) || 1)}
-                                  required
-                                  className="bg-white/5 border-white/10 text-xs rounded-xl h-9"
-                                />
-                              </div>
-
-                              <div className="space-y-1.5">
-                                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold text-left block">Rate per Unit (₹)</label>
-                                <Input
-                                  type="number"
-                                  placeholder="Calculated per QTY"
-                                  value={rate}
-                                  onChange={e => {
-                                    setRate(e.target.value);
-                                    setLastCalculatedBy("rate");
-                                  }}
-                                  className="bg-white/5 border-white/10 text-xs rounded-xl h-9"
-                                />
-                              </div>
-
-                              <div className="space-y-1.5">
-                                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold text-left block">Discount</label>
-                                <div className="flex gap-1">
-                                  <Input
-                                    type="number"
-                                    placeholder="0"
-                                    value={discount}
-                                    onChange={e => setDiscount(e.target.value)}
-                                    className="bg-white/5 border-white/10 text-xs rounded-xl h-9 w-2/3"
-                                  />
-                                  <select
-                                    value={discountType}
-                                    onChange={e => setDiscountType(e.target.value as "rs" | "%")}
-                                    className="bg-[#050508] border border-white/10 text-xs rounded-xl h-9 w-1/3 outline-none text-foreground"
-                                  >
-                                    <option value="rs">₹</option>
-                                    <option value="%">%</option>
-                                  </select>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Ask user to confirm if total amount includes discount */}
-                            {parseFloat(discount) > 0 && lastCalculatedBy === "total" && (
-                              <div className="space-y-1.5 animate-fadeSlideUp">
-                                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold text-left block">Discount Calibration</label>
-                                <select
-                                  value={includesDiscount ? "yes" : "no"}
-                                  onChange={e => setIncludesDiscount(e.target.value === "yes")}
-                                  className="w-full h-9 px-3 bg-cyan-950/20 border border-cyan-500/30 rounded-xl text-2xs text-cyan-400 outline-none"
-                                >
-                                  <option value="yes">Total enters is INCLUDING discount</option>
-                                  <option value="no">Total enters is EXCLUDING discount</option>
-                                </select>
-                              </div>
-                            )}
-
-                            {/* Log to Cashbook checkbox */}
-                            <div className="flex items-center gap-2 pt-2 select-none border-t border-white/5">
-                              <input
-                                type="checkbox"
-                                id="logToCashbook"
-                                checked={logToCashbook}
-                                onChange={e => setLogToCashbook(e.target.checked)}
-                                className="rounded accent-cyan-400 w-4 h-4 cursor-pointer"
-                              />
-                              <label htmlFor="logToCashbook" className="text-2xs text-muted-foreground cursor-pointer text-left">
-                                Automatically log this invoice amount as UPI Service Income in Cashbook?
-                              </label>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+                            <option value="yes">Total entered is INCLUDING discount</option>
+                            <option value="no">Total entered is EXCLUDING discount</option>
+                          </select>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </div>
+                  </motion.div>
+                )}
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setIsWorkspaceOpen(false)}
-                    className="border border-white/5 text-muted-foreground hover:bg-white/5 text-xs rounded-xl px-5"
+                {/* Step 3: Gateway & Settlement Preview */}
+                {formStep === 3 && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -15 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 15 }}
+                    className="space-y-4 text-left min-h-[300px]"
                   >
-                    CANCEL
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-600 hover:to-indigo-600 text-black font-extrabold text-xs rounded-xl px-6 py-5 shadow-lg shadow-cyan-500/10"
-                  >
-                    PREVIEW & SAVE INVOICE
-                  </Button>
+                    <div className="p-4 rounded-xl border border-indigo-500/10 bg-indigo-500/[0.01] backdrop-blur-sm flex items-center gap-3">
+                      <ShieldCheck className="w-5 h-5 text-indigo-400" />
+                      <div>
+                        <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Step 3: Settlement Gateway Review</h4>
+                        <p className="text-3xs text-muted-foreground mt-0.5">Verify payee records and simulated QR checkout endpoints before final document ignition.</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+                      {/* Left: Summary card */}
+                      <div className="rounded-xl border border-white/5 bg-white/[0.01] p-5 space-y-3 font-mono text-[10px] text-white/70">
+                        <h4 className="font-bold text-xs uppercase tracking-wider text-indigo-400 font-sans mb-1">Billing Summary</h4>
+                        
+                        <div className="flex justify-between border-b border-white/5 pb-2">
+                          <span className="text-white/40">Payee Client:</span>
+                          <span className="font-bold text-white uppercase">{billingName}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-white/5 pb-2">
+                          <span className="text-white/40">Address Reference:</span>
+                          <span className="font-bold text-white truncate max-w-[200px]" title={billingAddress}>{billingAddress}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-white/5 pb-2">
+                          <span className="text-white/40">Service Catalog:</span>
+                          <span className="font-bold text-white truncate max-w-[200px]" title={service}>{service}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-white/5 pb-2">
+                          <span className="text-white/40">Quantity & Rate:</span>
+                          <span className="font-bold text-white">{qty} × ₹{Number(rate || (parseFloat(totalAmount) / qty)).toFixed(2)}</span>
+                        </div>
+                        
+                        {parseFloat(discount) > 0 && (
+                          <div className="flex justify-between border-b border-white/5 pb-2 text-red-400">
+                            <span>Discount Calibrated:</span>
+                            <span>- {discountType === "rs" ? `₹${parseFloat(discount).toFixed(2)}` : `${discount}%`}</span>
+                          </div>
+                        )}
+
+                        <div className="flex justify-between text-emerald-400 text-xs font-extrabold pt-2 mt-1 border-t border-indigo-500/20">
+                          <span className="font-sans font-bold">GRAND TOTAL DUE:</span>
+                          <span>₹{parseFloat(totalAmount).toFixed(2)}</span>
+                        </div>
+
+                        {/* Log to Cashbook checkbox */}
+                        <div className="flex items-center gap-2.5 pt-4 select-none border-t border-white/5 mt-4">
+                          <input
+                            type="checkbox"
+                            id="logToCashbook"
+                            checked={logToCashbook}
+                            onChange={e => setLogToCashbook(e.target.checked)}
+                            className="rounded accent-cyan-400 w-4 h-4 cursor-pointer"
+                          />
+                          <label htmlFor="logToCashbook" className="text-[9px] text-muted-foreground cursor-pointer text-left leading-normal">
+                            Log ₹{parseFloat(totalAmount).toFixed(2)} as UPI income in global Cashbook?
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Right: UPI QR Simulation Card */}
+                      <div className="rounded-xl border border-white/5 bg-white/[0.01] p-5 flex flex-col items-center justify-center gap-4 relative">
+                        <div className="absolute top-3 right-3 flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[8px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                          <span>DOCK QR</span>
+                        </div>
+
+                        <div className="w-32 h-32 bg-white p-2 rounded-xl flex items-center justify-center shadow-inner relative group overflow-hidden">
+                          {bankingDetails?.upiId ? (
+                            <img 
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=${bankingDetails.upiId}&pn=${bankingDetails.accountName}&am=${parseFloat(totalAmount)}&cu=INR`)}`}
+                              alt="Settlement UPI QR Checkout" 
+                              className="w-full h-full object-contain"
+                            />
+                          ) : (
+                            <div className="text-center p-2 text-muted-foreground/30">
+                              🌐
+                              <span className="text-[8px] uppercase font-mono block mt-1">Awaiting VPA...</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="text-center space-y-1 w-full">
+                          <div className="text-[9px] uppercase tracking-widest text-muted-foreground/60 font-semibold font-mono">Invoice Settlement Target</div>
+                          <div className="text-xs font-bold text-white truncate max-w-[220px] mx-auto font-sans">{bankingDetails?.accountName || "AWAITING CONFIG"}</div>
+                          <div className="text-[9px] font-mono text-cyan-400 truncate max-w-[220px] mx-auto">{bankingDetails?.upiId || "VPA uncalibrated"}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                <div className="flex justify-between items-center pt-5 border-t border-white/5 mt-6">
+                  {/* Left Action Button */}
+                  <div>
+                    {formStep > 1 ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setFormStep(prev => prev - 1)}
+                        className="border border-white/10 text-white hover:bg-white/5 text-xs rounded-xl px-5"
+                      >
+                        BACK
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setIsWorkspaceOpen(false)}
+                        className="border border-white/5 text-muted-foreground hover:bg-white/5 text-xs rounded-xl px-5"
+                      >
+                        CANCEL
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Right Action Button */}
+                  <div>
+                    {formStep < 3 ? (
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          if (formStep === 1) {
+                            if (!billingName || !billingAddress) {
+                              toast({ title: "Missing parameters", description: "Name and physical address are required.", variant: "destructive" });
+                              return;
+                            }
+                            setFormStep(2);
+                          } else if (formStep === 2) {
+                            if (!service || !totalAmount) {
+                              toast({ title: "Missing parameters", description: "Service catalog description and amount are required.", variant: "destructive" });
+                              return;
+                            }
+                            setFormStep(3);
+                          }
+                        }}
+                        className="bg-cyan-500 hover:bg-cyan-600 text-black font-extrabold text-xs rounded-xl px-6 py-2 shadow-lg shadow-cyan-500/10"
+                      >
+                        NEXT STEP
+                      </Button>
+                    ) : (
+                      <Button
+                        type="submit"
+                        className="bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-600 hover:to-indigo-600 text-black font-extrabold text-xs rounded-xl px-8 py-5 shadow-lg shadow-cyan-500/15"
+                      >
+                        IGNITE TAX INVOICE ⚡
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </form>
             </motion.div>
