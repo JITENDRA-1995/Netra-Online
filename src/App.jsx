@@ -4292,10 +4292,10 @@ function App() {
                                 src="/logo.png"
                                 alt="Netra Logo"
                                 style={{
-                                  height: '75px',
+                                  height: '95px',
                                   width: 'auto',
                                   objectFit: 'contain',
-                                  filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.35))',
+                                  filter: 'drop-shadow(0 0 6px rgba(255,255,255,0.4))',
                                   flexShrink: 0
                                 }}
                               />
@@ -4424,18 +4424,47 @@ function App() {
                                       <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>-₹{formatCurrencyValue(invoiceProject.discount)}</span>
                                     </div>
                                   )}
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.8rem' }}>
-                                    <span style={{ color: '#666' }}>ADVANCE PAID</span>
-                                    <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>-₹{formatCurrencyValue(invoiceProject.advanceAmount)}</span>
-                                  </div>
- 
-                                  <div style={{
-                                    background: '#3f51b5', padding: '10px 15px', color: '#fff', borderRadius: '6px',
-                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                                  }}>
-                                    <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>GRAND TOTAL</span>
-                                    <span style={{ fontSize: '1.25rem', fontWeight: '900' }}>₹{formatCurrencyValue(parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0))}</span>
-                                  </div>
+
+                                  {(() => {
+                                    const isCompleted = (invoiceProject.status || '').toLowerCase() === 'completed';
+                                    const subtotal = parseFloat(invoiceProject.quote) || 0;
+                                    const discount = parseFloat(invoiceProject.discount) || 0;
+                                    const advance = parseFloat(invoiceProject.advanceAmount) || 0;
+                                    const grandTotal = subtotal - discount;
+                                    const remaining = grandTotal - advance;
+
+                                    if (isCompleted) {
+                                      // Completed: show clean Grand Total only
+                                      return (
+                                        <div style={{
+                                          background: '#1b5e20', padding: '10px 15px', color: '#fff', borderRadius: '6px',
+                                          display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px'
+                                        }}>
+                                          <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>GRAND TOTAL</span>
+                                          <span style={{ fontSize: '1.25rem', fontWeight: '900' }}>₹{formatCurrencyValue(grandTotal)}</span>
+                                        </div>
+                                      );
+                                    } else {
+                                      // In Progress: show advance deduction + Remaining Due
+                                      return (
+                                        <>
+                                          {advance > 0 && (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.8rem' }}>
+                                              <span style={{ color: '#666' }}>ADVANCE PAID</span>
+                                              <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>-₹{formatCurrencyValue(advance)}</span>
+                                            </div>
+                                          )}
+                                          <div style={{
+                                            background: '#3f51b5', padding: '10px 15px', color: '#fff', borderRadius: '6px',
+                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px'
+                                          }}>
+                                            <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>REMAINING DUE</span>
+                                            <span style={{ fontSize: '1.25rem', fontWeight: '900' }}>₹{formatCurrencyValue(advance > 0 ? remaining : grandTotal)}</span>
+                                          </div>
+                                        </>
+                                      );
+                                    }
+                                  })()}
                                 </div>
                               </div>
 
@@ -4443,7 +4472,14 @@ function App() {
                                 <div style={{ background: '#fcfcfc', border: '1px solid #f0f0f0', borderLeft: '3px solid #d32f2f', padding: '6px 12px' }}>
                                   <label style={{ fontSize: '0.5rem', color: '#888', fontWeight: '900', display: 'block' }}>AMOUNT IN WORDS</label>
                                   <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 'bold' }}>
-                                    {amountInWords(parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0))}
+                                    {(() => {
+                                      const isCompleted = (invoiceProject.status || '').toLowerCase() === 'completed';
+                                      const subtotal = parseFloat(invoiceProject.quote) || 0;
+                                      const discount = parseFloat(invoiceProject.discount) || 0;
+                                      const advance = parseFloat(invoiceProject.advanceAmount) || 0;
+                                      const grandTotal = subtotal - discount;
+                                      return amountInWords(isCompleted ? grandTotal : (advance > 0 ? grandTotal - advance : grandTotal));
+                                    })()}
                                   </p>
                                 </div>
                               </div>
