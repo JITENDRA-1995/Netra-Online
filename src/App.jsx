@@ -1865,7 +1865,7 @@ function App() {
             status: newStatus,
             activityLog: [
               { action: actionMsg, time: new Date().toLocaleTimeString() },
-              ...p.activityLog
+              ...(p.activityLog || [])
             ]
           };
         }
@@ -1921,7 +1921,7 @@ function App() {
             status: newStatus,
             activityLog: [
               { action: actionMsg, time: new Date().toLocaleTimeString() },
-              ...p.activityLog
+              ...(p.activityLog || [])
             ]
           };
         }

@@ -1,4 +1,27 @@
 import { useState, useEffect, useMemo } from "react";
+import { motion } from "framer-motion";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
+import {
+  TrendingUp,
+  TrendingDown,
+  Briefcase,
+  Users,
+  FileText,
+  Zap,
+  AlertTriangle,
+  Clock,
+} from "lucide-react";
 
 const CATEGORY_COLORS: Record<string, string> = {
   branding: "#00d4ff",
@@ -101,7 +124,8 @@ export default function Dashboard({
   const overdueInvoicesCount = useMemo(() => {
     return projects.filter(p => {
       if (p.status === 'Completed' || p.status === 'Closed' || p.status === 'Cancelled' || !p.deadline) return false;
-      return new Date(p.deadline) < new Date();
+      const parsedDate = new Date(p.deadline);
+      return !isNaN(parsedDate.getTime()) && parsedDate < new Date();
     }).length;
   }, [projects]);
 
@@ -120,9 +144,10 @@ export default function Dashboard({
     }
 
     let hasData = false;
-    cashbookEntries.forEach(entry => {
-      if (!entry.date) return;
+    (cashbookEntries || []).forEach(entry => {
+      if (!entry || !entry.date) return;
       const entryDate = new Date(entry.date);
+      if (isNaN(entryDate.getTime())) return;
       const key = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}`;
       const mBucket = months.find(m => m.dateKey === key);
       if (mBucket) {
@@ -180,6 +205,7 @@ export default function Dashboard({
   const recentActivity = useMemo(() => {
     const list = projects.flatMap(p => 
       (p.activityLog || []).map((log, idx) => {
+        if (!log) return null;
         const rawTime = log.time || '';
         let actDate = new Date(p.createdAt || Date.now());
         if (rawTime.includes(':')) {
@@ -187,12 +213,12 @@ export default function Dashboard({
           actDate.setHours(parseInt(hours) || 12, parseInt(minutes) || 0);
         }
         return {
-          id: `${p.id}-${idx}-${log.action}`,
-          description: `${p.service || p.name}: ${log.action}`,
+          id: `${p.id}-${idx}-${log.action || ''}`,
+          description: `${p.service || p.name || 'Project'}: ${log.action || ''}`,
           createdAt: actDate.toISOString(),
-          type: log.action.toLowerCase().includes('ignite') ? 'project_created' : 'invoice_sent'
+          type: (log.action || '').toLowerCase().includes('ignite') ? 'project_created' : 'invoice_sent'
         };
-      })
+      }).filter(Boolean)
     );
 
     return list
@@ -213,7 +239,11 @@ export default function Dashboard({
       label: "Active Projects",
       value: activeProjects,
       icon: Briefcase,
-      trend: projects.filter(p => p.status === 'Ongoing' && new Date(p.createdAt).getMonth() === new Date().getMonth()).length,
+      trend: projects.filter(p => {
+        if (p.status !== 'Ongoing') return false;
+        const pDate = new Date(p.createdAt || Date.now());
+        return !isNaN(pDate.getTime()) && pDate.getMonth() === new Date().getMonth();
+      }).length,
       trendLabel: "this month",
       color: "#8b5cf6",
     },
