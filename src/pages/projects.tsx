@@ -87,6 +87,28 @@ export default function Projects({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<any | null>(null);
 
+  // Layered filter states
+  const [filterClient, setFilterClient] = useState("all");
+  const [filterMonth, setFilterMonth] = useState("all");
+  const [filterStartDate, setFilterStartDate] = useState("");
+  const [filterEndDate, setFilterEndDate] = useState("");
+
+  // Extract unique client visionaries
+  const uniqueClients = Array.from(
+    new Set(projects.map((p) => p.clientName || p.client?.name || p.name || "").filter(Boolean))
+  );
+
+  // Extract unique project creation months
+  const uniqueMonths = Array.from(
+    new Set(
+      projects.map((p) => {
+        if (!p.createdAt) return "";
+        const date = new Date(p.createdAt);
+        return date.toLocaleString("en-IN", { month: "long", year: "numeric" });
+      }).filter(Boolean)
+    )
+  );
+
   // Local React State Form Fields
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
@@ -105,16 +127,46 @@ export default function Projects({
 
   const filtered = projects.filter((p) => {
     const serviceName = p.service || p.name || "";
-    const clientName = p.clientName || p.name || "";
+    const clientName = p.clientName || p.client?.name || p.name || "";
+    
+    // 1. Search filter
     const matchSearch = 
       serviceName.toLowerCase().includes(search.toLowerCase()) ||
       clientName.toLowerCase().includes(search.toLowerCase());
     
+    // 2. Status filter
     const statusVal = (p.status || "active").toLowerCase().replace(" ", "_");
     const normalizedStatus = statusVal === "ongoing" ? "active" : statusVal;
     const matchStatus = filterStatus === "all" || normalizedStatus === filterStatus;
+
+    // 3. Client visionary filter
+    const matchClient = filterClient === "all" || clientName.trim().toLowerCase() === filterClient.trim().toLowerCase();
+
+    // 4. Month filter
+    let matchMonth = true;
+    if (filterMonth !== "all" && p.createdAt) {
+      const date = new Date(p.createdAt);
+      const mStr = date.toLocaleString("en-IN", { month: "long", year: "numeric" });
+      matchMonth = mStr === filterMonth;
+    }
+
+    // 5. Custom Date Range filter
+    let matchDateRange = true;
+    if (p.createdAt) {
+      const projectTime = new Date(p.createdAt).getTime();
+      if (filterStartDate) {
+        const start = new Date(filterStartDate);
+        start.setHours(0, 0, 0, 0);
+        if (projectTime < start.getTime()) matchDateRange = false;
+      }
+      if (filterEndDate) {
+        const end = new Date(filterEndDate);
+        end.setHours(23, 59, 59, 999);
+        if (projectTime > end.getTime()) matchDateRange = false;
+      }
+    }
     
-    return matchSearch && matchStatus;
+    return matchSearch && matchStatus && matchClient && matchMonth && matchDateRange;
   });
 
   function openEdit(project: any) {
@@ -331,6 +383,80 @@ export default function Projects({
             data-testid="input-search-projects"
           />
         </div>
+      </motion.div>
+
+      {/* Multi-Layer Layered Filter Bar */}
+      <motion.div variants={itemVariants} className="flex gap-4 flex-wrap items-center bg-[#0c101d]/40 backdrop-blur-sm border border-white/5 p-4 rounded-2xl w-full">
+        {/* Client Selector */}
+        <div className="flex flex-col gap-1.5 min-w-[180px] flex-1">
+          <label className="text-3xs font-bold text-muted-foreground uppercase tracking-widest">Client Name</label>
+          <select
+            className="h-9 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer w-full uppercase"
+            value={filterClient}
+            onChange={(e) => setFilterClient(e.target.value)}
+          >
+            <option value="all">ALL CLIENTS</option>
+            {uniqueClients.map(c => (
+              <option key={c} value={c}>{c.toUpperCase()}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Month Selector */}
+        <div className="flex flex-col gap-1.5 min-w-[150px] flex-1">
+          <label className="text-3xs font-bold text-muted-foreground uppercase tracking-widest">Month</label>
+          <select
+            className="h-9 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer w-full uppercase"
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(e.target.value)}
+          >
+            <option value="all">ALL MONTHS</option>
+            {uniqueMonths.map(m => (
+              <option key={m} value={m}>{m.toUpperCase()}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Start Date */}
+        <div className="flex flex-col gap-1.5 min-w-[130px] flex-1">
+          <label className="text-3xs font-bold text-muted-foreground uppercase tracking-widest">Start Date</label>
+          <input
+            type="date"
+            className="h-9 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer w-full"
+            value={filterStartDate}
+            onChange={(e) => setFilterStartDate(e.target.value)}
+            style={{ colorScheme: 'dark' }}
+          />
+        </div>
+
+        {/* End Date */}
+        <div className="flex flex-col gap-1.5 min-w-[130px] flex-1">
+          <label className="text-3xs font-bold text-muted-foreground uppercase tracking-widest">End Date</label>
+          <input
+            type="date"
+            className="h-9 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer w-full"
+            value={filterEndDate}
+            onChange={(e) => setFilterEndDate(e.target.value)}
+            style={{ colorScheme: 'dark' }}
+          />
+        </div>
+
+        {/* Reset Button */}
+        {(filterClient !== "all" || filterMonth !== "all" || filterStartDate !== "" || filterEndDate !== "") && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-9 px-4 text-2xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 rounded-xl self-end"
+            onClick={() => {
+              setFilterClient("all");
+              setFilterMonth("all");
+              setFilterStartDate("");
+              setFilterEndDate("");
+            }}
+          >
+            RESET
+          </Button>
+        )}
       </motion.div>
 
       {/* Grid */}

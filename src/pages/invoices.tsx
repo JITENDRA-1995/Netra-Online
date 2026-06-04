@@ -137,6 +137,29 @@ export default function InvoicesPage({
     }
   }, [qty, totalAmount, discount, discountType, includesDiscount, lastCalculatedBy]);
 
+  // Layered filter states
+  const [filterClient, setFilterClient] = useState("all");
+  const [filterMonth, setFilterMonth] = useState("all");
+  const [filterStartDate, setFilterStartDate] = useState("");
+  const [filterEndDate, setFilterEndDate] = useState("");
+
+  // Extract unique clients from current ledger list
+  const uniqueClients = Array.from(
+    new Set(invoices.map((inv) => inv.clientName || "").filter(Boolean))
+  );
+
+  // Extract unique months from current ledger list
+  const uniqueMonths = Array.from(
+    new Set(
+      invoices.map((inv) => {
+        if (!inv.issueDate) return "";
+        const date = new Date(inv.issueDate);
+        if (isNaN(date.getTime())) return "";
+        return date.toLocaleString("en-IN", { month: "long", year: "numeric" });
+      }).filter(Boolean)
+    )
+  );
+
   // Get up-to-date project info to keep status in sync dynamically
   const getUpToDateInvoice = (inv: any) => {
     if (!inv.rawProject || !inv.rawProject.id) return inv;
@@ -151,20 +174,58 @@ export default function InvoicesPage({
   const upToDateInvoices = invoices.map(getUpToDateInvoice);
 
   const filteredInvoices = upToDateInvoices.filter(inv => {
+    // 1. Search filter
     const matchesSearch = inv.clientName.toLowerCase().includes(search.toLowerCase()) ||
       (inv.projectService && inv.projectService.toLowerCase().includes(search.toLowerCase())) ||
       inv.invoiceNo.toLowerCase().includes(search.toLowerCase());
 
     if (!matchesSearch) return false;
 
-    // A draft invoice is linked to a project and that project status is NOT Completed
+    // 2. Tab filter (Saved vs Draft)
     const isDraft = inv.rawProject && inv.rawProject.id && inv.rawProject.status && inv.rawProject.status !== 'Completed';
+    const matchesTab = invoiceTab === "DRAFT" ? isDraft : !isDraft;
+    if (!matchesTab) return false;
 
-    if (invoiceTab === "DRAFT") {
-      return isDraft;
-    } else {
-      return !isDraft;
+    // 3. Client name filter
+    const matchesClient = filterClient === "all" || inv.clientName.trim().toLowerCase() === filterClient.trim().toLowerCase();
+    if (!matchesClient) return false;
+
+    // 4. Month filter
+    let matchesMonth = true;
+    if (filterMonth !== "all" && inv.issueDate) {
+      const date = new Date(inv.issueDate);
+      if (!isNaN(date.getTime())) {
+        const mStr = date.toLocaleString("en-IN", { month: "long", year: "numeric" });
+        matchesMonth = mStr === filterMonth;
+      } else {
+        matchesMonth = false;
+      }
     }
+    if (!matchesMonth) return false;
+
+    // 5. Custom Date Range filter
+    let matchesDateRange = true;
+    if (inv.issueDate) {
+      const date = new Date(inv.issueDate);
+      if (!isNaN(date.getTime())) {
+        const time = date.getTime();
+        if (filterStartDate) {
+          const start = new Date(filterStartDate);
+          start.setHours(0, 0, 0, 0);
+          if (time < start.getTime()) matchesDateRange = false;
+        }
+        if (filterEndDate) {
+          const end = new Date(filterEndDate);
+          end.setHours(23, 59, 59, 999);
+          if (time > end.getTime()) matchesDateRange = false;
+        }
+      } else {
+        matchesDateRange = false;
+      }
+    }
+    if (!matchesDateRange) return false;
+
+    return true;
   });
 
   const getInvoiceNumber = (date: Date, serial = 1) => {
@@ -899,6 +960,80 @@ export default function InvoicesPage({
             )}
           </div>
         </div>
+
+        {/* Multi-Layer Layered Filter Bar */}
+        <motion.div variants={itemVariants} className="flex gap-4 flex-wrap items-center bg-[#0c101d]/40 backdrop-blur-sm border border-white/5 p-4 rounded-2xl w-full">
+          {/* Client Selector */}
+          <div className="flex flex-col gap-1.5 min-w-[180px] flex-1">
+            <label className="text-3xs font-bold text-muted-foreground uppercase tracking-widest">Client Name</label>
+            <select
+              className="h-9 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer w-full uppercase"
+              value={filterClient}
+              onChange={(e) => setFilterClient(e.target.value)}
+            >
+              <option value="all">ALL CLIENTS</option>
+              {uniqueClients.map(c => (
+                <option key={c} value={c}>{c.toUpperCase()}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Month Selector */}
+          <div className="flex flex-col gap-1.5 min-w-[150px] flex-1">
+            <label className="text-3xs font-bold text-muted-foreground uppercase tracking-widest">Month</label>
+            <select
+              className="h-9 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer w-full uppercase"
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+            >
+              <option value="all">ALL MONTHS</option>
+              {uniqueMonths.map(m => (
+                <option key={m} value={m}>{m.toUpperCase()}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Start Date */}
+          <div className="flex flex-col gap-1.5 min-w-[130px] flex-1">
+            <label className="text-3xs font-bold text-muted-foreground uppercase tracking-widest">Start Date</label>
+            <input
+              type="date"
+              className="h-9 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer w-full"
+              value={filterStartDate}
+              onChange={(e) => setFilterStartDate(e.target.value)}
+              style={{ colorScheme: 'dark' }}
+            />
+          </div>
+
+          {/* End Date */}
+          <div className="flex flex-col gap-1.5 min-w-[130px] flex-1">
+            <label className="text-3xs font-bold text-muted-foreground uppercase tracking-widest">End Date</label>
+            <input
+              type="date"
+              className="h-9 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer w-full"
+              value={filterEndDate}
+              onChange={(e) => setFilterEndDate(e.target.value)}
+              style={{ colorScheme: 'dark' }}
+            />
+          </div>
+
+          {/* Reset Button */}
+          {(filterClient !== "all" || filterMonth !== "all" || filterStartDate !== "" || filterEndDate !== "") && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-9 px-4 text-2xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 rounded-xl self-end"
+              onClick={() => {
+                setFilterClient("all");
+                setFilterMonth("all");
+                setFilterStartDate("");
+                setFilterEndDate("");
+              }}
+            >
+              RESET
+            </Button>
+          )}
+        </motion.div>
 
         <div className="overflow-x-auto border border-white/5 rounded-xl">
           <table className="w-full text-sm text-left border-collapse">
