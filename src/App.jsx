@@ -1957,8 +1957,8 @@ function App() {
     e.preventDefault();
     const form = e.target;
     const formData = new FormData(form);
-    const serviceId = formData.get('service');
-    const serviceName = services.find(s => s.id === parseInt(serviceId))?.title || "Custom Service";
+    const serviceVal = formData.get('service');
+    const serviceName = serviceVal || "Custom Service";
 
     const btn = form.querySelector('.ignite-submit-btn');
     btn.innerText = "IGNITING...";
@@ -2141,8 +2141,8 @@ function App() {
   const handleEditProject = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    const serviceId = formData.get('service');
-    const serviceName = services.find(s => s.id === parseInt(serviceId))?.title || "Custom Service";
+    const serviceVal = formData.get('service');
+    const serviceName = serviceVal || "Custom Service";
 
     const quoteVal = parseInt(formData.get('quote')) || 0;
     const discountVal = parseInt(formData.get('discount')) || 0;
@@ -2277,63 +2277,53 @@ function App() {
     }));
   };
 
-  const handleUpdateProjectStatusHandy = async (projectId, newPaymentStatus, newProjectStatus) => {
+  const handleUpdateProjectStatusHandy = async (projectId, newProjectStatus) => {
     const project = ignitionQueue.find(p => p.id === projectId);
     if (!project) return;
 
     const baseQuote = parseFloat(project.quote) || 0;
     const discountVal = parseFloat(project.discount) || 0;
     const finalQuote = baseQuote - discountVal;
-    const advanceAmt = parseFloat(project.advanceAmount) || 0;
+    const adv = parseFloat(project.advanceAmount) || 0;
 
     let updatedFields = {
-      paymentStatus: newPaymentStatus || project.paymentStatus,
-      status: newProjectStatus || project.status,
-      stage: project.stage
+      status: newProjectStatus,
+      stage: project.stage,
+      progress: project.progress,
+      paymentStatus: project.paymentStatus
     };
 
-    if (newPaymentStatus === 'paid') {
-      updatedFields.status = 'Completed';
+    if (newProjectStatus === 'Completed') {
       updatedFields.stage = 4;
-      
-      // Log to cashbook if not exists
-      const remainingAmt = finalQuote - (project.paymentStatus === 'part' ? advanceAmt : 0);
-      if (remainingAmt > 0) {
-        const exists = cashbookEntries.some(entry => entry.projectId === project.id && entry.desc.startsWith("Final Payment:"));
-        if (!exists) {
-          const newEntry = {
-            id: Date.now(),
-            projectId: project.id,
-            date: new Date().toISOString().split('T')[0],
-            desc: `Final Payment: ${project.service || project.name} - ${project.name}`,
-            amount: remainingAmt,
-            type: "INCOME",
-            mode: "UPI",
-            category: "Service"
-          };
-          setCashbookEntries(prev => [newEntry, ...prev]);
-        }
-      }
-    } else if (newPaymentStatus === 'unpaid') {
-      // Revert paymentStatus to unpaid, reset stage and status to Active
-      updatedFields.status = newProjectStatus || 'Active';
-      updatedFields.stage = 1;
-      // Remove any cashbook entries associated with this project
-      setCashbookEntries(prev => prev.filter(entry => entry.projectId !== project.id));
-    }
+      updatedFields.progress = 100;
+      updatedFields.paymentStatus = 'paid';
 
-    if (newProjectStatus === 'Cancelled') {
-      updatedFields.status = 'Cancelled';
+      const remainingAmt = finalQuote - adv;
+
+      setCustomPaymentPrompt({
+        p: { ...project, ...updatedFields },
+        finalQuote: finalQuote,
+        defaultAmt: remainingAmt,
+        adv: adv,
+        paymentMode: 'UPI'
+      });
+    } else if (newProjectStatus === 'Cancelled') {
       updatedFields.paymentStatus = 'unpaid';
-      // Remove any cashbook entries associated with this project
+      updatedFields.progress = 0;
       setCashbookEntries(prev => prev.filter(entry => entry.projectId !== project.id));
+    } else if (newProjectStatus === 'Active') {
+      updatedFields.stage = 1;
+      if (project.status === 'Completed') {
+        updatedFields.paymentStatus = adv > 0 ? 'part' : 'unpaid';
+        updatedFields.progress = 25;
+      }
     }
 
     try {
       await updateProjectState(projectId, updatedFields);
       toast({
-        title: "Project Status Calibrated",
-        description: `Successfully marked project as ${newPaymentStatus === 'paid' ? 'Paid' : (newProjectStatus === 'Cancelled' ? 'Cancelled' : 'Active/Unpaid')}.`
+        title: "Project Status Updated",
+        description: `Successfully marked project status as ${newProjectStatus}.`
       });
     } catch (err) {
       console.warn("Failed to update project status in Supabase:", err);
@@ -2490,6 +2480,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <datalist id="services-list">
+          {services.map(s => (
+            <option key={s.id} value={s.title} />
+          ))}
+        </datalist>
         <div className={`app-container ${isVaultActive ? 'vault-active' : ''}`} ref={containerRef}>
           {/* Side-aligned Sidebar (Only shown when a module is open) */}
           {isCommandCenterActive && isAdminGridActive && (
@@ -3561,12 +3556,16 @@ function App() {
                                 <div className="form-row">
                                   <div className="input-group">
                                     <label>Select Service Calibration</label>
-                                    <select name="service" required defaultValue={prefillData?.serviceId || ''}>
-                                      <option value="">Choose service...</option>
-                                      {services.map(s => (
-                                        <option key={s.id} value={s.id}>{s.title}</option>
-                                      ))}
-                                    </select>
+                                    <input
+                                      type="text"
+                                      name="service"
+                                      list="services-list"
+                                      required
+                                      defaultValue={prefillData?.serviceId ? services.find(s => s.id === prefillData.serviceId)?.title : ''}
+                                      placeholder="Type or select service..."
+                                      className="ignition-input"
+                                      style={{ width: '100%', padding: '0.8rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '4px', outline: 'none' }}
+                                    />
                                   </div>
                                   <div className="input-group">
                                     <label>Target Delivery Date</label>
@@ -3683,11 +3682,16 @@ function App() {
                                   <form className="ignition-form" onSubmit={handleEditProject}>
                                     <div className="input-group">
                                       <label>Service Calibration</label>
-                                      <select name="service" defaultValue={services.find(s => s.title === currentProject?.service)?.id} required>
-                                        {services.map(s => (
-                                          <option key={s.id} value={s.id}>{s.title}</option>
-                                        ))}
-                                      </select>
+                                      <input
+                                        type="text"
+                                        name="service"
+                                        list="services-list"
+                                        defaultValue={currentProject?.service || ''}
+                                        required
+                                        placeholder="Type or select service..."
+                                        className="ignition-input"
+                                        style={{ width: '100%', padding: '0.8rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '4px', outline: 'none' }}
+                                      />
                                     </div>
 
                                     <div className="form-row">

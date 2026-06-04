@@ -58,7 +58,7 @@ interface FinancialsProps {
   setSelectedVaultInvoices: React.Dispatch<React.SetStateAction<any[]>>;
   handleAddCashbookEntry: (e: any) => void;
   handleMarkMilestonePaid?: (p: any, type: 'deposit' | 'retainer') => void;
-  handleUpdateProjectStatusHandy?: (projectId: number, newPaymentStatus?: string, newProjectStatus?: string) => void;
+  handleUpdateProjectStatusHandy?: (projectId: number, newProjectStatus: string) => void;
 }
 
 const containerVariants = {
@@ -308,7 +308,7 @@ export default function Financials({
                       />
                     </th>
                     <th className="p-4">Mission / Client</th>
-                    <th className="p-4 text-left">Milestone Billings (50/50 Split)</th>
+                    <th className="p-4 text-left">Milestone Billings (Adv / Bal)</th>
                     <th className="p-4 text-right">Target Value</th>
                     <th className="p-4 text-center">Deadline</th>
                     <th className="p-4 text-right">Actions</th>
@@ -386,25 +386,19 @@ export default function Financials({
                           <td className="p-4">
                             <div className="flex items-center justify-end gap-2">
                               <select
-                                className="h-7 px-1.5 bg-[#0a0f1e] border border-white/10 rounded-lg text-3xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold"
-                                value={p.paymentStatus === 'paid' ? 'paid' : (p.status === 'Cancelled' ? 'cancelled' : 'unpaid')}
+                                className="h-7 px-1.5 bg-[#0a0f1e] border border-white/10 rounded-lg text-3xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold bg-[#0a0f1e]"
+                                value={p.status}
                                 onChange={(e) => {
-                                  const val = e.target.value;
                                   if (handleUpdateProjectStatusHandy) {
-                                    if (val === 'paid') {
-                                      handleUpdateProjectStatusHandy(p.id, 'paid', 'Completed');
-                                    } else if (val === 'cancelled') {
-                                      handleUpdateProjectStatusHandy(p.id, 'unpaid', 'Cancelled');
-                                    } else {
-                                      handleUpdateProjectStatusHandy(p.id, 'unpaid', 'Active');
-                                    }
+                                    handleUpdateProjectStatusHandy(p.id, e.target.value);
                                   }
                                 }}
-                                title="Quick Payment/Status"
+                                title="Quick Status Update"
                               >
-                                <option value="unpaid">Unpaid</option>
-                                <option value="paid">Paid</option>
-                                <option value="cancelled">Cancelled</option>
+                                <option value="Active">Active</option>
+                                <option value="Completed">Completed</option>
+                                <option value="On Hold">On Hold</option>
+                                <option value="Cancelled">Cancelled</option>
                               </select>
                               {/* Ignition Deposit Action Button */}
                               {!depPaid && advanceAmt > 0 && (

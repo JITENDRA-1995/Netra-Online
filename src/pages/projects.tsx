@@ -58,7 +58,7 @@ interface ProjectsProps {
   onOpenIgnitionModal: () => void;
   setCustomPaymentPrompt?: (p: any) => void;
   onDownloadInvoice?: (p: any) => void;
-  handleUpdateProjectStatusHandy?: (projectId: number, newPaymentStatus?: string, newProjectStatus?: string) => void;
+  handleUpdateProjectStatusHandy?: (projectId: number, newProjectStatus: string) => void;
 }
 
 const containerVariants = {
@@ -90,12 +90,12 @@ export default function Projects({
   const [formDescription, setFormDescription] = useState("");
   const [formStatus, setFormStatus] = useState("active");
   const [formCategory, setFormCategory] = useState("branding");
-  const [formBudget, setFormBudget] = useState(0);
-  const [formProgress, setFormProgress] = useState(0);
+  const [formBudget, setFormBudget] = useState<number | "">(0);
+  const [formProgress, setFormProgress] = useState<number | "">(0);
   const [formDeadline, setFormDeadline] = useState("");
-  const [formDiscountValue, setFormDiscountValue] = useState(0);
+  const [formDiscountValue, setFormDiscountValue] = useState<number | "">(0);
   const [formDiscountType, setFormDiscountType] = useState<"rs" | "%">("rs");
-  const [formAdvanceAmount, setFormAdvanceAmount] = useState(0);
+  const [formAdvanceAmount, setFormAdvanceAmount] = useState<number | "">(0);
 
 
   const filtered = projects.filter((p) => {
@@ -138,17 +138,18 @@ export default function Projects({
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (editingProject && setProjects) {
-      const budgetVal = formBudget;
+      const budgetVal = typeof formBudget === "number" ? formBudget : 0;
+      const discountInput = typeof formDiscountValue === "number" ? formDiscountValue : 0;
       const statusFormatted = formStatus.charAt(0).toUpperCase() + formStatus.slice(1).replace("_", " ");
       
       let discountAmt = 0;
       if (formDiscountType === "%") {
-        discountAmt = (budgetVal * (formDiscountValue || 0)) / 100;
+        discountAmt = (budgetVal * discountInput) / 100;
       } else {
-        discountAmt = formDiscountValue || 0;
+        discountAmt = discountInput;
       }
 
-      const advanceVal = formAdvanceAmount;
+      const advanceVal = typeof formAdvanceAmount === "number" ? formAdvanceAmount : 0;
       const finalQuote = budgetVal - discountAmt;
       let paymentStatus = 'unpaid';
       if (advanceVal >= finalQuote) {
@@ -167,11 +168,11 @@ export default function Projects({
         quote: budgetVal,
         budget: budgetVal,
         deadline: formDeadline,
-        progress: formProgress,
+        progress: typeof formProgress === "number" ? formProgress : 0,
         discount: discountAmt,
-        discountValue: formDiscountValue.toString(),
+        discountValue: discountInput.toString(),
         discountType: formDiscountType,
-        discountPercent: formDiscountType === "%" ? formDiscountValue.toFixed(2) : ((formDiscountValue / (budgetVal || 1)) * 100).toFixed(2),
+        discountPercent: formDiscountType === "%" ? discountInput.toFixed(2) : ((discountInput / (budgetVal || 1)) * 100).toFixed(2),
         advanceAmount: advanceVal,
         paymentStatus: paymentStatus
       };
@@ -370,25 +371,19 @@ export default function Projects({
                       </Button>
                     )}
                     <select
-                      className="h-7 px-1.5 bg-[#0c101d] border border-white/10 rounded-lg text-3xs text-foreground outline-none focus:border-cyan-400 cursor-pointer"
-                      value={project.paymentStatus === 'paid' ? 'paid' : (project.status === 'Cancelled' ? 'cancelled' : 'unpaid')}
+                      className="h-7 px-1.5 bg-[#0c101d] border border-white/10 rounded-lg text-3xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold bg-[#0c101d]"
+                      value={project.status}
                       onChange={(e) => {
-                        const val = e.target.value;
                         if (handleUpdateProjectStatusHandy) {
-                          if (val === 'paid') {
-                            handleUpdateProjectStatusHandy(project.id, 'paid', 'Completed');
-                          } else if (val === 'cancelled') {
-                            handleUpdateProjectStatusHandy(project.id, 'unpaid', 'Cancelled');
-                          } else {
-                            handleUpdateProjectStatusHandy(project.id, 'unpaid', 'Active');
-                          }
+                          handleUpdateProjectStatusHandy(project.id, e.target.value);
                         }
                       }}
-                      title="Quick Payment/Status"
+                      title="Quick Status Update"
                     >
-                      <option value="unpaid">Unpaid</option>
-                      <option value="paid">Paid</option>
-                      <option value="cancelled">Cancelled</option>
+                      <option value="Active">Active</option>
+                      <option value="Completed">Completed</option>
+                      <option value="On Hold">On Hold</option>
+                      <option value="Cancelled">Cancelled</option>
                     </select>
                     <Button
                       size="icon"
@@ -449,6 +444,7 @@ export default function Projects({
                 onChange={(e) => setFormName(e.target.value)}
                 className="bg-white/5 border-white/10 rounded-xl"
                 placeholder="Service tag/name"
+                list="services-list"
                 required
               />
             </div>
@@ -498,7 +494,7 @@ export default function Projects({
                 <Input
                   type="number"
                   value={formBudget}
-                  onChange={(e) => setFormBudget(parseInt(e.target.value) || 0)}
+                  onChange={(e) => setFormBudget(e.target.value === "" ? "" : (parseInt(e.target.value) || 0))}
                   className="bg-white/5 border-white/10 rounded-xl"
                   required
                 />
@@ -508,7 +504,7 @@ export default function Projects({
                 <Input
                   type="number"
                   value={formProgress}
-                  onChange={(e) => setFormProgress(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                  onChange={(e) => setFormProgress(e.target.value === "" ? "" : Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
                   className="bg-white/5 border-white/10 rounded-xl"
                   min={0}
                   max={100}
@@ -538,7 +534,7 @@ export default function Projects({
                     <Input
                       type="number"
                       value={formDiscountValue}
-                      onChange={(e) => setFormDiscountValue(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => setFormDiscountValue(e.target.value === "" ? "" : (parseFloat(e.target.value) || 0))}
                       className="bg-white/5 border-white/10 rounded-xl pr-10"
                       placeholder="0"
                     />
@@ -565,7 +561,7 @@ export default function Projects({
                   <Input
                     type="number"
                     value={formAdvanceAmount}
-                    onChange={(e) => setFormAdvanceAmount(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setFormAdvanceAmount(e.target.value === "" ? "" : (parseFloat(e.target.value) || 0))}
                     className="bg-white/5 border-white/10 rounded-xl"
                     placeholder="0"
                   />
