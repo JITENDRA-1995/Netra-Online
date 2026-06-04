@@ -41,6 +41,7 @@ export const getProjects = async () => {
     category: project.category || 'branding',
     progress: project.progress || 0,
     client: project.clients ? {
+      id: project.clients.id,
       name: project.clients.name,
       phone: project.clients.phone,
       email: project.clients.email,

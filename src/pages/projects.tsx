@@ -96,6 +96,9 @@ export default function Projects({
   const [formDiscountValue, setFormDiscountValue] = useState<number | "">(0);
   const [formDiscountType, setFormDiscountType] = useState<"rs" | "%">("rs");
   const [formAdvanceAmount, setFormAdvanceAmount] = useState<number | "">(0);
+  const [formClientEmail, setFormClientEmail] = useState("");
+  const [formClientPhone, setFormClientPhone] = useState("");
+  const [formClientAddress, setFormClientAddress] = useState("");
 
 
   const filtered = projects.filter((p) => {
@@ -131,6 +134,9 @@ export default function Projects({
     setFormDiscountValue(parseFloat(project.discountValue) || parseFloat(project.discount) || 0);
     setFormDiscountType(project.discountType || 'rs');
     setFormAdvanceAmount(parseFloat(project.advanceAmount) || 0);
+    setFormClientEmail(project.client?.email || "");
+    setFormClientPhone(project.client?.phone || "");
+    setFormClientAddress(project.client?.address || "");
 
     setDialogOpen(true);
   }
@@ -174,10 +180,17 @@ export default function Projects({
         discountType: formDiscountType,
         discountPercent: formDiscountType === "%" ? discountInput.toFixed(2) : ((discountInput / (budgetVal || 1)) * 100).toFixed(2),
         advanceAmount: advanceVal,
-        paymentStatus: paymentStatus
+        paymentStatus: paymentStatus,
+        client: editingProject.client ? {
+          ...editingProject.client,
+          email: formClientEmail,
+          phone: formClientPhone,
+          address: formClientAddress
+        } : null
       };
 
       try {
+        // 1. Update project row
         const { error } = await supabase
           .from("projects")
           .update({
@@ -196,6 +209,19 @@ export default function Projects({
           })
           .eq("id", editingProject.id);
         if (error) throw error;
+
+        // 2. Update client row if associated
+        if (editingProject.client && editingProject.client.id) {
+          const { error: clientErr } = await supabase
+            .from("clients")
+            .update({
+              email: formClientEmail,
+              phone: formClientPhone,
+              address: formClientAddress
+            })
+            .eq("id", editingProject.client.id);
+          if (clientErr) throw clientErr;
+        }
       } catch (err: any) {
         console.error("Supabase update failed:", err);
         alert("Failed to save project to database: " + (err.message || JSON.stringify(err)));
@@ -448,15 +474,52 @@ export default function Projects({
                 required
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Mission Brief / Notes</label>
-              <Input
-                value={formDescription}
-                onChange={(e) => setFormDescription(e.target.value)}
-                className="bg-white/5 border-white/10 rounded-xl"
-                placeholder="Project objectives"
-              />
-            </div>
+             <div className="space-y-1">
+               <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Mission Brief / Notes</label>
+               <Input
+                 value={formDescription}
+                 onChange={(e) => setFormDescription(e.target.value)}
+                 className="bg-white/5 border-white/10 rounded-xl"
+                 placeholder="Project objectives"
+               />
+             </div>
+             
+             <div className="border-t border-white/5 pt-3 mt-3 space-y-2">
+               <label className="text-3xs uppercase tracking-widest text-cyan-400 font-extrabold flex items-center gap-1.5">
+                 <span>👤</span> CLIENT CONTACT & BILLING
+               </label>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                 <div className="space-y-1">
+                   <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Client Email</label>
+                   <Input
+                     type="email"
+                     value={formClientEmail}
+                     onChange={(e) => setFormClientEmail(e.target.value)}
+                     className="bg-white/5 border-white/10 rounded-xl"
+                     placeholder="client@mail.com"
+                   />
+                 </div>
+                 <div className="space-y-1">
+                   <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Client Mobile</label>
+                   <Input
+                     type="tel"
+                     value={formClientPhone}
+                     onChange={(e) => setFormClientPhone(e.target.value)}
+                     className="bg-white/5 border-white/10 rounded-xl"
+                     placeholder="+91 XXXXX XXXXX"
+                   />
+                 </div>
+               </div>
+               <div className="space-y-1">
+                 <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Billing Address</label>
+                 <Input
+                   value={formClientAddress}
+                   onChange={(e) => setFormClientAddress(e.target.value)}
+                   className="bg-white/5 border-white/10 rounded-xl"
+                   placeholder="Official Address"
+                 />
+               </div>
+             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Status</label>
