@@ -4513,10 +4513,10 @@ function App() {
                           </button>
                           <button
                             className="action-btn btn-whatsapp"
-                            onClick={async () => {
+                            onClick={() => {
                               saveInvoiceToVault(invoiceProject, stableInvoiceNo);
-                              // Trigger automatic PDF download first so it's ready for drag-and-drop
-                              await downloadMultiPageInvoicePDF(invoiceProject, stableInvoiceNo);
+                              // Trigger automatic PDF download in the background so it's ready for drag-and-drop
+                              downloadMultiPageInvoicePDF(invoiceProject, stableInvoiceNo);
                               
                               const msg = `Namaste! Your Tax Invoice (${stableInvoiceNo}) from Netra Graphics is ready. Amount: ₹${(parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0)).toLocaleString()}. Thank you!`;
 
