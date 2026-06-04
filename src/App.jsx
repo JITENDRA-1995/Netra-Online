@@ -1750,11 +1750,22 @@ function App() {
     pushPageToHistory('login');
   });
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError("");
     if (isAdminSelected) {
-      if (accessKey === "savan@netra.com" && passphrase === "revolution2026") {
+      const btn = e.target.querySelector('button[type="submit"]');
+      const originalText = btn ? btn.innerText : "";
+      if (btn) btn.innerText = "AUTHENTICATING...";
+
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: accessKey,
+          password: passphrase
+        });
+
+        if (error) throw error;
+
         if (saveLoginInfo) {
           localStorage.setItem('netra_saved_admin_key', accessKey);
           localStorage.setItem('netra_saved_admin_pass', passphrase);
@@ -1762,6 +1773,7 @@ function App() {
           localStorage.removeItem('netra_saved_admin_key');
           localStorage.removeItem('netra_saved_admin_pass');
         }
+
         triggerInstantTransition(() => {
           clearAllPages();
           setIsCommandCenterActive(true);
@@ -1769,8 +1781,11 @@ function App() {
           pushPageToHistory('admin', { activeAdminModule: 'DASHBOARD', isAdminGridActive: false });
           setShowSparkToast(unreadSparksCount > 0);
         });
-      } else {
-        setLoginError("ACCESS DENIED: Credentials do not match the Architect's records.");
+      } catch (err) {
+        console.error("Login failed:", err);
+        setLoginError("ACCESS DENIED: " + (err.message || "Invalid credentials"));
+      } finally {
+        if (btn) btn.innerText = originalText;
       }
     } else {
       // Client Access
@@ -2956,26 +2971,32 @@ function App() {
                       ? (!!savedAdminKey && !!savedAdminPass)
                       : (!!savedClientKey && !!savedClientPass);
 
-                    const handleAutoLogin = () => {
+                    const handleAutoLogin = async () => {
                       if (isAdminSelected) {
                         const k = localStorage.getItem('netra_saved_admin_key');
                         const p = localStorage.getItem('netra_saved_admin_pass');
                         if (k && p) {
                           setAccessKey(k);
                           setPassphrase(p);
-                          setTimeout(() => {
-                            if (k === "savan@netra.com" && p === "revolution2026") {
-                              triggerInstantTransition(() => {
-                                clearAllPages();
-                                setIsCommandCenterActive(true);
-                                setIsAdminGridActive(false);
-                                pushPageToHistory('admin', { activeAdminModule: 'DASHBOARD', isAdminGridActive: false });
-                                setShowSparkToast(unreadSparksCount > 0);
-                              });
-                            } else {
-                              setLoginError("ACCESS DENIED: Credentials do not match the Architect's records.");
-                            }
-                          }, 100);
+                          setLoginError("");
+                          try {
+                            const { data, error } = await supabase.auth.signInWithPassword({
+                              email: k,
+                              password: p
+                            });
+                            if (error) throw error;
+
+                            triggerInstantTransition(() => {
+                              clearAllPages();
+                              setIsCommandCenterActive(true);
+                              setIsAdminGridActive(false);
+                              pushPageToHistory('admin', { activeAdminModule: 'DASHBOARD', isAdminGridActive: false });
+                              setShowSparkToast(unreadSparksCount > 0);
+                            });
+                          } catch (err) {
+                            console.error("Auto login failed:", err);
+                            setLoginError("ACCESS DENIED: " + (err.message || "Invalid credentials"));
+                          }
                         }
                       } else {
                         const k = localStorage.getItem('netra_saved_client_key');
