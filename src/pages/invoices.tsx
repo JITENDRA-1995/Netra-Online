@@ -36,6 +36,8 @@ interface InvoicesPageProps {
   selectedVaultInvoices: any[];
   setSelectedVaultInvoices: React.Dispatch<React.SetStateAction<any[]>>;
   bankingDetails: any;
+  projects?: any[];
+  services?: any[];
 }
 
 const containerVariants = {
@@ -58,11 +60,15 @@ export default function InvoicesPage({
   setInvoiceProject,
   selectedVaultInvoices,
   setSelectedVaultInvoices,
-  bankingDetails
+  bankingDetails,
+  projects = [],
+  services = []
 }: InvoicesPageProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
+  const [invoiceTab, setInvoiceTab] = useState<"SAVED" | "DRAFT">("SAVED");
+  const [showServiceSuggestions, setShowServiceSuggestions] = useState(false);
   const [formStep, setFormStep] = useState(1); // 1 = Client details, 2 = Service Details, 3 = Gateway Review
 
   // Form States
@@ -81,6 +87,10 @@ export default function InvoicesPage({
   const [logToCashbook, setLogToCashbook] = useState(true);
   const [includesDiscount, setIncludesDiscount] = useState(true);
   const [isServiceExpanded, setIsServiceExpanded] = useState(true);
+
+  const serviceSuggestions = services.filter((s: any) =>
+    s.title.toLowerCase().includes(service.toLowerCase())
+  );
 
   // Tracks what the user last interacted with to prevent recursive calculations
   const [lastCalculatedBy, setLastCalculatedBy] = useState<"rate" | "total" | null>(null);
@@ -127,11 +137,35 @@ export default function InvoicesPage({
     }
   }, [qty, totalAmount, discount, discountType, includesDiscount, lastCalculatedBy]);
 
-  const filteredInvoices = invoices.filter(inv =>
-    inv.clientName.toLowerCase().includes(search.toLowerCase()) ||
-    (inv.projectService && inv.projectService.toLowerCase().includes(search.toLowerCase())) ||
-    inv.invoiceNo.toLowerCase().includes(search.toLowerCase())
-  );
+  // Get up-to-date project info to keep status in sync dynamically
+  const getUpToDateInvoice = (inv: any) => {
+    if (!inv.rawProject || !inv.rawProject.id) return inv;
+    const currentProj = projects.find(p => p.id === inv.rawProject.id);
+    if (!currentProj) return inv;
+    return {
+      ...inv,
+      rawProject: currentProj
+    };
+  };
+
+  const upToDateInvoices = invoices.map(getUpToDateInvoice);
+
+  const filteredInvoices = upToDateInvoices.filter(inv => {
+    const matchesSearch = inv.clientName.toLowerCase().includes(search.toLowerCase()) ||
+      (inv.projectService && inv.projectService.toLowerCase().includes(search.toLowerCase())) ||
+      inv.invoiceNo.toLowerCase().includes(search.toLowerCase());
+
+    if (!matchesSearch) return false;
+
+    // A draft invoice is linked to a project and that project status is NOT Completed
+    const isDraft = inv.rawProject && inv.rawProject.id && inv.rawProject.status && inv.rawProject.status !== 'Completed';
+
+    if (invoiceTab === "DRAFT") {
+      return isDraft;
+    } else {
+      return !isDraft;
+    }
+  });
 
   const getInvoiceNumber = (date: Date, serial = 1) => {
     const d = new Date(date);
@@ -461,15 +495,37 @@ export default function InvoicesPage({
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
+                      <div className="space-y-1.5 relative">
                         <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Service Description *</label>
                         <Input
                           value={service}
                           onChange={e => setService(e.target.value)}
+                          onFocus={() => setShowServiceSuggestions(true)}
+                          onBlur={() => setTimeout(() => setShowServiceSuggestions(false), 200)}
                           placeholder="e.g. Brand Identity (Logo) Design"
                           required
                           className="bg-white/5 border-white/10 text-xs rounded-xl h-10 text-foreground"
+                          autoComplete="off"
                         />
+                        {showServiceSuggestions && serviceSuggestions.length > 0 && (
+                          <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-xl border border-white/10 bg-[#0c1220]/95 backdrop-blur-md shadow-2xl z-50 text-left divide-y divide-white/5">
+                            {serviceSuggestions.map((s: any) => (
+                              <button
+                                key={s.id}
+                                type="button"
+                                className="w-full text-left px-4 py-2.5 text-xs text-foreground hover:bg-cyan-500/10 hover:text-cyan-400 transition-colors flex items-center gap-2"
+                                onMouseDown={(e) => {
+                                  e.preventDefault(); // prevents input blur before selection
+                                  setService(s.title);
+                                  setShowServiceSuggestions(false);
+                                }}
+                              >
+                                <span className="text-sm">{s.icon}</span>
+                                <span>{s.title}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Total Invoice Amount (₹) *</label>
@@ -718,7 +774,34 @@ export default function InvoicesPage({
             <h3 className="font-bold text-foreground text-lg">Document Ledger</h3>
             <p className="text-xs text-muted-foreground">Secure repository for generated tax invoice documents</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Tabs for Saved Invoices and Draft Invoices */}
+            <div className="flex gap-1 p-0.5 rounded-lg bg-white/5 border border-white/5 mr-2">
+              <Button
+                variant={invoiceTab === "SAVED" ? "secondary" : "ghost"}
+                size="sm"
+                className={`h-7 rounded-md text-[10px] font-bold tracking-wider px-3 ${
+                  invoiceTab === "SAVED" 
+                    ? "bg-white/10 text-cyan-400" 
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => setInvoiceTab("SAVED")}
+              >
+                SAVED INVOICES
+              </Button>
+              <Button
+                variant={invoiceTab === "DRAFT" ? "secondary" : "ghost"}
+                size="sm"
+                className={`h-7 rounded-md text-[10px] font-bold tracking-wider px-3 ${
+                  invoiceTab === "DRAFT" 
+                    ? "bg-white/10 text-amber-400" 
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => setInvoiceTab("DRAFT")}
+              >
+                DRAFT INVOICES
+              </Button>
+            </div>
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <Input
@@ -782,7 +865,11 @@ export default function InvoicesPage({
                         }}
                       />
                     </td>
-                    <td className="p-4 font-bold text-cyan-400">{inv.invoiceNo}</td>
+                    <td className={`p-4 font-bold ${
+                      inv.rawProject && inv.rawProject.id && inv.rawProject.status && inv.rawProject.status !== 'Completed'
+                        ? 'text-amber-400'
+                        : 'text-cyan-400'
+                    }`}>{inv.invoiceNo}</td>
                     <td className="p-4">
                       <div className="flex flex-col">
                         <span className="font-bold text-foreground">{inv.clientName}</span>
@@ -827,7 +914,7 @@ export default function InvoicesPage({
               ) : (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-muted-foreground uppercase tracking-widest text-3xs font-semibold">
-                    LEDGER IS VOID OF ENTRIES
+                    {invoiceTab === "DRAFT" ? "NO TEMPORARY DRAFT INVOICES IN VAULT" : "LEDGER IS VOID OF SAVED INVOICES"}
                   </td>
                 </tr>
               )}

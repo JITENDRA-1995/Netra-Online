@@ -59,6 +59,7 @@ interface ProjectsProps {
   setCustomPaymentPrompt?: (p: any) => void;
   onDownloadInvoice?: (p: any) => void;
   handleUpdateProjectStatusHandy?: (projectId: number, newProjectStatus: string) => void;
+  setCashbookEntries?: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 const containerVariants = {
@@ -77,7 +78,8 @@ export default function Projects({
   onOpenIgnitionModal,
   setCustomPaymentPrompt,
   onDownloadInvoice,
-  handleUpdateProjectStatusHandy
+  handleUpdateProjectStatusHandy,
+  setCashbookEntries
 }: ProjectsProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -230,6 +232,17 @@ export default function Projects({
       setProjects((prev) =>
         prev.map((p) => (p.id === editingProject.id ? updatedProject : p))
       );
+
+      // Handle Cashbook updates on project status updates (Reversal / Cancellation)
+      if (setCashbookEntries) {
+        if (editingProject.status === "Completed" && statusFormatted !== "Completed") {
+          // Reverted from Completed: remove final payment entry
+          setCashbookEntries((prev: any[]) => prev.filter(entry => !(entry.projectId === editingProject.id && entry.isFinal)));
+        } else if (statusFormatted === "Cancelled") {
+          // Cancelled: remove all entries for this project
+          setCashbookEntries((prev: any[]) => prev.filter(entry => entry.projectId !== editingProject.id));
+        }
+      }
 
       // Trigger cashbook catch-up dialog if project is newly marked as Completed
       if (statusFormatted === "Completed" && editingProject.status !== "Completed") {

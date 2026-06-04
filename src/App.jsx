@@ -1168,14 +1168,21 @@ function App() {
   };
 
   const saveInvoiceToVault = async (p, invNo) => {
-    if (invoices.find(i => i.invoiceNo === invNo)) return;
+    if (p.id && invoices.some(i => i.rawProject?.id === p.id)) return;
+    if (invoices.some(i => i.invoiceNo === invNo)) return;
+
+    const isCompleted = (p.status || '').toLowerCase() === 'completed';
+    const subtotal = parseFloat(p.quote) || 0;
+    const discount = parseFloat(p.discount) || 0;
+    const advance = parseFloat(p.advanceAmount) || 0;
+    const grandTotal = isCompleted ? (subtotal - discount) : (subtotal - discount - advance);
 
     const newInvoice = {
       invoiceNo: invNo,
       clientName: p.name,
       projectService: p.service,
       issueDate: new Date().toISOString().split('T')[0],
-      grandTotal: parseFloat(p.quote) - (parseFloat(p.advanceAmount) || 0) - (parseFloat(p.discount) || 0),
+      grandTotal: grandTotal,
       projectId: p.id
     };
 
@@ -1409,14 +1416,15 @@ function App() {
 
     cashbookEntries.forEach(entry => {
       const amt = parseFloat(entry.amount);
+      const mode = (entry.mode || "").toUpperCase();
       if (entry.type === "EXPENSE") {
         totalExpense += amt;
-        if (entry.mode === "UPI") upiFlow -= amt;
-        if (entry.mode === "CASH") cashFlow -= amt;
+        if (mode === "UPI" || mode === "ONLINE") upiFlow -= amt;
+        if (mode === "CASH") cashFlow -= amt;
       } else {
         totalIncome += amt;
-        if (entry.mode === "UPI") upiFlow += amt;
-        if (entry.mode === "CASH") cashFlow += amt;
+        if (mode === "UPI" || mode === "ONLINE") upiFlow += amt;
+        if (mode === "CASH") cashFlow += amt;
       }
     });
 
@@ -2046,6 +2054,21 @@ function App() {
       setIgnitionQueue(prev => [...prev, newProject]);
       triggerBellPulse();
 
+      if (advanceVal > 0) {
+        const advanceEntry = {
+          id: Date.now(),
+          projectId: savedProjCore.id,
+          date: new Date().toISOString().split('T')[0],
+          desc: `Advance: ${serviceName} - ${clientInfo.name}`,
+          amount: advanceVal,
+          type: "INCOME",
+          mode: "UPI",
+          category: "Project",
+          isAdvance: true
+        };
+        setCashbookEntries(prev => [advanceEntry, ...prev]);
+      }
+
       if (prefillData && prefillData.inquiryId) {
         try {
           await updateInquiry(prefillData.inquiryId, { status: 'Ignited', remarks: 'Automatically ignited into active project mission.' });
@@ -2280,6 +2303,11 @@ function App() {
   const handleUpdateProjectStatusHandy = async (projectId, newProjectStatus) => {
     const project = ignitionQueue.find(p => p.id === projectId);
     if (!project) return;
+
+    if (project.status === 'Completed' && newProjectStatus !== 'Completed') {
+      // Reverted from Completed: remove final payment entry
+      setCashbookEntries(prev => prev.filter(entry => !(entry.projectId === projectId && entry.isFinal)));
+    }
 
     const baseQuote = parseFloat(project.quote) || 0;
     const discountVal = parseFloat(project.discount) || 0;
@@ -3392,6 +3420,7 @@ function App() {
                               setIsInvoicePreviewOpen(true);
                             }}
                             handleUpdateProjectStatusHandy={handleUpdateProjectStatusHandy}
+                            setCashbookEntries={setCashbookEntries}
                           />
 
                         )}
@@ -3427,6 +3456,8 @@ function App() {
                             selectedVaultInvoices={selectedVaultInvoices}
                             setSelectedVaultInvoices={setSelectedVaultInvoices}
                             bankingDetails={bankingDetails}
+                            projects={ignitionQueue}
+                            services={services}
                           />
                         )}
 
@@ -4184,9 +4215,23 @@ function App() {
                             amount: amt,
                             type: "INCOME",
                             mode: customPaymentPrompt.paymentMode,
-                            category: "Project"
+                            category: "Project",
+                            isFinal: true
                           }]);
                           alert(`Payment of ₹${amt} logged to Cashbook!`);
+                        }
+
+                        // Auto-generate and save invoice to vault when project completes
+                        const completedProjectForInvoice = {
+                          ...customPaymentPrompt.p,
+                          status: "Completed",
+                          stage: 4,
+                          paymentStatus: "paid"
+                        };
+                        const existingInvoice = invoices.find(i => i.rawProject?.id === customPaymentPrompt.p.id);
+                        if (!existingInvoice) {
+                          const invNo = getInvoiceNumber(customPaymentPrompt.p.createdAt, invoices.length + 1);
+                          saveInvoiceToVault(completedProjectForInvoice, invNo);
                         }
 
                         setIgnitionQueue(prev => prev.map(proj =>
@@ -4242,7 +4287,8 @@ function App() {
                 >
                   {(() => {
                     const rowsPerPage = 6;
-                    const stableInvoiceNo = invoiceProject.invoiceNo || getInvoiceNumber(invoiceProject.createdAt, invoices.length + 1);
+                    const existingInvoice = invoices.find(inv => inv.rawProject?.id === invoiceProject.id);
+                    const stableInvoiceNo = existingInvoice ? existingInvoice.invoiceNo : (invoiceProject.invoiceNo || getInvoiceNumber(invoiceProject.createdAt, invoices.length + 1));
 
                     // If it's a batch project, use its internal items, otherwise use single project as one item
                     const allItems = (invoiceProject.items && invoiceProject.items.length > 0)
