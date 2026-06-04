@@ -3535,8 +3535,8 @@ function App() {
                                         <input type="text" name="clientName" defaultValue={prefillData?.clientName || ''} placeholder="Identity of the visionary" required />
                                       </div>
                                       <div className="input-group">
-                                        <label>Client Email</label>
-                                        <input type="email" name="email" defaultValue={prefillData?.email || ''} placeholder="Direct digital link" required />
+                                        <label>Client Email (Optional)</label>
+                                        <input type="email" name="email" defaultValue={prefillData?.email || ''} placeholder="Direct digital link" />
                                       </div>
                                     </div>
 
@@ -3624,8 +3624,8 @@ function App() {
                                     <input type="text" name="name" defaultValue={selectedClient?.name} placeholder="Identity of the visionary" required />
                                   </div>
                                   <div className="input-group">
-                                    <label>Email Address</label>
-                                    <input type="email" name="email" defaultValue={selectedClient?.email} placeholder="Direct digital link" required />
+                                    <label>Email Address (Optional)</label>
+                                    <input type="email" name="email" defaultValue={selectedClient?.email} placeholder="Direct digital link" />
                                   </div>
                                 </div>
 
