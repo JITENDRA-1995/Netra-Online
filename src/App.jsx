@@ -2002,6 +2002,14 @@ function App() {
       const quoteVal = parseInt(formData.get('quote')) || 15000;
       const discountVal = parseInt(formData.get('discount')) || 0;
       const discountPct = ((discountVal / quoteVal) * 100).toFixed(2);
+      const advanceVal = parseInt(formData.get('advanceAmount')) || 0;
+      const finalQuote = quoteVal - discountVal;
+      let paymentStatus = 'unpaid';
+      if (advanceVal >= finalQuote) {
+        paymentStatus = 'paid';
+      } else if (advanceVal > 0) {
+        paymentStatus = 'part';
+      }
 
       const projectPayload = {
         name: clientInfo.name,
@@ -2017,8 +2025,8 @@ function App() {
         discountType: 'rs',
         discountPercent: discountPct,
         discount: discountVal,
-        advanceAmount: 0,
-        paymentStatus: 'part',
+        advanceAmount: advanceVal,
+        paymentStatus: paymentStatus,
         mediaVault: [],
         collaborationStream: [
           { id: 1, sender: "SYSTEM", text: "Project Ignited", time: new Date().toLocaleTimeString() }
@@ -2191,29 +2199,34 @@ function App() {
 
   const handleMarkMilestonePaid = async (project, type) => {
     const baseQuote = parseFloat(project.quote) || 0;
-    const milestoneAmt = baseQuote * 0.5;
+    const discountVal = parseFloat(project.discount) || 0;
+    const finalQuote = baseQuote - discountVal;
+    const advanceAmt = parseFloat(project.advanceAmount) || 0;
+    const balanceAmt = Math.max(0, finalQuote - advanceAmt);
 
     let updatedFields = {};
     let desc = "";
+    let milestoneAmt = 0;
 
     if (type === 'deposit') {
+      milestoneAmt = advanceAmt;
       updatedFields = {
-        advanceAmount: milestoneAmt,
-        paymentStatus: 'part'
+        paymentStatus: balanceAmt === 0 ? 'paid' : 'part'
       };
-      desc = `Deposit: ${project.service} - ${project.name}`;
+      desc = `Advance Payment: ${project.service} - ${project.name}`;
     } else if (type === 'retainer') {
+      milestoneAmt = balanceAmt;
       updatedFields = {
         paymentStatus: 'paid',
         status: 'Completed',
         stage: 4
       };
-      desc = `Final: ${project.service} - ${project.name}`;
+      desc = `Final Payment: ${project.service} - ${project.name}`;
     }
 
     // Check if cashbook entry already exists to prevent double logging
-    const exists = cashbookEntries.some(entry => entry.projectId === project.id && entry.desc.startsWith(type === 'deposit' ? "Deposit:" : "Final:"));
-    if (!exists) {
+    const exists = cashbookEntries.some(entry => entry.projectId === project.id && entry.desc.startsWith(type === 'deposit' ? "Advance Payment:" : "Final Payment:"));
+    if (!exists && milestoneAmt > 0) {
       const newEntry = {
         id: Date.now(),
         projectId: project.id,
@@ -2233,7 +2246,7 @@ function App() {
         ...updatedFields
       });
       toast({
-        title: `${type === 'deposit' ? 'Ignition Deposit' : 'Delivery Retainer'} Marked Paid`,
+        title: `${type === 'deposit' ? 'Advance Payment' : 'Final Payment'} Marked Paid`,
         description: `Successfully logged ₹${milestoneAmt.toLocaleString()} service income.`
       });
     } catch (err) {
@@ -3280,7 +3293,12 @@ function App() {
 
                       <div className="module-content-area">
                         {activeAdminModule === "DASHBOARD" && (
-                          <Dashboard />
+                          <Dashboard
+                            projects={ignitionQueue}
+                            clients={clients}
+                            invoices={invoices}
+                            cashbookEntries={cashbookEntries}
+                          />
                         )}
 
                         {activeAdminModule === "PROJECTS" && (
@@ -3478,6 +3496,10 @@ function App() {
                                   <div className="input-group">
                                     <label>Special Discount (₹)</label>
                                     <input type="number" name="discount" placeholder="0" />
+                                  </div>
+                                  <div className="input-group">
+                                    <label>Advance Payment (₹)</label>
+                                    <input type="number" name="advanceAmount" placeholder="0" />
                                   </div>
                                 </div>
 

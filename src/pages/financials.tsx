@@ -315,14 +315,17 @@ export default function Financials({
                 <tbody className="divide-y divide-white/5">
                   {filteredProjects.length > 0 ? (
                     filteredProjects.map((p) => {
-                      const baseQuote = p.quote || 0;
-                      const milestoneAmt = baseQuote * 0.5;
+                      const baseQuote = parseFloat(p.quote) || 0;
+                      const discountVal = parseFloat(p.discount) || 0;
+                      const finalQuote = baseQuote - discountVal;
+                      const advanceAmt = parseFloat(p.advanceAmount) || 0;
+                      const balanceAmt = Math.max(0, finalQuote - advanceAmt);
 
                       // Check if deposit or retainer invoice exists in invoices array
-                      const hasDepositInvoice = invoices.some(inv => inv.projectId === p.id && (inv.invoiceNo?.includes('-DEP') || inv.clientName?.toLowerCase().includes('deposit') || inv.projectService?.toLowerCase().includes('deposit')));
-                      const hasRetainerInvoice = invoices.some(inv => inv.projectId === p.id && (inv.invoiceNo?.includes('-COM') || inv.clientName?.toLowerCase().includes('retainer') || inv.projectService?.toLowerCase().includes('retainer') || inv.projectService?.toLowerCase().includes('completion')));
+                      const hasDepositInvoice = invoices.some(inv => inv.projectId === p.id && (inv.invoiceNo?.includes('-DEP') || inv.clientName?.toLowerCase().includes('deposit') || inv.projectService?.toLowerCase().includes('deposit') || inv.clientName?.toLowerCase().includes('advance') || inv.projectService?.toLowerCase().includes('advance')));
+                      const hasRetainerInvoice = invoices.some(inv => inv.projectId === p.id && (inv.invoiceNo?.includes('-COM') || inv.clientName?.toLowerCase().includes('retainer') || inv.projectService?.toLowerCase().includes('retainer') || inv.projectService?.toLowerCase().includes('completion') || inv.clientName?.toLowerCase().includes('final') || inv.projectService?.toLowerCase().includes('final')));
 
-                      const depPaid = p.paymentStatus === 'paid' || p.paymentStatus === 'part' || p.advanceAmount >= milestoneAmt;
+                      const depPaid = p.paymentStatus === 'paid' || p.paymentStatus === 'part' || advanceAmt > 0;
                       const depInvoiced = hasDepositInvoice;
 
                       const retPaid = p.paymentStatus === 'paid' || p.status === 'Completed';
@@ -350,7 +353,7 @@ export default function Financials({
                           <td className="p-4 text-left">
                             <div className="flex flex-col gap-1.5 items-start">
                               <div className="flex items-center gap-1.5">
-                                <span className="text-3xs text-muted-foreground uppercase font-bold tracking-wider w-16">Deposit (50%):</span>
+                                <span className="text-3xs text-muted-foreground uppercase font-bold tracking-wider w-16">Advance Payment:</span>
                                 {depPaid ? (
                                   <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-3xs font-extrabold px-2 py-0">PAID</Badge>
                                 ) : depInvoiced ? (
@@ -360,7 +363,7 @@ export default function Financials({
                                 )}
                               </div>
                               <div className="flex items-center gap-1.5">
-                                <span className="text-3xs text-muted-foreground uppercase font-bold tracking-wider w-16">Retainer (50%):</span>
+                                <span className="text-3xs text-muted-foreground uppercase font-bold tracking-wider w-16">Final Payment:</span>
                                 {retPaid ? (
                                   <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-3xs font-extrabold px-2 py-0">PAID</Badge>
                                 ) : retInvoiced ? (
@@ -372,8 +375,8 @@ export default function Financials({
                             </div>
                           </td>
                           <td className="p-4 text-right font-semibold text-foreground">
-                            <div>₹{baseQuote.toLocaleString()}</div>
-                            <div className="text-3xs text-muted-foreground mt-0.5">₹{milestoneAmt.toLocaleString()} / milestone</div>
+                            <div>₹{finalQuote.toLocaleString()}</div>
+                            <div className="text-3xs text-muted-foreground mt-0.5">₹{advanceAmt.toLocaleString()} Adv / ₹{balanceAmt.toLocaleString()} Bal</div>
                           </td>
                           <td className="p-4 text-center text-muted-foreground">
                             {p.deadline ? new Date(p.deadline).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
@@ -381,7 +384,7 @@ export default function Financials({
                           <td className="p-4">
                             <div className="flex items-center justify-end gap-2">
                               {/* Ignition Deposit Action Button */}
-                              {!depPaid && (
+                              {!depPaid && advanceAmt > 0 && (
                                 <>
                                   {!depInvoiced ? (
                                     <Button
@@ -391,16 +394,16 @@ export default function Financials({
                                         const depProject = {
                                           ...p,
                                           invoiceType: 'deposit',
-                                          quote: milestoneAmt,
+                                          quote: advanceAmt,
                                           discount: 0,
                                           advanceAmount: 0,
-                                          service: `Ignition Deposit (50%) - ${p.service}`
+                                          service: `Advance Payment - ${p.service}`
                                         };
                                         setInvoiceProject(depProject);
                                         setIsInvoicePreviewOpen(true);
                                       }}
                                     >
-                                      🔥 IGNITE DEPOSIT (50%)
+                                      🔥 INVOICE ADVANCE
                                     </Button>
                                   ) : (
                                     <Button
@@ -412,14 +415,14 @@ export default function Financials({
                                         }
                                       }}
                                     >
-                                      💰 MARK DEPOSIT PAID
+                                      💰 MARK ADVANCE PAID
                                     </Button>
                                   )}
                                 </>
                               )}
 
                               {/* Delivery Retainer Action Button */}
-                              {depPaid && !retPaid && (
+                              {depPaid && !retPaid && balanceAmt > 0 && (
                                 <>
                                   {!retInvoiced ? (
                                     <Button
@@ -429,16 +432,16 @@ export default function Financials({
                                         const retProject = {
                                           ...p,
                                           invoiceType: 'retainer',
-                                          quote: milestoneAmt,
+                                          quote: balanceAmt,
                                           discount: 0,
                                           advanceAmount: 0,
-                                          service: `Delivery Retainer (50%) - ${p.service}`
+                                          service: `Final Payment - ${p.service}`
                                         };
                                         setInvoiceProject(retProject);
                                         setIsInvoicePreviewOpen(true);
                                       }}
                                     >
-                                      📄 INVOICE RETAINER (50%)
+                                      📄 INVOICE FINAL
                                     </Button>
                                   ) : (
                                     <Button
