@@ -162,7 +162,7 @@ export default function Projects({
       };
 
       try {
-        await supabase
+        const { error } = await supabase
           .from("projects")
           .update({
             service: updatedProject.service,
@@ -177,8 +177,10 @@ export default function Projects({
             discount_type: updatedProject.discountType,
           })
           .eq("id", editingProject.id);
-      } catch (err) {
-        console.warn("Supabase update failed, falling back to local memory:", err);
+        if (error) throw error;
+      } catch (err: any) {
+        console.error("Supabase update failed:", err);
+        alert("Failed to save project to database: " + (err.message || JSON.stringify(err)));
       }
 
       setProjects((prev) =>
@@ -211,9 +213,11 @@ export default function Projects({
   async function handleDelete(id: number) {
     if (window.confirm("ARE YOU SURE YOU WANT TO TERMINATE THIS MISSION? ALL DATA FOR THIS PROJECT WILL BE PURGED.")) {
       try {
-        await supabase.from("projects").delete().eq("id", id);
-      } catch (err) {
-        console.warn("Supabase delete failed, falling back to local memory:", err);
+        const { error } = await supabase.from("projects").delete().eq("id", id);
+        if (error) throw error;
+      } catch (err: any) {
+        console.error("Supabase delete failed:", err);
+        alert("Failed to delete project from database: " + (err.message || JSON.stringify(err)));
       }
       if (setProjects) {
         setProjects((prev) => prev.filter((p) => p.id !== id));

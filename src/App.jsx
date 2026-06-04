@@ -2130,23 +2130,42 @@ function App() {
     }
   };
 
-  const handleEditProject = (e) => {
+  const handleEditProject = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     const serviceId = formData.get('service');
     const serviceName = services.find(s => s.id === parseInt(serviceId))?.title || "Custom Service";
 
+    const quoteVal = parseInt(formData.get('quote')) || 0;
+    const discountVal = parseInt(formData.get('discount')) || 0;
+    const discountPercentVal = ((discountVal / (quoteVal || 1)) * 100).toFixed(2);
+
+    const updatedFields = {
+      service: serviceName,
+      deadline: formData.get('deadline'),
+      quote: quoteVal,
+      discountValue: (formData.get('discount') || '0').toString(),
+      discountType: 'rs',
+      discountPercent: discountPercentVal,
+      discount: discountVal
+    };
+
+    try {
+      await updateProjectState(selectedProjectTab, updatedFields);
+      toast({
+        title: "Project Parameters Calibrated",
+        description: "Successfully updated project details in the database."
+      });
+    } catch (err) {
+      console.error("Failed to update project details in Supabase:", err);
+      alert("Failed to save calibrated project to database: " + (err.message || err.details || JSON.stringify(err)));
+    }
+
     setIgnitionQueue(prev => prev.map(p => {
       if (p.id === selectedProjectTab) {
         return {
           ...p,
-          service: serviceName,
-          deadline: formData.get('deadline'),
-          quote: parseInt(formData.get('quote')),
-          discountValue: formData.get('discount') || '0',
-          discountType: 'rs',
-          discountPercent: ((parseFloat(formData.get('discount')) || 0) / parseInt(formData.get('quote')) * 100).toFixed(2),
-          discount: parseInt(formData.get('discount')) || 0
+          ...updatedFields
         };
       }
       return p;

@@ -37,6 +37,9 @@ export const getProjects = async () => {
     discountType: project.discount_type,
     advanceAmount: parseFloat(project.advance_amount || 0),
     paymentStatus: project.payment_status,
+    description: project.description || '',
+    category: project.category || 'branding',
+    progress: project.progress || 0,
     client: project.clients ? {
       name: project.clients.name,
       phone: project.clients.phone,
@@ -82,7 +85,10 @@ export const igniteProject = async (projectData) => {
         advance_amount: projectData.advanceAmount || 0,
         payment_status: projectData.paymentStatus || 'part',
         deadline: projectData.deadline,
-        client_id: projectData.client_id
+        client_id: projectData.client_id,
+        description: projectData.description || '',
+        category: projectData.category || 'branding',
+        progress: projectData.progress || 0
       }
     ])
     .select()
@@ -121,19 +127,33 @@ export const igniteProject = async (projectData) => {
  * Update project state details (stage, financials, timeline)
  */
 export const updateProjectState = async (projectId, updates) => {
+  const updatePayload = {};
+  if (updates.name !== undefined) updatePayload.name = updates.name;
+  if (updates.service !== undefined) updatePayload.service = updates.service;
+  if (updates.stage !== undefined) updatePayload.stage = updates.stage;
+  if (updates.status !== undefined) updatePayload.status = updates.status;
+  if (updates.quote !== undefined) updatePayload.quote = updates.quote;
+  if (updates.discount !== undefined) updatePayload.discount = updates.discount;
+  if (updates.discountValue !== undefined || updates.discount_value !== undefined) {
+    updatePayload.discount_value = updates.discountValue !== undefined ? updates.discountValue : updates.discount_value;
+  }
+  if (updates.discountType !== undefined || updates.discount_type !== undefined) {
+    updatePayload.discount_type = updates.discountType !== undefined ? updates.discountType : updates.discount_type;
+  }
+  if (updates.advanceAmount !== undefined || updates.advance_amount !== undefined) {
+    updatePayload.advance_amount = updates.advanceAmount !== undefined ? updates.advanceAmount : updates.advance_amount;
+  }
+  if (updates.paymentStatus !== undefined || updates.payment_status !== undefined) {
+    updatePayload.payment_status = updates.paymentStatus !== undefined ? updates.paymentStatus : updates.payment_status;
+  }
+  if (updates.deadline !== undefined) updatePayload.deadline = updates.deadline;
+  if (updates.description !== undefined) updatePayload.description = updates.description;
+  if (updates.category !== undefined) updatePayload.category = updates.category;
+  if (updates.progress !== undefined) updatePayload.progress = updates.progress;
+
   const { data, error } = await supabase
     .from('projects')
-    .update({
-      stage: updates.stage,
-      status: updates.status,
-      quote: updates.quote,
-      discount: updates.discount,
-      discount_value: updates.discountValue,
-      discount_type: updates.discountType,
-      advance_amount: updates.advanceAmount,
-      payment_status: updates.paymentStatus,
-      deadline: updates.deadline
-    })
+    .update(updatePayload)
     .eq('id', projectId)
     .select()
     .single();
