@@ -3382,11 +3382,11 @@ function App() {
                                     <label>Select Existing Client</label>
                                     <select name="existingClientId" required>
                                       <option value="">Choose from your network...</option>
-                                      {clients.map(c => (
+                                      {clients.filter(c => c.email !== 'settings@netra.graphics').map(c => (
                                         <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
                                       ))}
                                     </select>
-                                    {clients.length === 0 && <p className="dim-text small-hint">No clients registered yet. Please create a new one.</p>}
+                                    {clients.filter(c => c.email !== 'settings@netra.graphics').length === 0 && <p className="dim-text small-hint">No clients registered yet. Please create a new one.</p>}
                                   </div>
                                 ) : (
                                   <>
