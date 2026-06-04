@@ -1045,10 +1045,10 @@ function App() {
     today.setHours(0, 0, 0, 0);
     const target = new Date(project.deadline);
     target.setHours(0, 0, 0, 0);
-    
+
     const diffTime = target - today;
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays < 0) {
       const days = Math.abs(diffDays);
       return `OVERDUE by ${days} day${days > 1 ? 's' : ''}! Immediate Calibration Required`;
@@ -1503,7 +1503,7 @@ function App() {
 
     const handleTouchEnd = (e) => {
       if (isTransitioning || showConstruction) return;
-      
+
       const touchEndY = e.changedTouches[0].clientY;
       const deltaY = touchStartY - touchEndY; // Swiped up (scrolled down)
 
@@ -2489,7 +2489,7 @@ function App() {
           {/* Side-aligned Sidebar (Only shown when a module is open) */}
           {isCommandCenterActive && isAdminGridActive && (
             <>
-              <button 
+              <button
                 className="admin-mobile-toggle"
                 onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
                 aria-label="Toggle Navigation Menu"
@@ -2497,7 +2497,7 @@ function App() {
                 {isMobileSidebarOpen ? <LogOut className="w-5 h-5" style={{ transform: 'rotate(180deg)' }} /> : <Menu className="w-5 h-5" />}
               </button>
               {isMobileSidebarOpen && (
-                <div 
+                <div
                   className="sidebar-mobile-overlay"
                   onClick={() => setIsMobileSidebarOpen(false)}
                 />
@@ -3078,7 +3078,7 @@ function App() {
                     const savedAdminPass = localStorage.getItem('netra_saved_admin_pass');
                     const savedClientKey = localStorage.getItem('netra_saved_client_key');
                     const savedClientPass = localStorage.getItem('netra_saved_client_pass');
-                    const hasSavedCredentials = isAdminSelected 
+                    const hasSavedCredentials = isAdminSelected
                       ? (!!savedAdminKey && !!savedAdminPass)
                       : (!!savedClientKey && !!savedClientPass);
 
@@ -3148,7 +3148,7 @@ function App() {
                           {!isAdminSelected ? 'CLIENT PORTAL' : 'SECURE ADMIN ACCESS'}
                         </p>
                         {hasSavedCredentials && (
-                          <p 
+                          <p
                             className="text-[10px] text-emerald-400 mt-2 font-bold cursor-pointer hover:underline tracking-widest uppercase"
                             onClick={handleAutoLogin}
                           >
@@ -4284,10 +4284,10 @@ function App() {
                         >
                           <div style={{
                             background: 'linear-gradient(115deg, #d32f2f 58%, #222 58.2%)',
-                            padding: '12px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            padding: '12px 40px 12px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                             color: '#fff', position: 'relative'
                           }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', zIndex: 2 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', zIndex: 2 }}>
                               <img
                                 src="/logo.png"
                                 alt="Netra Logo"
@@ -4304,7 +4304,7 @@ function App() {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.85rem', opacity: 0.95, marginTop: '6px' }}>
                                   <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.83a16 16 0 0 0 5.92 5.92l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7a2 2 0 0 1 1.72 2.02z"/>
+                                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.83a16 16 0 0 0 5.92 5.92l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7a2 2 0 0 1 1.72 2.02z" />
                                     </svg>
                                     {adminProfile.phone}
                                   </span>
@@ -4389,7 +4389,7 @@ function App() {
                               </tbody>
                             </table>
                           </div>
- 
+
                           {/* TOTALS & FOOTER - ONLY ON LAST PAGE */}
                           {isLastPage ? (
                             <div style={{ background: '#fff', borderTop: '1px solid #eee' }}>
@@ -4411,7 +4411,7 @@ function App() {
                                     </div>
                                   </div>
                                 </div>
- 
+
                                 {/* Totals Section */}
                                 <div style={{ width: '38%', textAlign: 'right' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.8rem' }}>
@@ -4553,7 +4553,7 @@ function App() {
                               saveInvoiceToVault(invoiceProject, stableInvoiceNo);
                               // Trigger automatic PDF download in the background so it's ready for drag-and-drop
                               downloadMultiPageInvoicePDF(invoiceProject, stableInvoiceNo);
-                              
+
                               const msg = `Namaste! Your Tax Invoice (${stableInvoiceNo}) from Netra Graphics is ready. Amount: ₹${(parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0)).toLocaleString()}. Thank you!`;
 
                               // Look up client phone robustly
