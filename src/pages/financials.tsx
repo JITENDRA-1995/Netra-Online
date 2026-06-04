@@ -58,6 +58,7 @@ interface FinancialsProps {
   setSelectedVaultInvoices: React.Dispatch<React.SetStateAction<any[]>>;
   handleAddCashbookEntry: (e: any) => void;
   handleMarkMilestonePaid?: (p: any, type: 'deposit' | 'retainer') => void;
+  handleUpdateProjectStatusHandy?: (projectId: number, newPaymentStatus?: string, newProjectStatus?: string) => void;
 }
 
 const containerVariants = {
@@ -93,7 +94,8 @@ export default function Financials({
   selectedVaultInvoices,
   setSelectedVaultInvoices,
   handleAddCashbookEntry,
-  handleMarkMilestonePaid
+  handleMarkMilestonePaid,
+  handleUpdateProjectStatusHandy
 }: FinancialsProps) {
   const { toast } = useToast();
   const [ledgerSearch, setLedgerSearch] = useState("");
@@ -383,6 +385,27 @@ export default function Financials({
                           </td>
                           <td className="p-4">
                             <div className="flex items-center justify-end gap-2">
+                              <select
+                                className="h-7 px-1.5 bg-[#0a0f1e] border border-white/10 rounded-lg text-3xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold"
+                                value={p.paymentStatus === 'paid' ? 'paid' : (p.status === 'Cancelled' ? 'cancelled' : 'unpaid')}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (handleUpdateProjectStatusHandy) {
+                                    if (val === 'paid') {
+                                      handleUpdateProjectStatusHandy(p.id, 'paid', 'Completed');
+                                    } else if (val === 'cancelled') {
+                                      handleUpdateProjectStatusHandy(p.id, 'unpaid', 'Cancelled');
+                                    } else {
+                                      handleUpdateProjectStatusHandy(p.id, 'unpaid', 'Active');
+                                    }
+                                  }
+                                }}
+                                title="Quick Payment/Status"
+                              >
+                                <option value="unpaid">Unpaid</option>
+                                <option value="paid">Paid</option>
+                                <option value="cancelled">Cancelled</option>
+                              </select>
                               {/* Ignition Deposit Action Button */}
                               {!depPaid && advanceAmt > 0 && (
                                 <>

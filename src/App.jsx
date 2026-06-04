@@ -2146,6 +2146,15 @@ function App() {
 
     const quoteVal = parseInt(formData.get('quote')) || 0;
     const discountVal = parseInt(formData.get('discount')) || 0;
+    const advanceVal = parseInt(formData.get('advanceAmount')) || 0;
+    const finalQuote = quoteVal - discountVal;
+    let paymentStatus = 'unpaid';
+    if (advanceVal >= finalQuote) {
+      paymentStatus = 'paid';
+    } else if (advanceVal > 0) {
+      paymentStatus = 'part';
+    }
+
     const discountPercentVal = ((discountVal / (quoteVal || 1)) * 100).toFixed(2);
 
     const updatedFields = {
@@ -2155,7 +2164,9 @@ function App() {
       discountValue: (formData.get('discount') || '0').toString(),
       discountType: 'rs',
       discountPercent: discountPercentVal,
-      discount: discountVal
+      discount: discountVal,
+      advanceAmount: advanceVal,
+      paymentStatus: paymentStatus
     };
 
     try {
@@ -2260,6 +2271,79 @@ function App() {
           ...updatedFields,
           status: type === 'retainer' ? 'Completed' : p.status,
           stage: type === 'retainer' ? 4 : p.stage
+        };
+      }
+      return p;
+    }));
+  };
+
+  const handleUpdateProjectStatusHandy = async (projectId, newPaymentStatus, newProjectStatus) => {
+    const project = ignitionQueue.find(p => p.id === projectId);
+    if (!project) return;
+
+    const baseQuote = parseFloat(project.quote) || 0;
+    const discountVal = parseFloat(project.discount) || 0;
+    const finalQuote = baseQuote - discountVal;
+    const advanceAmt = parseFloat(project.advanceAmount) || 0;
+
+    let updatedFields = {
+      paymentStatus: newPaymentStatus || project.paymentStatus,
+      status: newProjectStatus || project.status,
+      stage: project.stage
+    };
+
+    if (newPaymentStatus === 'paid') {
+      updatedFields.status = 'Completed';
+      updatedFields.stage = 4;
+      
+      // Log to cashbook if not exists
+      const remainingAmt = finalQuote - (project.paymentStatus === 'part' ? advanceAmt : 0);
+      if (remainingAmt > 0) {
+        const exists = cashbookEntries.some(entry => entry.projectId === project.id && entry.desc.startsWith("Final Payment:"));
+        if (!exists) {
+          const newEntry = {
+            id: Date.now(),
+            projectId: project.id,
+            date: new Date().toISOString().split('T')[0],
+            desc: `Final Payment: ${project.service || project.name} - ${project.name}`,
+            amount: remainingAmt,
+            type: "INCOME",
+            mode: "UPI",
+            category: "Service"
+          };
+          setCashbookEntries(prev => [newEntry, ...prev]);
+        }
+      }
+    } else if (newPaymentStatus === 'unpaid') {
+      // Revert paymentStatus to unpaid, reset stage and status to Active
+      updatedFields.status = newProjectStatus || 'Active';
+      updatedFields.stage = 1;
+      // Remove any cashbook entries associated with this project
+      setCashbookEntries(prev => prev.filter(entry => entry.projectId !== project.id));
+    }
+
+    if (newProjectStatus === 'Cancelled') {
+      updatedFields.status = 'Cancelled';
+      updatedFields.paymentStatus = 'unpaid';
+      // Remove any cashbook entries associated with this project
+      setCashbookEntries(prev => prev.filter(entry => entry.projectId !== project.id));
+    }
+
+    try {
+      await updateProjectState(projectId, updatedFields);
+      toast({
+        title: "Project Status Calibrated",
+        description: `Successfully marked project as ${newPaymentStatus === 'paid' ? 'Paid' : (newProjectStatus === 'Cancelled' ? 'Cancelled' : 'Active/Unpaid')}.`
+      });
+    } catch (err) {
+      console.warn("Failed to update project status in Supabase:", err);
+    }
+
+    setIgnitionQueue(prev => prev.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          ...updatedFields
         };
       }
       return p;
@@ -3312,6 +3396,7 @@ function App() {
                               setInvoiceProject(p);
                               setIsInvoicePreviewOpen(true);
                             }}
+                            handleUpdateProjectStatusHandy={handleUpdateProjectStatusHandy}
                           />
 
                         )}
@@ -3375,6 +3460,7 @@ function App() {
                             setSelectedVaultInvoices={setSelectedVaultInvoices}
                             handleAddCashbookEntry={handleAddCashbookEntry}
                             handleMarkMilestonePaid={handleMarkMilestonePaid}
+                            handleUpdateProjectStatusHandy={handleUpdateProjectStatusHandy}
                           />
                         )}
 
@@ -3617,6 +3703,10 @@ function App() {
                                         <div className="input-group">
                                           <label>Discount Calibration (₹)</label>
                                           <input type="number" name="discount" defaultValue={currentProject?.discount} />
+                                        </div>
+                                        <div className="input-group">
+                                          <label>Advance Payment Calibration (₹)</label>
+                                          <input type="number" name="advanceAmount" defaultValue={currentProject?.advanceAmount} />
                                         </div>
                                       </div>
                                     </div>

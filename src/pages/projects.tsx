@@ -58,6 +58,7 @@ interface ProjectsProps {
   onOpenIgnitionModal: () => void;
   setCustomPaymentPrompt?: (p: any) => void;
   onDownloadInvoice?: (p: any) => void;
+  handleUpdateProjectStatusHandy?: (projectId: number, newPaymentStatus?: string, newProjectStatus?: string) => void;
 }
 
 const containerVariants = {
@@ -75,7 +76,8 @@ export default function Projects({
   clients = [],
   onOpenIgnitionModal,
   setCustomPaymentPrompt,
-  onDownloadInvoice
+  onDownloadInvoice,
+  handleUpdateProjectStatusHandy
 }: ProjectsProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -93,6 +95,7 @@ export default function Projects({
   const [formDeadline, setFormDeadline] = useState("");
   const [formDiscountValue, setFormDiscountValue] = useState(0);
   const [formDiscountType, setFormDiscountType] = useState<"rs" | "%">("rs");
+  const [formAdvanceAmount, setFormAdvanceAmount] = useState(0);
 
 
   const filtered = projects.filter((p) => {
@@ -127,6 +130,7 @@ export default function Projects({
     setFormDeadline(deadlineStr);
     setFormDiscountValue(parseFloat(project.discountValue) || parseFloat(project.discount) || 0);
     setFormDiscountType(project.discountType || 'rs');
+    setFormAdvanceAmount(parseFloat(project.advanceAmount) || 0);
 
     setDialogOpen(true);
   }
@@ -144,6 +148,15 @@ export default function Projects({
         discountAmt = formDiscountValue || 0;
       }
 
+      const advanceVal = formAdvanceAmount;
+      const finalQuote = budgetVal - discountAmt;
+      let paymentStatus = 'unpaid';
+      if (advanceVal >= finalQuote) {
+        paymentStatus = 'paid';
+      } else if (advanceVal > 0) {
+        paymentStatus = 'part';
+      }
+
       const updatedProject = {
         ...editingProject,
         service: formName,
@@ -158,7 +171,9 @@ export default function Projects({
         discount: discountAmt,
         discountValue: formDiscountValue.toString(),
         discountType: formDiscountType,
-        discountPercent: formDiscountType === "%" ? formDiscountValue.toFixed(2) : ((formDiscountValue / budgetVal) * 100).toFixed(2),
+        discountPercent: formDiscountType === "%" ? formDiscountValue.toFixed(2) : ((formDiscountValue / (budgetVal || 1)) * 100).toFixed(2),
+        advanceAmount: advanceVal,
+        paymentStatus: paymentStatus
       };
 
       try {
@@ -175,6 +190,8 @@ export default function Projects({
             discount: updatedProject.discount,
             discount_value: updatedProject.discountValue,
             discount_type: updatedProject.discountType,
+            advance_amount: updatedProject.advanceAmount,
+            payment_status: updatedProject.paymentStatus,
           })
           .eq("id", editingProject.id);
         if (error) throw error;
@@ -352,6 +369,27 @@ export default function Projects({
                         <FileText className="w-3.5 h-3.5" />
                       </Button>
                     )}
+                    <select
+                      className="h-7 px-1.5 bg-[#0c101d] border border-white/10 rounded-lg text-3xs text-foreground outline-none focus:border-cyan-400 cursor-pointer"
+                      value={project.paymentStatus === 'paid' ? 'paid' : (project.status === 'Cancelled' ? 'cancelled' : 'unpaid')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (handleUpdateProjectStatusHandy) {
+                          if (val === 'paid') {
+                            handleUpdateProjectStatusHandy(project.id, 'paid', 'Completed');
+                          } else if (val === 'cancelled') {
+                            handleUpdateProjectStatusHandy(project.id, 'unpaid', 'Cancelled');
+                          } else {
+                            handleUpdateProjectStatusHandy(project.id, 'unpaid', 'Active');
+                          }
+                        }
+                      }}
+                      title="Quick Payment/Status"
+                    >
+                      <option value="unpaid">Unpaid</option>
+                      <option value="paid">Paid</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
                     <Button
                       size="icon"
                       variant="ghost"
@@ -519,6 +557,18 @@ export default function Projects({
                     <option value="rs">Rupees (₹)</option>
                     <option value="%">Percentage (%)</option>
                   </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 mt-3">
+                <div className="space-y-1">
+                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Advance Payment (₹)</label>
+                  <Input
+                    type="number"
+                    value={formAdvanceAmount}
+                    onChange={(e) => setFormAdvanceAmount(parseFloat(e.target.value) || 0)}
+                    className="bg-white/5 border-white/10 rounded-xl"
+                    placeholder="0"
+                  />
                 </div>
               </div>
             </div>
