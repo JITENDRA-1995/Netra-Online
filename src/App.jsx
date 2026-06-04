@@ -510,6 +510,12 @@ function App() {
   };
 
   const handleClearAllDemoData = async () => {
+    const pw = prompt("🔴 SECURITY ACCESS REQUIRED 🔴\n\nPlease enter the system password to clear all demo data:");
+    if (pw !== "73590@Savan") {
+      alert("Incorrect password. Operation aborted.");
+      return;
+    }
+
     try {
       // 1. Purge Supabase Invoices
       const { error: invoiceErr } = await supabase
