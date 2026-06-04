@@ -1482,6 +1482,84 @@ function App() {
     };
   }, [cashbookEntries]);
 
+  // Cashbook entries self-healing reconciler to ensure alignment with projects status
+  useEffect(() => {
+    if (!ignitionQueue || ignitionQueue.length === 0) return;
+
+    let updated = false;
+    let newEntries = [...cashbookEntries];
+
+    ignitionQueue.forEach(p => {
+      const isCompleted = (p.status || '').toLowerCase() === 'completed';
+      const isCancelled = (p.status || '').toLowerCase() === 'cancelled';
+      const subtotal = parseFloat(p.quote) || 0;
+      const discount = parseFloat(p.discount) || 0;
+      const advance = parseFloat(p.advanceAmount) || 0;
+      const grandTotal = subtotal - discount;
+      const remainingDue = grandTotal - advance;
+
+      // A. Advance payment verification
+      if (advance > 0 && !isCancelled) {
+        const hasAdvance = newEntries.some(entry => entry.projectId === p.id && (entry.isAdvance || entry.desc.toLowerCase().startsWith('advance:')));
+        if (!hasAdvance) {
+          newEntries.push({
+            id: Date.now() + Math.random(),
+            projectId: p.id,
+            date: p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            desc: `Advance: ${p.service} - ${p.name}`,
+            amount: advance,
+            type: "INCOME",
+            mode: "UPI",
+            category: "Project",
+            isAdvance: true
+          });
+          updated = true;
+        }
+      }
+
+      // B. Final payment verification
+      if (isCompleted) {
+        const hasFinal = newEntries.some(entry => entry.projectId === p.id && entry.isFinal);
+        if (!hasFinal && remainingDue > 0) {
+          newEntries.push({
+            id: Date.now() + Math.random(),
+            projectId: p.id,
+            date: new Date().toISOString().split('T')[0],
+            desc: `Payment: ${p.service} - ${p.name}`,
+            amount: remainingDue,
+            type: "INCOME",
+            mode: "UPI",
+            category: "Project",
+            isFinal: true
+          });
+          updated = true;
+        }
+      }
+
+      // C. Remove final payment if project is not completed
+      if (!isCompleted) {
+        const finalEntries = newEntries.filter(entry => entry.projectId === p.id && entry.isFinal);
+        if (finalEntries.length > 0) {
+          newEntries = newEntries.filter(entry => !(entry.projectId === p.id && entry.isFinal));
+          updated = true;
+        }
+      }
+
+      // D. Remove all entries if project is cancelled
+      if (isCancelled) {
+        const projectEntries = newEntries.filter(entry => entry.projectId === p.id);
+        if (projectEntries.length > 0) {
+          newEntries = newEntries.filter(entry => entry.projectId !== p.id);
+          updated = true;
+        }
+      }
+    });
+
+    if (updated) {
+      setCashbookEntries(newEntries);
+    }
+  }, [ignitionQueue, cashbookEntries]);
+
   const kanbanColumns = [
     { id: 1, title: "SPARK", desc: "Discovery" },
     { id: 2, title: "CALIBRATION", desc: "Design" },
