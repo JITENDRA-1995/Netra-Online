@@ -302,8 +302,27 @@ export default function Financials({
                         type="checkbox"
                         className="rounded accent-emerald-400"
                         onChange={(e) => {
-                          if (e.target.checked) setSelectedBatchProjects(filteredProjects.map(p => p.id));
-                          else setSelectedBatchProjects([]);
+                          if (e.target.checked) {
+                            const activeProjects = filteredProjects.filter(p => {
+                              const st = (p.status || "Active").toLowerCase();
+                              return st === "active" || st === "ongoing";
+                            });
+                            if (activeProjects.length > 0) {
+                              alert("Warning: Active projects cannot be selected for batch invoicing. Only completed or non-active projects will be selected.");
+                              const nonActiveIds = filteredProjects
+                                .filter(p => {
+                                  const st = (p.status || "Active").toLowerCase();
+                                  return st !== "active" && st !== "ongoing";
+                                })
+                                .map(p => p.id);
+                              setSelectedBatchProjects(nonActiveIds);
+                              e.target.checked = false;
+                            } else {
+                              setSelectedBatchProjects(filteredProjects.map(p => p.id));
+                            }
+                          } else {
+                            setSelectedBatchProjects([]);
+                          }
                         }}
                       />
                     </th>
@@ -341,8 +360,17 @@ export default function Financials({
                               checked={selectedBatchProjects.includes(p.id)}
                               className="rounded accent-emerald-400"
                               onChange={(e) => {
-                                if (e.target.checked) setSelectedBatchProjects(prev => [...prev, p.id]);
-                                else setSelectedBatchProjects(prev => prev.filter(id => id !== p.id));
+                                if (e.target.checked) {
+                                  const st = (p.status || "Active").toLowerCase();
+                                  if (st === "active" || st === "ongoing") {
+                                    alert(`Warning: The project "${p.service}" for client "${p.name}" is Active. Active projects cannot be selected. Please complete the project before selecting.`);
+                                    e.target.checked = false;
+                                    return;
+                                  }
+                                  setSelectedBatchProjects(prev => [...prev, p.id]);
+                                } else {
+                                  setSelectedBatchProjects(prev => prev.filter(id => id !== p.id));
+                                }
                               }}
                             />
                           </td>
