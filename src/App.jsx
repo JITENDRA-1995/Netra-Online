@@ -1392,13 +1392,16 @@ function App() {
     const currentYear = now.getFullYear();
 
     ignitionQueue.forEach(p => {
-      const baseQuote = p.quote || 0;
-      const discountPct = parseFloat(p.discountPercent) || 0;
-      const finalQuote = baseQuote - (baseQuote * discountPct / 100);
+      const isCancelled = (p.status || "").toLowerCase() === "cancelled";
+      if (isCancelled) return;
+
+      const baseQuote = parseFloat(p.quote) || 0;
+      const discountVal = parseFloat(p.discount) || 0;
+      const finalQuote = baseQuote - discountVal;
 
       const adv = parseFloat(p.advanceAmount) || 0;
-      const isPaid = p.paymentStatus === 'paid' || p.status === "Completed";
-      const isPart = p.paymentStatus === 'part';
+      const isPaid = p.paymentStatus === 'paid' || (p.status || "").toLowerCase() === "completed";
+      const hasAdvance = adv > 0;
 
       let revenueFromProject = 0;
       let duesFromProject = 0;
@@ -1406,9 +1409,9 @@ function App() {
       if (isPaid) {
         revenueFromProject = finalQuote;
         duesFromProject = 0;
-      } else if (isPart) {
+      } else if (hasAdvance) {
         revenueFromProject = adv;
-        duesFromProject = finalQuote - adv;
+        duesFromProject = Math.max(0, finalQuote - adv);
       } else {
         revenueFromProject = 0;
         duesFromProject = finalQuote;
@@ -1417,9 +1420,11 @@ function App() {
       totalRevenue += revenueFromProject;
       pendingDues += duesFromProject;
 
-      const pDate = new Date(p.deadline);
-      if (pDate.getMonth() === currentMonth && pDate.getFullYear() === currentYear) {
-        monthlyRevenue += revenueFromProject;
+      if (p.deadline) {
+        const pDate = new Date(p.deadline);
+        if (!isNaN(pDate.getTime()) && pDate.getMonth() === currentMonth && pDate.getFullYear() === currentYear) {
+          monthlyRevenue += revenueFromProject;
+        }
       }
     });
 

@@ -100,23 +100,27 @@ export default function Dashboard({
 
   const totalRevenue = useMemo(() => {
     return projects.reduce((sum, p) => {
+      if ((p.status || "").toLowerCase() === "cancelled") return sum;
       const baseQuote = parseFloat(p.quote) || 0;
       const discountVal = parseFloat(p.discount) || 0;
       const finalQuote = baseQuote - discountVal;
-      const isPaid = p.paymentStatus === 'paid' || p.status === 'Completed';
-      const isPart = p.paymentStatus === 'part';
-      return sum + (isPaid ? finalQuote : (isPart ? (parseFloat(p.advanceAmount) || 0) : 0));
+      const isPaid = p.paymentStatus === 'paid' || (p.status || "").toLowerCase() === "completed";
+      const adv = parseFloat(p.advanceAmount) || 0;
+      const hasAdvance = adv > 0;
+      return sum + (isPaid ? finalQuote : (hasAdvance ? adv : 0));
     }, 0);
   }, [projects]);
 
   const pendingInvoices = useMemo(() => {
     return projects.reduce((sum, p) => {
+      if ((p.status || "").toLowerCase() === "cancelled") return sum;
       const baseQuote = parseFloat(p.quote) || 0;
       const discountVal = parseFloat(p.discount) || 0;
       const finalQuote = baseQuote - discountVal;
-      const isPaid = p.paymentStatus === 'paid' || p.status === 'Completed';
-      const isPart = p.paymentStatus === 'part';
-      const dues = isPaid ? 0 : (isPart ? (finalQuote - (parseFloat(p.advanceAmount) || 0)) : finalQuote);
+      const isPaid = p.paymentStatus === 'paid' || (p.status || "").toLowerCase() === "completed";
+      const adv = parseFloat(p.advanceAmount) || 0;
+      const hasAdvance = adv > 0;
+      const dues = isPaid ? 0 : (hasAdvance ? (finalQuote - adv) : finalQuote);
       return sum + Math.max(0, dues);
     }, 0);
   }, [projects]);
