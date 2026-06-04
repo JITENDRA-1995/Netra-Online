@@ -4193,24 +4193,18 @@ function App() {
                             padding: '12px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                             color: '#fff', position: 'relative'
                           }}>
-                            <img
-                              src="/logo.png"
-                              alt="Netra Logo"
-                              style={{
-                                position: 'absolute',
-                                left: '25px',
-                                top: '8px',
-                                bottom: '8px',
-                                height: 'calc(100% - 16px)',
-                                width: 'auto',
-                                objectFit: 'contain',
-                                zIndex: 3,
-                                filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.35))'
-                              }}
-                            />
                             <div style={{ display: 'flex', alignItems: 'center', gap: '20px', zIndex: 2 }}>
-                              {/* Spacer to prevent text overlapping the absolutely positioned logo */}
-                              <div style={{ width: '100px', flexShrink: 0 }} />
+                              <img
+                                src="/logo.png"
+                                alt="Netra Logo"
+                                style={{
+                                  height: '75px',
+                                  width: 'auto',
+                                  objectFit: 'contain',
+                                  filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.35))',
+                                  flexShrink: 0
+                                }}
+                              />
                               <div style={{ display: 'flex', flexDirection: 'column' }}>
                                 <h1 style={{ margin: 0, fontSize: '2.0rem', fontWeight: '900', fontFamily: 'Urbanist, sans-serif', letterSpacing: '1px' }}>{adminProfile.businessName.toUpperCase()}</h1>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.85rem', opacity: 0.95, marginTop: '6px' }}>
