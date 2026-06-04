@@ -81,7 +81,8 @@ export const igniteProject = async (projectData) => {
         discount_type: projectData.discountType || 'rs',
         advance_amount: projectData.advanceAmount || 0,
         payment_status: projectData.paymentStatus || 'part',
-        deadline: projectData.deadline
+        deadline: projectData.deadline,
+        client_id: projectData.client_id
       }
     ])
     .select()
