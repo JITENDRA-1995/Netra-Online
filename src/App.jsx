@@ -4316,6 +4316,9 @@ function App() {
                     const pageRenders = pages.map((pageItems, pageIdx) => {
                       const isLastPage = pageIdx === pages.length - 1;
                       const blankRowsCount = Math.max(0, rowsPerPage - pageItems.length);
+                      const pageSubtotal = pageItems.reduce((sum, item) => sum + (parseFloat(item.rate || item.quote) * (item.qty || 1)), 0);
+                      const pageDiscount = pageItems.reduce((sum, item) => sum + (parseFloat(item.discount) || 0), 0);
+                      const pageTotal = pageSubtotal - pageDiscount;
 
                       return (
                         <div
@@ -4436,149 +4439,181 @@ function App() {
                             </table>
                           </div>
 
-                          {/* TOTALS & FOOTER - ONLY ON LAST PAGE */}
-                          {isLastPage ? (
-                            <div style={{ background: '#fff', borderTop: '1px solid #eee' }}>
-                              <div style={{ padding: '12px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                {/* Payment Instructions */}
-                                <div style={{ background: '#f8f9fa', padding: '12px', borderRadius: '8px', display: 'flex', gap: '10px', width: '58%', border: '1px solid #eee' }}>
-                                  <div style={{ width: '80px', height: '80px', background: '#fff', padding: '4px', borderRadius: '4px', border: '1px solid #ddd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=${encodeURIComponent(bankingDetails.upiId)}&pn=${encodeURIComponent(bankingDetails.accountName)}&am=${parseFloat(invoiceProject.quote) - (parseFloat(invoiceProject.advanceAmount) || 0) - (parseFloat(invoiceProject.discount) || 0)}&cu=INR`} alt="UPI QR" style={{ width: '100%', height: '100%' }} />
-                                  </div>
-                                  <div style={{ flex: 1 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#546e7a', fontSize: '0.65rem', fontWeight: 'bold', marginBottom: '6px' }}>
-                                      🏠 PAYMENT INSTRUCTIONS
-                                    </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.65rem', textTransform: 'uppercase' }}>
-                                      <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Bank Name</span><strong style={{ fontSize: '0.65rem' }}>{bankingDetails.bankName}</strong></div>
-                                      <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Account Name</span><strong style={{ fontSize: '0.65rem' }}>{bankingDetails.accountName}</strong></div>
-                                      <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Account Number</span><strong style={{ fontSize: '0.65rem', fontFamily: 'monospace' }}>{bankingDetails.accountNumber}</strong></div>
-                                      <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>IFSC Code</span><strong style={{ fontSize: '0.65rem', fontFamily: 'monospace' }}>{bankingDetails.ifscCode}</strong></div>
-                                    </div>
-                                  </div>
+                          {/* TOTALS & FOOTER - ON ALL PAGES */}
+                          <div style={{ background: '#fff', borderTop: '1px solid #eee' }}>
+                            <div style={{ padding: '12px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              {/* Payment Instructions */}
+                              <div style={{ background: '#f8f9fa', padding: '12px', borderRadius: '8px', display: 'flex', gap: '10px', width: '58%', border: '1px solid #eee' }}>
+                                <div style={{ width: '80px', height: '80px', background: '#fff', padding: '4px', borderRadius: '4px', border: '1px solid #ddd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=${encodeURIComponent(bankingDetails.upiId)}&pn=${encodeURIComponent(bankingDetails.accountName)}&am=${
+                                    isLastPage 
+                                      ? (() => {
+                                          const isCompleted = (invoiceProject.status || '').toLowerCase() === 'completed';
+                                          const subtotal = parseFloat(invoiceProject.quote) || 0;
+                                          const discount = parseFloat(invoiceProject.discount) || 0;
+                                          const advance = parseFloat(invoiceProject.advanceAmount) || 0;
+                                          const grandTotal = subtotal - discount;
+                                          return isCompleted ? grandTotal : (advance > 0 ? grandTotal - advance : grandTotal);
+                                        })()
+                                      : pageTotal
+                                  }&cu=INR`} alt="UPI QR" style={{ width: '100%', height: '100%' }} />
                                 </div>
-
-                                {/* Totals Section */}
-                                <div style={{ width: '38%', textAlign: 'right' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.8rem' }}>
-                                    <span style={{ color: '#666' }}>SUBTOTAL</span>
-                                    <span style={{ fontWeight: 'bold' }}>₹{formatCurrencyValue(invoiceProject.quote)}</span>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#546e7a', fontSize: '0.65rem', fontWeight: 'bold', marginBottom: '6px' }}>
+                                    🏠 PAYMENT INSTRUCTIONS
                                   </div>
-                                  {(parseFloat(invoiceProject.discount) || 0) > 0 && (
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.8rem' }}>
-                                      <span style={{ color: '#666' }}>DISCOUNT</span>
-                                      <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>-₹{formatCurrencyValue(invoiceProject.discount)}</span>
-                                    </div>
-                                  )}
-
-                                  {(() => {
-                                    const isCompleted = (invoiceProject.status || '').toLowerCase() === 'completed';
-                                    const subtotal = parseFloat(invoiceProject.quote) || 0;
-                                    const discount = parseFloat(invoiceProject.discount) || 0;
-                                    const advance = parseFloat(invoiceProject.advanceAmount) || 0;
-                                    const grandTotal = subtotal - discount;
-                                    const remaining = grandTotal - advance;
-
-                                    if (isCompleted) {
-                                      // Completed: show clean Grand Total only
-                                      return (
-                                        <div style={{
-                                          background: '#1b5e20', padding: '10px 15px', color: '#fff', borderRadius: '6px',
-                                          display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px'
-                                        }}>
-                                          <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>GRAND TOTAL</span>
-                                          <span style={{ fontSize: '1.25rem', fontWeight: '900' }}>₹{formatCurrencyValue(grandTotal)}</span>
-                                        </div>
-                                      );
-                                    } else {
-                                      // In Progress: show advance deduction + Remaining Due
-                                      return (
-                                        <>
-                                          {advance > 0 && (
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.8rem' }}>
-                                              <span style={{ color: '#666' }}>ADVANCE PAID</span>
-                                              <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>-₹{formatCurrencyValue(advance)}</span>
-                                            </div>
-                                          )}
-                                          <div style={{
-                                            background: '#3f51b5', padding: '10px 15px', color: '#fff', borderRadius: '6px',
-                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px'
-                                          }}>
-                                            <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>REMAINING DUE</span>
-                                            <span style={{ fontSize: '1.25rem', fontWeight: '900' }}>₹{formatCurrencyValue(advance > 0 ? remaining : grandTotal)}</span>
-                                          </div>
-                                        </>
-                                      );
-                                    }
-                                  })()}
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.65rem', textTransform: 'uppercase' }}>
+                                    <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Bank Name</span><strong style={{ fontSize: '0.65rem' }}>{bankingDetails.bankName}</strong></div>
+                                    <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Account Name</span><strong style={{ fontSize: '0.65rem' }}>{bankingDetails.accountName}</strong></div>
+                                    <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>Account Number</span><strong style={{ fontSize: '0.65rem', fontFamily: 'monospace' }}>{bankingDetails.accountNumber}</strong></div>
+                                    <div><span style={{ color: '#888', display: 'block', fontSize: '0.55rem' }}>IFSC Code</span><strong style={{ fontSize: '0.65rem', fontFamily: 'monospace' }}>{bankingDetails.ifscCode}</strong></div>
+                                  </div>
                                 </div>
                               </div>
 
-                              <div style={{ padding: '0 40px 12px' }}>
-                                <div style={{ background: '#fcfcfc', border: '1px solid #f0f0f0', borderLeft: '3px solid #d32f2f', padding: '6px 12px' }}>
-                                  <label style={{ fontSize: '0.5rem', color: '#888', fontWeight: '900', display: 'block' }}>AMOUNT IN WORDS</label>
-                                  <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 'bold' }}>
+                              {/* Totals Section */}
+                              <div style={{ width: '38%', textAlign: 'right' }}>
+                                {isLastPage ? (
+                                  <>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.8rem' }}>
+                                      <span style={{ color: '#666' }}>SUBTOTAL</span>
+                                      <span style={{ fontWeight: 'bold' }}>₹{formatCurrencyValue(invoiceProject.quote)}</span>
+                                    </div>
+                                    {(parseFloat(invoiceProject.discount) || 0) > 0 && (
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.8rem' }}>
+                                        <span style={{ color: '#666' }}>DISCOUNT</span>
+                                        <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>-₹{formatCurrencyValue(invoiceProject.discount)}</span>
+                                      </div>
+                                    )}
+
                                     {(() => {
                                       const isCompleted = (invoiceProject.status || '').toLowerCase() === 'completed';
                                       const subtotal = parseFloat(invoiceProject.quote) || 0;
                                       const discount = parseFloat(invoiceProject.discount) || 0;
                                       const advance = parseFloat(invoiceProject.advanceAmount) || 0;
                                       const grandTotal = subtotal - discount;
-                                      return amountInWords(isCompleted ? grandTotal : (advance > 0 ? grandTotal - advance : grandTotal));
+                                      const remaining = grandTotal - advance;
+
+                                      if (isCompleted) {
+                                        // Completed: show clean Grand Total only
+                                        return (
+                                          <div style={{
+                                            background: '#1b5e20', padding: '10px 15px', color: '#fff', borderRadius: '6px',
+                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px'
+                                          }}>
+                                            <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>GRAND TOTAL</span>
+                                            <span style={{ fontSize: '1.25rem', fontWeight: '900' }}>₹{formatCurrencyValue(grandTotal)}</span>
+                                          </div>
+                                        );
+                                      } else {
+                                        // In Progress: show advance deduction + Remaining Due
+                                        return (
+                                          <>
+                                            {advance > 0 && (
+                                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.8rem' }}>
+                                                <span style={{ color: '#666' }}>ADVANCE PAID</span>
+                                                <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>-₹{formatCurrencyValue(advance)}</span>
+                                              </div>
+                                            )}
+                                            <div style={{
+                                              background: '#3f51b5', padding: '10px 15px', color: '#fff', borderRadius: '6px',
+                                              display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px'
+                                            }}>
+                                              <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>REMAINING DUE</span>
+                                              <span style={{ fontSize: '1.25rem', fontWeight: '900' }}>₹{formatCurrencyValue(advance > 0 ? remaining : grandTotal)}</span>
+                                            </div>
+                                          </>
+                                        );
+                                      }
                                     })()}
-                                  </p>
-                                </div>
-                              </div>
-
-                              {/* Signatures Area */}
-                              <div style={{ padding: '0 40px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                                <div style={{ textAlign: 'center' }}>
-                                  <div style={{ width: '130px', borderBottom: '1px solid #333', marginBottom: '4px' }}></div>
-                                  <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#666' }}>Receiver's Sign</span>
-                                </div>
-                                <div style={{ textAlign: 'right' }}>
-                                  <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: '900' }}>For {adminProfile.businessName}</h4>
-                                  <p style={{ margin: '5px 0 0 0', fontSize: '0.6rem', color: '#999', fontStyle: 'italic' }}>
-                                    This is a computer generated invoice hence signatory not required.
-                                  </p>
-                                </div>
-                              </div>
-
-                              {/* FOOTER CARDS */}
-                              <div style={{ padding: '0 40px 15px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                                <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
-                                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.7rem', fontWeight: '900' }}>Follow Us on Instagram</h4>
-                                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                    <div style={{ width: '35px', height: '35px' }}>
-                                      <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://instagram.com/HIRAPARASAVANPHOTOGRAPHER" alt="IG QR" style={{ width: '100%' }} />
+                                  </>
+                                ) : (
+                                  <>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.8rem' }}>
+                                      <span style={{ color: '#666' }}>PAGE SUBTOTAL</span>
+                                      <span style={{ fontWeight: 'bold' }}>₹{formatCurrencyValue(pageSubtotal)}</span>
                                     </div>
-                                    <div style={{ fontSize: '0.5rem', color: '#777' }}>
-                                      <strong style={{ color: '#333' }}>@HIRAPARASAVANPHOTOGRAPHER</strong>
+                                    {pageDiscount > 0 && (
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.8rem' }}>
+                                        <span style={{ color: '#666' }}>PAGE DISCOUNT</span>
+                                        <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>-₹{formatCurrencyValue(pageDiscount)}</span>
+                                      </div>
+                                    )}
+                                    <div style={{
+                                      background: '#37474f', padding: '10px 15px', color: '#fff', borderRadius: '6px',
+                                      display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px'
+                                    }}>
+                                      <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>PAGE TOTAL</span>
+                                      <span style={{ fontSize: '1.25rem', fontWeight: '900' }}>₹{formatCurrencyValue(pageTotal)}</span>
                                     </div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ padding: '0 40px 12px' }}>
+                              <div style={{ background: '#fcfcfc', border: '1px solid #f0f0f0', borderLeft: '3px solid #d32f2f', padding: '6px 12px' }}>
+                                <label style={{ fontSize: '0.5rem', color: '#888', fontWeight: '900', display: 'block' }}>
+                                  {isLastPage ? 'AMOUNT IN WORDS' : 'PAGE TOTAL IN WORDS'}
+                                </label>
+                                <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                  {isLastPage ? (
+                                    (() => {
+                                      const isCompleted = (invoiceProject.status || '').toLowerCase() === 'completed';
+                                      const subtotal = parseFloat(invoiceProject.quote) || 0;
+                                      const discount = parseFloat(invoiceProject.discount) || 0;
+                                      const advance = parseFloat(invoiceProject.advanceAmount) || 0;
+                                      const grandTotal = subtotal - discount;
+                                      return amountInWords(isCompleted ? grandTotal : (advance > 0 ? grandTotal - advance : grandTotal));
+                                    })()
+                                  ) : (
+                                    amountInWords(pageTotal)
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Signatures Area */}
+                            <div style={{ padding: '0 40px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                              <div style={{ textAlign: 'center' }}>
+                                <div style={{ width: '130px', borderBottom: '1px solid #333', marginBottom: '4px' }}></div>
+                                <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#666' }}>Receiver's Sign</span>
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: '900' }}>For {adminProfile.businessName}</h4>
+                                <p style={{ margin: '5px 0 0 0', fontSize: '0.6rem', color: '#999', fontStyle: 'italic' }}>
+                                  This is a computer generated invoice hence signatory not required.
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* FOOTER CARDS */}
+                            <div style={{ padding: '0 40px 15px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                              <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
+                                <h4 style={{ margin: '0 0 4px 0', fontSize: '0.7rem', fontWeight: '900' }}>Follow Us on Instagram</h4>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                  <div style={{ width: '35px', height: '35px' }}>
+                                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://instagram.com/HIRAPARASAVANPHOTOGRAPHER" alt="IG QR" style={{ width: '100%' }} />
+                                  </div>
+                                  <div style={{ fontSize: '0.5rem', color: '#777' }}>
+                                    <strong style={{ color: '#333' }}>@HIRAPARASAVANPHOTOGRAPHER</strong>
                                   </div>
                                 </div>
-                                <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
-                                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.7rem', fontWeight: '900' }}>Quality Assured Work</h4>
-                                  <p style={{ fontSize: '0.55rem', color: '#777', margin: 0 }}>Every project is crafted with precision and passion.</p>
-                                </div>
-                                <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
-                                  <h4 style={{ margin: '0 0 4px 0', fontSize: '0.7rem', fontWeight: '900' }}>Thank You</h4>
-                                  <p style={{ fontSize: '0.55rem', color: '#777', margin: 0 }}>We value your trust in Netra Graphics.</p>
-                                </div>
                               </div>
+                              <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
+                                <h4 style={{ margin: '0 0 4px 0', fontSize: '0.7rem', fontWeight: '900' }}>Quality Assured Work</h4>
+                                <p style={{ fontSize: '0.55rem', color: '#777', margin: 0 }}>Every project is crafted with precision and passion.</p>
+                              </div>
+                              <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #f0f0f0' }}>
+                                <h4 style={{ margin: '0 0 4px 0', fontSize: '0.7rem', fontWeight: '900' }}>Thank You</h4>
+                                <p style={{ fontSize: '0.55rem', color: '#777', margin: 0 }}>We value your trust in Netra Graphics.</p>
+                              </div>
+                            </div>
 
-                              <div style={{ textAlign: 'center', paddingBottom: '8px', fontSize: '0.6rem', color: '#bbb' }}>
-                                Page {pageIdx + 1} of {pages.length}
-                              </div>
+                            <div style={{ textAlign: 'center', paddingBottom: '8px', fontSize: '0.6rem', color: '#bbb' }}>
+                              Page {pageIdx + 1} of {pages.length}
                             </div>
-                          ) : (
-                            <div style={{ marginTop: 'auto', padding: '15px 40px', textAlign: 'center', color: '#bbb', fontSize: '0.7rem', borderTop: '1px solid #eee' }}>
-                              CONTINUED ON PAGE {pageIdx + 2}...
-                              <div style={{ textAlign: 'center', paddingTop: '6px', fontSize: '0.6rem', color: '#bbb' }}>
-                                Page {pageIdx + 1} of {pages.length}
-                              </div>
-                            </div>
-                          )}
+                          </div>
                         </div>
                       );
                     });
