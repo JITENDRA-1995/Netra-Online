@@ -812,19 +812,90 @@ export default function InvoicesPage({
               />
             </div>
             {selectedVaultInvoices.length > 0 && (
-              <Button
-                size="sm"
-                className="bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 font-bold text-xs"
-                onClick={() => {
-                  if (window.confirm(`Delete ${selectedVaultInvoices.length} selected invoices? This action cannot be undone.`)) {
-                    setInvoices(prev => prev.filter(inv => !selectedVaultInvoices.includes(inv.id)));
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  className="bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/35 hover:to-indigo-500/35 border border-cyan-500/30 text-cyan-400 font-bold text-xs"
+                  onClick={() => {
+                    const selectedInvs = upToDateInvoices.filter(inv => selectedVaultInvoices.includes(inv.id));
+                    const clientsList = [...new Set(selectedInvs.map(inv => inv.clientName.trim().toLowerCase()))];
+                    if (clientsList.length > 1) {
+                      toast({
+                        title: "Multi-client selection",
+                        description: "Batch invoices can only be generated for a single client at a time.",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+
+                    const baseInvoice = selectedInvs[0];
+                    const firstRaw = baseInvoice.rawProject;
+                    
+                    let allItemsCombined: any[] = [];
+                    selectedInvs.forEach(inv => {
+                      const raw = inv.rawProject;
+                      if (raw && raw.items && raw.items.length > 0) {
+                        raw.items.forEach((item: any) => {
+                          allItemsCombined.push({
+                            service: item.service,
+                            quote: parseFloat(item.rate || item.quote) * (item.qty || 1),
+                            discount: parseFloat(item.discount) || 0,
+                            qty: item.qty || 1,
+                            rate: parseFloat(item.rate || item.quote)
+                          });
+                        });
+                      } else {
+                        allItemsCombined.push({
+                          service: inv.projectService || raw?.service || "Service Description",
+                          quote: parseFloat(raw?.quote || inv.grandTotal),
+                          discount: parseFloat(raw?.discount || 0),
+                          qty: raw?.qty || 1,
+                          rate: parseFloat(raw?.rate || raw?.quote || inv.grandTotal)
+                        });
+                      }
+                    });
+
+                    const totalQuote = allItemsCombined.reduce((sum, item) => sum + (parseFloat(item.rate || item.quote) * (item.qty || 1)), 0);
+                    const totalDiscount = allItemsCombined.reduce((sum, item) => sum + (parseFloat(item.discount) || 0), 0);
+                    const totalAdvance = selectedInvs.reduce((sum, inv) => sum + (parseFloat(inv.rawProject?.advanceAmount) || 0), 0);
+
+                    const batchProject = {
+                      id: `batch-vault-${Date.now()}`,
+                      name: baseInvoice.clientName,
+                      phone: firstRaw?.phone || baseInvoice.phone,
+                      email: firstRaw?.email || baseInvoice.email,
+                      address: firstRaw?.address || baseInvoice.address,
+                      gst: firstRaw?.gst || baseInvoice.gst,
+                      status: firstRaw?.status || "Active",
+                      service: allItemsCombined.map(i => i.service).join(", "),
+                      quote: totalQuote,
+                      discount: totalDiscount,
+                      advanceAmount: totalAdvance,
+                      items: allItemsCombined
+                    };
+
+                    setInvoiceProject(batchProject);
+                    setIsInvoicePreviewOpen(true);
                     setSelectedVaultInvoices([]);
-                    toast({ title: "Invoices deleted" });
-                  }
-                }}
-              >
-                DELETE SELECTED ({selectedVaultInvoices.length})
-              </Button>
+                  }}
+                >
+                  GENERATE BATCH INVOICE ({selectedVaultInvoices.length})
+                </Button>
+
+                <Button
+                  size="sm"
+                  className="bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 font-bold text-xs"
+                  onClick={() => {
+                    if (window.confirm(`Delete ${selectedVaultInvoices.length} selected invoices? This action cannot be undone.`)) {
+                      setInvoices(prev => prev.filter(inv => !selectedVaultInvoices.includes(inv.id)));
+                      setSelectedVaultInvoices([]);
+                      toast({ title: "Invoices deleted" });
+                    }
+                  }}
+                >
+                  DELETE SELECTED ({selectedVaultInvoices.length})
+                </Button>
+              </div>
             )}
           </div>
         </div>

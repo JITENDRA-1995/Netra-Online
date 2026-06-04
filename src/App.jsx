@@ -982,14 +982,14 @@ function App() {
                     id: inv.id,
                     name: parsed.name,
                     service: parsed.service,
-                    quote: parsed.rate * parsed.qty,
-                    discount: parsed.discount,
-                    advanceAmount: 0,
+                    quote: parsed.quote || (parsed.rate * parsed.qty),
+                    discount: parsed.discount || 0,
+                    advanceAmount: parsed.advanceAmount || 0,
                     phone: parsed.phone,
                     email: parsed.email,
                     address: parsed.address,
                     gst: parsed.gst,
-                    items: [{
+                    items: (parsed.items && parsed.items.length > 0) ? parsed.items : [{
                       service: parsed.service,
                       quote: parsed.rate * parsed.qty,
                       discount: parsed.discount,
@@ -1177,26 +1177,71 @@ function App() {
     const advance = parseFloat(p.advanceAmount) || 0;
     const grandTotal = isCompleted ? (subtotal - discount) : (subtotal - discount - advance);
 
+    const isBatch = p.id?.toString().startsWith('batch-') || (p.items && p.items.length > 1);
+
+    let clientNamePayload = p.name;
+    if (isBatch) {
+      const mockClientPayload = {
+        name: p.name,
+        address: p.address || "",
+        email: p.email || "",
+        phone: p.phone || "",
+        gst: p.gst || "",
+        service: p.service,
+        quote: p.quote,
+        discount: p.discount || 0,
+        advanceAmount: p.advanceAmount || 0,
+        items: p.items || []
+      };
+      clientNamePayload = `JSON_MOCK:${JSON.stringify(mockClientPayload)}`;
+    }
+
     const newInvoice = {
       invoiceNo: invNo,
-      clientName: p.name,
+      clientName: clientNamePayload,
       projectService: p.service,
       issueDate: new Date().toISOString().split('T')[0],
       grandTotal: grandTotal,
-      projectId: p.id
+      projectId: isBatch ? null : p.id
     };
 
     try {
       const savedInvoice = await saveInvoice(newInvoice);
-      const formattedInvoice = {
-        id: savedInvoice.id,
-        invoiceNo: savedInvoice.invoice_no,
-        clientName: savedInvoice.client_name,
-        projectService: savedInvoice.project_service,
-        issueDate: new Date(savedInvoice.issue_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-        grandTotal: parseFloat(savedInvoice.grand_total),
-        rawProject: p
-      };
+      let formattedInvoice;
+      if (isBatch) {
+        const parsed = JSON.parse(clientNamePayload.substring(10));
+        formattedInvoice = {
+          id: savedInvoice.id,
+          invoiceNo: savedInvoice.invoice_no,
+          clientName: parsed.name,
+          projectService: parsed.service,
+          issueDate: new Date(savedInvoice.issue_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+          grandTotal: parseFloat(savedInvoice.grand_total),
+          rawProject: {
+            id: savedInvoice.id,
+            name: parsed.name,
+            service: parsed.service,
+            quote: parsed.quote,
+            discount: parsed.discount,
+            advanceAmount: parsed.advanceAmount,
+            phone: parsed.phone,
+            email: parsed.email,
+            address: parsed.address,
+            gst: parsed.gst,
+            items: parsed.items
+          }
+        };
+      } else {
+        formattedInvoice = {
+          id: savedInvoice.id,
+          invoiceNo: savedInvoice.invoice_no,
+          clientName: savedInvoice.client_name,
+          projectService: savedInvoice.project_service,
+          issueDate: new Date(savedInvoice.issue_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+          grandTotal: parseFloat(savedInvoice.grand_total),
+          rawProject: p
+        };
+      }
       setInvoices(prev => [formattedInvoice, ...prev]);
     } catch (err) {
       console.error("Failed to save invoice to Supabase:", err);
