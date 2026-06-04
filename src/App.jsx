@@ -1505,7 +1505,7 @@ function App() {
 
       // A. Advance payment verification
       if (advance > 0 && !isCancelled) {
-        const hasAdvance = newEntries.some(entry => entry.projectId === p.id && (entry.isAdvance || entry.desc.toLowerCase().startsWith('advance:')));
+        const hasAdvance = newEntries.some(entry => entry.projectId === p.id && (entry.isAdvance || entry.desc.toLowerCase().startsWith('advance:') || entry.desc.toLowerCase().startsWith('advance payment:')));
         if (!hasAdvance) {
           newEntries.push({
             id: Date.now() + Math.random(),
@@ -1522,9 +1522,24 @@ function App() {
         }
       }
 
+      // Deduplicate advance payment entries if there are multiple
+      const advanceEntries = newEntries.filter(entry => entry.projectId === p.id && (entry.isAdvance || entry.desc.toLowerCase().startsWith('advance:') || entry.desc.toLowerCase().startsWith('advance payment:')));
+      if (advanceEntries.length > 1) {
+        const keepId = advanceEntries[0].id;
+        newEntries = newEntries.filter(entry => {
+          const isMatch = entry.projectId === p.id && (entry.isAdvance || entry.desc.toLowerCase().startsWith('advance:') || entry.desc.toLowerCase().startsWith('advance payment:'));
+          if (isMatch) {
+            return entry.id === keepId;
+          }
+          return true;
+        });
+        updated = true;
+      }
+
       // B. Final payment verification
       if (isCompleted) {
-        const hasFinal = newEntries.some(entry => entry.projectId === p.id && entry.isFinal);
+        const isPromptOpenForProject = customPaymentPrompt && customPaymentPrompt.p.id === p.id;
+        const hasFinal = newEntries.some(entry => entry.projectId === p.id && (entry.isFinal || entry.desc.toLowerCase().startsWith('payment:') || entry.desc.toLowerCase().startsWith('final payment:'))) || isPromptOpenForProject;
         if (!hasFinal && remainingDue > 0) {
           newEntries.push({
             id: Date.now() + Math.random(),
@@ -1541,11 +1556,25 @@ function App() {
         }
       }
 
+      // Deduplicate final payment entries if there are multiple
+      const finalEntries = newEntries.filter(entry => entry.projectId === p.id && (entry.isFinal || entry.desc.toLowerCase().startsWith('payment:') || entry.desc.toLowerCase().startsWith('final payment:')));
+      if (finalEntries.length > 1) {
+        const keepId = finalEntries[0].id;
+        newEntries = newEntries.filter(entry => {
+          const isMatch = entry.projectId === p.id && (entry.isFinal || entry.desc.toLowerCase().startsWith('payment:') || entry.desc.toLowerCase().startsWith('final payment:'));
+          if (isMatch) {
+            return entry.id === keepId;
+          }
+          return true;
+        });
+        updated = true;
+      }
+
       // C. Remove final payment if project is not completed
       if (!isCompleted) {
-        const finalEntries = newEntries.filter(entry => entry.projectId === p.id && entry.isFinal);
-        if (finalEntries.length > 0) {
-          newEntries = newEntries.filter(entry => !(entry.projectId === p.id && entry.isFinal));
+        const finalEntriesExist = newEntries.filter(entry => entry.projectId === p.id && (entry.isFinal || entry.desc.toLowerCase().startsWith('payment:') || entry.desc.toLowerCase().startsWith('final payment:')));
+        if (finalEntriesExist.length > 0) {
+          newEntries = newEntries.filter(entry => !(entry.projectId === p.id && (entry.isFinal || entry.desc.toLowerCase().startsWith('payment:') || entry.desc.toLowerCase().startsWith('final payment:'))));
           updated = true;
         }
       }
@@ -1563,7 +1592,7 @@ function App() {
     if (updated) {
       setCashbookEntries(newEntries);
     }
-  }, [ignitionQueue, cashbookEntries]);
+  }, [ignitionQueue, cashbookEntries, customPaymentPrompt]);
 
   const kanbanColumns = [
     { id: 1, title: "SPARK", desc: "Discovery" },
@@ -2387,7 +2416,7 @@ function App() {
     }
 
     // Check if cashbook entry already exists to prevent double logging
-    const exists = cashbookEntries.some(entry => entry.projectId === project.id && entry.desc.startsWith(type === 'deposit' ? "Advance Payment:" : "Final Payment:"));
+    const exists = cashbookEntries.some(entry => entry.projectId === project.id && (entry.isAdvance || entry.isFinal || entry.desc.startsWith(type === 'deposit' ? "Advance Payment:" : "Final Payment:")));
     if (!exists && milestoneAmt > 0) {
       const newEntry = {
         id: Date.now(),
@@ -2397,7 +2426,9 @@ function App() {
         amount: milestoneAmt,
         type: "INCOME",
         mode: "UPI",
-        category: "Service"
+        category: "Service",
+        isAdvance: type === 'deposit' ? true : undefined,
+        isFinal: type === 'retainer' ? true : undefined
       };
       setCashbookEntries(prev => [newEntry, ...prev]);
     }
