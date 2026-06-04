@@ -2046,7 +2046,7 @@ function App() {
     } catch (err) {
       console.error("Failed to ignite project:", err);
       btn.innerText = "ERROR - RETRY";
-      alert("Failed to ignite project in database.");
+      alert("Failed to ignite project in database: " + (err.message || err.details || JSON.stringify(err)));
     }
   };
 
@@ -2059,7 +2059,7 @@ function App() {
         setSelectedProjectTab(null);
       } catch (err) {
         console.error("Failed to delete project from Supabase:", err);
-        alert("Failed to terminate project database record.");
+        alert("Failed to terminate project database record: " + (err.message || err.details || JSON.stringify(err)));
       }
     }
   };
@@ -2111,7 +2111,7 @@ function App() {
       alert(`Successfully uploaded and shared: ${file.name}`);
     } catch (err) {
       console.error("Vault asset upload failed:", err);
-      alert("Failed to upload file to Supabase Storage.");
+      alert("Failed to upload file to Supabase Storage: " + (err.message || err.details || JSON.stringify(err)));
     }
   };
 
@@ -2298,7 +2298,7 @@ function App() {
       }
     } catch (err) {
       console.error("Failed to save client:", err);
-      alert("Failed to save client record.");
+      alert("Failed to save client record: " + (err.message || err.details || JSON.stringify(err)));
     }
 
     setIsClientModalOpen(false);
@@ -2322,7 +2322,7 @@ function App() {
         toast({ title: "Client Deleted Successfully" });
       } catch (err) {
         console.error("Failed to delete client:", err);
-        alert("Failed to delete client record.");
+        alert("Failed to delete client record: " + (err.message || err.details || JSON.stringify(err)));
       }
     }
   };
