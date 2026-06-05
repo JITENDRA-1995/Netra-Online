@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Plus, Search, Pencil, Trash2, FileText } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
@@ -134,28 +134,47 @@ export default function Projects({
   const [formClientPhone, setFormClientPhone] = useState("");
   const [formClientAddress, setFormClientAddress] = useState("");
 
-  // QTY / Rate bidirectional calculation state
+  // QTY / Rate / Discount bidirectional state
+  // formBudget = grossQuote = qty × rate  (stored in DB quote column)
+  // formNetQuote = grossQuote − discount   (displayed as "Estimated Quote")
   const [formQty, setFormQty] = useState<number>(1);
   const [formRate, setFormRate] = useState<number | "">(0);
-  const [qtyRateLastCalc, setQtyRateLastCalc] = useState<"rate" | "budget">("rate");
+  const [formNetQuote, setFormNetQuote] = useState<number | "">(0);
+  const [netQuoteUserTyped, setNetQuoteUserTyped] = useState(false);
 
-  // Qty or Rate change → recalculate Budget
+  // 2-step wizard step
+  const [editStep, setEditStep] = useState(1);
+
+  // Qty or Rate → recalculate gross then net (discount unchanged, rate unchanged)
   useEffect(() => {
-    if (qtyRateLastCalc !== "budget") {
+    if (!netQuoteUserTyped) {
       const qty = Number(formQty) || 1;
       const rate = Number(formRate) || 0;
-      setFormBudget(qty * rate);
+      const gross = qty * rate;
+      setFormBudget(gross);
+      const disc = typeof formDiscountValue === "number" ? formDiscountValue : 0;
+      setFormNetQuote(Math.max(0, gross - disc));
     }
-  }, [formQty, formRate, qtyRateLastCalc]);
+  }, [formQty, formRate]);
 
-  // Budget change → recalculate Rate
+  // Discount change → recalculate net only (rate stays fixed)
   useEffect(() => {
-    if (qtyRateLastCalc === "budget") {
+    const gross = typeof formBudget === "number" ? formBudget : 0;
+    const disc = typeof formDiscountValue === "number" ? formDiscountValue : 0;
+    setFormNetQuote(Math.max(0, gross - disc));
+  }, [formDiscountValue]);
+
+  // User types net quote → derive rate from (net + discount) / qty
+  useEffect(() => {
+    if (netQuoteUserTyped) {
+      const net = typeof formNetQuote === "number" ? formNetQuote : 0;
+      const disc = typeof formDiscountValue === "number" ? formDiscountValue : 0;
+      const gross = net + disc;
       const qty = Number(formQty) || 1;
-      const budget = Number(formBudget) || 0;
-      setFormRate(parseFloat((budget / qty).toFixed(2)));
+      setFormBudget(gross);
+      setFormRate(parseFloat((gross / qty).toFixed(2)));
     }
-  }, [formBudget, qtyRateLastCalc]);
+  }, [formNetQuote]);
 
 
   const filtered = projects.filter((p) => {
@@ -208,53 +227,52 @@ export default function Projects({
     const currentStatus = (project.status || "active").toLowerCase().replace(" ", "_");
     const formStatusVal = currentStatus === "ongoing" ? "active" : currentStatus;
     const currentCategory = (project.category || "branding").toLowerCase().replace(" ", "_");
-    const budgetVal = project.budget !== undefined ? project.budget : (parseFloat(project.quote) || 0);
-
-    // Load QTY and Rate from project data (parsed from JSON_METADATA by getProjects)
+    // grossQuote = value stored in DB quote column
+    const grossQuote = project.budget !== undefined ? project.budget : (parseFloat(project.quote) || 0);
     const loadedQty = Number(project.qty) || 1;
-    const loadedRate = Number(project.rate) || (loadedQty > 0 ? budgetVal / loadedQty : budgetVal);
+    const loadedRate = Number(project.rate) || (loadedQty > 0 ? grossQuote / loadedQty : grossQuote);
+    const loadedDiscount = parseFloat(project.discountValue) || parseFloat(project.discount) || 0;
+    const loadedNet = Math.max(0, grossQuote - loadedDiscount);
 
     setFormName(project.service || project.name || "");
     setFormDescription(project.description || project.desc || "");
     setFormStatus(["active", "completed", "on_hold", "cancelled"].includes(formStatusVal) ? formStatusVal : "active");
     setFormCategory(["branding", "web", "print", "motion", "illustration", "social_media", "packaging"].includes(currentCategory) ? currentCategory : "branding");
-    setFormBudget(budgetVal);
+    setFormBudget(grossQuote);
     setFormProgress(project.progress || 0);
-    const deadlineStr = project.deadline ? project.deadline.split('T')[0] : "";
-    setFormDeadline(deadlineStr);
-    setFormDiscountValue(parseFloat(project.discountValue) || parseFloat(project.discount) || 0);
+    setFormDeadline(project.deadline ? project.deadline.split('T')[0] : "");
+    setFormDiscountValue(loadedDiscount);
     setFormDiscountType(project.discountType || 'rs');
     setFormAdvanceAmount(parseFloat(project.advanceAmount) || 0);
     setFormClientEmail(project.client?.email || "");
     setFormClientPhone(project.client?.phone || "");
     setFormClientAddress(project.client?.address || "");
-
-    // Set QTY/Rate state — use 'rate' mode so bidirectional effect doesn't immediately overwrite budget
-    setQtyRateLastCalc("rate");
     setFormQty(loadedQty);
     setFormRate(parseFloat(loadedRate.toFixed(2)));
-
+    setFormNetQuote(loadedNet);
+    setNetQuoteUserTyped(false);
+    setEditStep(1);
     setDialogOpen(true);
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (editingProject && setProjects) {
-      const budgetVal = typeof formBudget === "number" ? formBudget : 0;
+      // grossQuote = qty × rate (stored in DB quote column)
       const qtyVal = Number(formQty) || 1;
-      const rateVal = typeof formRate === "number" ? formRate : (budgetVal / qtyVal);
+      const rateVal = typeof formRate === "number" ? formRate : 0;
+      const grossQuote = qtyVal * rateVal;
+      // Always store gross in formBudget for consistency
+      const budgetVal = grossQuote;
       const discountInput = typeof formDiscountValue === "number" ? formDiscountValue : 0;
       const statusFormatted = formStatus.charAt(0).toUpperCase() + formStatus.slice(1).replace("_", " ");
-      
-      let discountAmt = 0;
-      if (formDiscountType === "%") {
-        discountAmt = (budgetVal * discountInput) / 100;
-      } else {
-        discountAmt = discountInput;
-      }
+
+      // Only ₹ discount supported (matching ignition logic)
+      const discountAmt = discountInput;
 
       const advanceVal = typeof formAdvanceAmount === "number" ? formAdvanceAmount : 0;
-      const finalQuote = budgetVal - discountAmt;
+      // finalQuote = amount client actually pays after discount
+      const finalQuote = grossQuote - discountAmt;
       let paymentStatus = 'unpaid';
       if (advanceVal >= finalQuote) {
         paymentStatus = 'paid';
@@ -652,277 +670,297 @@ export default function Projects({
         )}
       </motion.div>
 
-      {/* Edit Modal */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-[#080c18] border border-white/10 max-w-2xl w-full p-0 overflow-hidden flex flex-col max-h-[90vh]" data-testid="dialog-project-form">
+      {/* Edit Modal — 2-Step Wizard */}
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditStep(1); }}>
+        <DialogContent className="bg-[#080c18] border border-white/10 max-w-xl w-full p-0 overflow-hidden flex flex-col max-h-[90vh]" data-testid="dialog-project-form">
+
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-gradient-to-r from-cyan-500/10 to-indigo-500/5 flex-shrink-0">
+          <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-white/10 bg-gradient-to-r from-cyan-500/10 to-indigo-500/5 flex-shrink-0">
             <div>
-              <DialogTitle className="text-foreground font-black tracking-wide text-base flex items-center gap-2">
-                <span className="text-cyan-400">⚙️</span> CALIBRATE PROJECT PARAMETERS
+              <DialogTitle className="text-foreground font-black tracking-wide text-sm flex items-center gap-2">
+                <span className="text-cyan-400">⚙️</span> CALIBRATE PROJECT
               </DialogTitle>
-              <p className="text-3xs text-muted-foreground mt-0.5 uppercase tracking-widest">Editing: {formName || 'Project'}</p>
+              <p className="text-3xs text-muted-foreground mt-0.5 uppercase tracking-widest">{formName || 'Project'}</p>
+            </div>
+            {/* Step indicator */}
+            <div className="flex items-center gap-2">
+              <div className={`flex items-center justify-center w-7 h-7 rounded-full text-2xs font-black border transition-all ${
+                editStep === 1 ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' : 'bg-white/5 border-white/10 text-muted-foreground'
+              }`}>1</div>
+              <div className="w-8 h-px bg-white/10"/>
+              <div className={`flex items-center justify-center w-7 h-7 rounded-full text-2xs font-black border transition-all ${
+                editStep === 2 ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' : 'bg-white/5 border-white/10 text-muted-foreground'
+              }`}>2</div>
             </div>
           </div>
 
-          {/* Scrollable Content */}
+          {/* Step labels */}
+          <div className="flex border-b border-white/5 flex-shrink-0">
+            <button type="button" onClick={() => setEditStep(1)}
+              className={`flex-1 py-2.5 text-3xs font-extrabold uppercase tracking-widest transition-all ${
+                editStep === 1 ? 'text-cyan-400 border-b-2 border-cyan-400 bg-cyan-500/5' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >📋 Mission Details</button>
+            <button type="button" onClick={() => setEditStep(2)}
+              className={`flex-1 py-2.5 text-3xs font-extrabold uppercase tracking-widest transition-all ${
+                editStep === 2 ? 'text-cyan-400 border-b-2 border-cyan-400 bg-cyan-500/5' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >💰 Financial Matrix</button>
+          </div>
+
           <form onSubmit={handleSave} className="flex flex-col flex-1 min-h-0">
-            <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+            <div className="overflow-y-auto flex-1 px-6 py-5">
 
-              {/* Section: Basic Info */}
-              <div className="space-y-3">
-                <p className="text-3xs uppercase tracking-widest text-cyan-400 font-extrabold flex items-center gap-1.5 border-b border-white/5 pb-2">
-                  📋 Basic Information
-                </p>
-                <div className="space-y-1">
-                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Project / Service Title</label>
-                  <Input
-                    value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
-                    className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
-                    placeholder="Service tag/name"
-                    list="services-list"
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Mission Brief / Notes</label>
-                  <Input
-                    value={formDescription}
-                    onChange={(e) => setFormDescription(e.target.value)}
-                    className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
-                    placeholder="Project objectives and notes"
-                  />
-                </div>
-              </div>
+              {/* ── STEP 1: Mission Details ── */}
+              {editStep === 1 && (
+                <div className="space-y-4">
 
-              {/* Section: Client Contact */}
-              <div className="space-y-3">
-                <p className="text-3xs uppercase tracking-widest text-cyan-400 font-extrabold flex items-center gap-1.5 border-b border-white/5 pb-2">
-                  👤 Client Contact & Billing
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Client Email (Optional)</label>
+                  {/* Service */}
+                  <div className="space-y-1.5">
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Service / Project Title</label>
                     <Input
-                      type="email"
-                      value={formClientEmail}
-                      onChange={(e) => setFormClientEmail(e.target.value)}
+                      value={formName}
+                      onChange={(e) => setFormName(e.target.value)}
                       className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
-                      placeholder="client@mail.com"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Client Mobile</label>
-                    <Input
-                      type="tel"
-                      value={formClientPhone}
-                      onChange={(e) => setFormClientPhone(e.target.value)}
-                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
-                      placeholder="+91 XXXXX XXXXX"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Billing Address</label>
-                  <Input
-                    value={formClientAddress}
-                    onChange={(e) => setFormClientAddress(e.target.value)}
-                    className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
-                    placeholder="Official billing address"
-                  />
-                </div>
-              </div>
-
-              {/* Section: Status & Category */}
-              <div className="space-y-3">
-                <p className="text-3xs uppercase tracking-widest text-cyan-400 font-extrabold flex items-center gap-1.5 border-b border-white/5 pb-2">
-                  🏷️ Status & Classification
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Status</label>
-                    <select
-                      className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer"
-                      value={formStatus}
-                      onChange={(e) => setFormStatus(e.target.value)}
-                    >
-                      <option value="active">Active</option>
-                      <option value="completed">Completed</option>
-                      <option value="on_hold">On Hold</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Category</label>
-                    <select
-                      className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer"
-                      value={formCategory}
-                      onChange={(e) => setFormCategory(e.target.value)}
-                    >
-                      <option value="branding">Branding</option>
-                      <option value="web">Web App/UI</option>
-                      <option value="print">Print Media</option>
-                      <option value="motion">Motion Graphics</option>
-                      <option value="illustration">Illustration</option>
-                      <option value="social_media">Social Media</option>
-                      <option value="packaging">Packaging</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section: Budget & Timeline */}
-              <div className="space-y-3">
-                <p className="text-3xs uppercase tracking-widest text-cyan-400 font-extrabold flex items-center gap-1.5 border-b border-white/5 pb-2">
-                  💰 Budget & Timeline
-                </p>
-
-                {/* QTY + Rate row */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Quantity</label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={formQty}
-                      onChange={(e) => {
-                        setFormQty(parseInt(e.target.value) || 1);
-                        setQtyRateLastCalc("rate");
-                      }}
-                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
-                      placeholder="1"
+                      placeholder="e.g. Logo Design, Wedding Invite..."
+                      list="services-list"
                       required
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Rate (₹)</label>
-                    <Input
-                      type="number"
-                      value={formRate}
-                      onChange={(e) => {
-                        setFormRate(e.target.value === "" ? "" : parseFloat(e.target.value) || 0);
-                        setQtyRateLastCalc("rate");
-                      }}
-                      onFocus={(e) => { if (formRate === 0) setFormRate(""); }}
-                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
-                      placeholder="Rate per unit"
-                      required
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Quote / Budget (₹) <span className="normal-case opacity-60">(Qty×Rate)</span></label>
-                    <Input
-                      type="number"
-                      value={formBudget}
-                      onChange={(e) => {
-                        setFormBudget(e.target.value === "" ? "" : (parseInt(e.target.value) || 0));
-                        setQtyRateLastCalc("budget");
-                      }}
-                      onFocus={(e) => { if (formBudget === 0) setFormBudget(""); }}
-                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
-                      placeholder="0"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Progress (%)</label>
-                    <Input
-                      type="number"
-                      value={formProgress}
-                      onChange={(e) => setFormProgress(e.target.value === "" ? "" : Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                      onFocus={(e) => { if (formProgress === 0) setFormProgress(""); }}
-                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
-                      min={0} max={100}
-                      placeholder="0"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Deadline</label>
-                    <Input
-                      type="date"
-                      value={formDeadline}
-                      onChange={(e) => setFormDeadline(e.target.value)}
-                      className="bg-white/5 border-white/10 rounded-xl text-xs focus:border-cyan-400"
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Section: Discount & Advance */}
-              <div className="space-y-3">
-                <p className="text-3xs uppercase tracking-widest text-cyan-400 font-extrabold flex items-center gap-1.5 border-b border-white/5 pb-2">
-                  🎁 Discount & Advance Payment
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Discount Value</label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        value={formDiscountValue}
-                        onChange={(e) => setFormDiscountValue(e.target.value === "" ? "" : (parseFloat(e.target.value) || 0))}
-                        onFocus={(e) => { if (formDiscountValue === 0) setFormDiscountValue(""); }}
-                        className="bg-white/5 border-white/10 rounded-xl pr-10 focus:border-cyan-400"
-                        placeholder="0"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-2xs text-muted-foreground font-bold">
-                        {formDiscountType === "rs" ? "₹" : "%"}
-                      </span>
+                  {/* Status + Category */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Status</label>
+                      <select
+                        className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer"
+                        value={formStatus}
+                        onChange={(e) => setFormStatus(e.target.value)}
+                      >
+                        <option value="active">Active</option>
+                        <option value="completed">Completed</option>
+                        <option value="on_hold">On Hold</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Category</label>
+                      <select
+                        className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer"
+                        value={formCategory}
+                        onChange={(e) => setFormCategory(e.target.value)}
+                      >
+                        <option value="branding">Branding</option>
+                        <option value="web">Web App/UI</option>
+                        <option value="print">Print Media</option>
+                        <option value="motion">Motion Graphics</option>
+                        <option value="illustration">Illustration</option>
+                        <option value="social_media">Social Media</option>
+                        <option value="packaging">Packaging</option>
+                      </select>
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Discount Type</label>
-                    <select
-                      className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer"
-                      value={formDiscountType}
-                      onChange={(e) => setFormDiscountType(e.target.value as 'rs' | '%')}
-                    >
-                      <option value="rs">Rupees (₹)</option>
-                      <option value="%">Percentage (%)</option>
-                    </select>
+
+                  {/* Deadline + Progress */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Deadline</label>
+                      <Input
+                        type="date"
+                        value={formDeadline}
+                        onChange={(e) => setFormDeadline(e.target.value)}
+                        className="bg-white/5 border-white/10 rounded-xl text-xs focus:border-cyan-400"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Progress (%)</label>
+                      <Input
+                        type="number"
+                        value={formProgress}
+                        onChange={(e) => setFormProgress(e.target.value === "" ? "" : Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                        onFocus={() => { if (formProgress === 0) setFormProgress(""); }}
+                        className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
+                        min={0} max={100} placeholder="0"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Client contact */}
+                  <div className="pt-1">
+                    <p className="text-3xs uppercase tracking-widest text-cyan-400/70 font-extrabold mb-3 border-b border-white/5 pb-2">👤 Client Contact</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Email (optional)</label>
+                        <Input type="email" value={formClientEmail} onChange={(e) => setFormClientEmail(e.target.value)}
+                          className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="client@email.com" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Mobile</label>
+                        <Input type="tel" value={formClientPhone} onChange={(e) => setFormClientPhone(e.target.value)}
+                          className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="+91 XXXXX XXXXX" />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5 mt-3">
+                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Billing Address</label>
+                      <Input value={formClientAddress} onChange={(e) => setFormClientAddress(e.target.value)}
+                        className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="Official billing address" />
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div className="space-y-1.5">
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Mission Brief / Notes</label>
+                    <Input value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
+                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="Project objectives and notes" />
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Advance Payment Received (₹)</label>
-                  <Input
-                    type="number"
-                    value={formAdvanceAmount}
-                    onChange={(e) => setFormAdvanceAmount(e.target.value === "" ? "" : (parseFloat(e.target.value) || 0))}
-                    onFocus={(e) => { if (formAdvanceAmount === 0) setFormAdvanceAmount(""); }}
-                    className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
-                    placeholder="0"
-                  />
+              )}
+
+              {/* ── STEP 2: Financial Matrix ── */}
+              {editStep === 2 && (
+                <div className="space-y-4">
+
+                  {/* Qty + Rate */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Quantity</label>
+                      <Input
+                        type="number" min={1} value={formQty}
+                        onChange={(e) => { setNetQuoteUserTyped(false); setFormQty(parseInt(e.target.value) || 1); }}
+                        className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
+                        placeholder="1" required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Rate (₹) per unit</label>
+                      <Input
+                        type="number" value={formRate}
+                        onChange={(e) => { setNetQuoteUserTyped(false); setFormRate(e.target.value === "" ? "" : parseFloat(e.target.value) || 0); }}
+                        onFocus={() => { if (formRate === 0) setFormRate(""); }}
+                        className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
+                        placeholder="Rate per unit" required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Gross quote display (read-only) */}
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/3 border border-white/8">
+                    <span className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold flex-1">Gross Quote (Qty × Rate)</span>
+                    <span className="font-black text-sm text-foreground">₹{(Number(formQty) * Number(formRate) || 0).toLocaleString('en-IN')}</span>
+                  </div>
+
+                  {/* Estimated Quote (after discount) — bidirectional */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">
+                        Special Discount (₹)
+                        <span className="ml-1 normal-case opacity-60">subtracted from gross</span>
+                      </label>
+                      <Input
+                        type="number" value={formDiscountValue}
+                        onChange={(e) => setFormDiscountValue(e.target.value === "" ? "" : parseFloat(e.target.value) || 0)}
+                        onFocus={() => { if (formDiscountValue === 0) setFormDiscountValue(""); }}
+                        className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">
+                        Estimated Quote (₹)
+                        <span className="ml-1 normal-case opacity-60">after discount</span>
+                      </label>
+                      <Input
+                        type="number" value={formNetQuote}
+                        onChange={(e) => {
+                          setNetQuoteUserTyped(true);
+                          setFormNetQuote(e.target.value === "" ? "" : parseFloat(e.target.value) || 0);
+                        }}
+                        onFocus={() => { if (formNetQuote === 0) setFormNetQuote(""); }}
+                        className="bg-white/5 border-cyan-500/30 rounded-xl focus:border-cyan-400 text-cyan-300"
+                        placeholder="Auto-calculated"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Live summary bar */}
+                  <div className="grid grid-cols-3 gap-2 rounded-xl border border-white/8 overflow-hidden">
+                    {[
+                      { label: 'Gross', val: `₹${(Number(formQty) * Number(formRate) || 0).toLocaleString('en-IN')}`, color: 'text-foreground' },
+                      { label: 'Discount', val: `-₹${(typeof formDiscountValue === 'number' ? formDiscountValue : 0).toLocaleString('en-IN')}`, color: 'text-amber-400' },
+                      { label: 'Net Payable', val: `₹${(typeof formNetQuote === 'number' ? formNetQuote : 0).toLocaleString('en-IN')}`, color: 'text-cyan-400' },
+                    ].map(({ label, val, color }) => (
+                      <div key={label} className="flex flex-col items-center py-3 bg-white/3">
+                        <span className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">{label}</span>
+                        <span className={`font-black text-sm mt-0.5 ${color}`}>{val}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Advance payment */}
+                  <div className="space-y-1.5">
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Advance Payment Received (₹)</label>
+                    <Input
+                      type="number" value={formAdvanceAmount}
+                      onChange={(e) => setFormAdvanceAmount(e.target.value === "" ? "" : parseFloat(e.target.value) || 0)}
+                      onFocus={() => { if (formAdvanceAmount === 0) setFormAdvanceAmount(""); }}
+                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
+                      placeholder="0"
+                    />
+                  </div>
+
+                  {/* Balance due */}
+                  {(() => {
+                    const net = typeof formNetQuote === 'number' ? formNetQuote : 0;
+                    const adv = typeof formAdvanceAmount === 'number' ? formAdvanceAmount : 0;
+                    const bal = Math.max(0, net - adv);
+                    return (
+                      <div className={`flex items-center justify-between px-4 py-3 rounded-xl border ${
+                        bal === 0 ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-amber-500/5 border-amber-500/20'
+                      }`}>
+                        <span className="text-3xs uppercase tracking-widest font-semibold text-muted-foreground">Balance Due</span>
+                        <span className={`font-black text-sm ${bal === 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                          {bal === 0 ? '✓ Fully Paid' : `₹${bal.toLocaleString('en-IN')}`}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
-              </div>
+              )}
 
             </div>
 
-            {/* Sticky Footer Buttons */}
+            {/* Footer */}
             <div className="flex gap-3 px-6 py-4 border-t border-white/10 bg-[#080c18] flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => setDialogOpen(false)}
-                className="flex-1 h-10 rounded-xl border border-white/10 text-muted-foreground text-xs font-semibold hover:bg-white/5 hover:text-foreground transition-all"
-              >
-                ✕ Discard Changes
-              </button>
-              <button
-                type="submit"
-                className="flex-1 h-10 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400 text-xs font-bold tracking-wide transition-all"
-              >
-                ✓ Save Calibration
-              </button>
+              {editStep === 1 ? (
+                <>
+                  <button type="button" onClick={() => setDialogOpen(false)}
+                    className="flex-1 h-10 rounded-xl border border-white/10 text-muted-foreground text-xs font-semibold hover:bg-white/5 hover:text-foreground transition-all">
+                    ✕ Cancel
+                  </button>
+                  <button type="button" onClick={() => setEditStep(2)}
+                    className="flex-1 h-10 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400 text-xs font-bold tracking-wide transition-all">
+                    Next: Financial Matrix →
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" onClick={() => setEditStep(1)}
+                    className="flex-1 h-10 rounded-xl border border-white/10 text-muted-foreground text-xs font-semibold hover:bg-white/5 hover:text-foreground transition-all">
+                    ← Back
+                  </button>
+                  <button type="submit"
+                    className="flex-1 h-10 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400 text-xs font-bold tracking-wide transition-all">
+                    ✓ Save Calibration
+                  </button>
+                </>
+              )}
             </div>
           </form>
         </DialogContent>
       </Dialog>
-    </motion.div>
+
+            </motion.div>
   );
 }
-
