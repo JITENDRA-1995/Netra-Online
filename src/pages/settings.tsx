@@ -298,21 +298,79 @@ export default function SettingsPage({
     } catch (err) {
       console.error("Direct storage upload failed:", err);
       clearInterval(progressInterval);
+      alert("Direct storage upload failed. Please verify your connection or bucket status.");
+    } finally {
+      setUploadStatus(prev => ({ ...prev, isUploading: false }));
+    }
+  };
+
+  const handleLocalServiceMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !calibratingServiceSlideshow) return;
+
+    setUploadStatus({
+      isUploading: true,
+      progress: 0,
+      fileName: file.name,
+      phase: "ESTABLISHING SECURE PORTAL CONNECTION..."
+    });
+
+    let progressInterval = setInterval(() => {
+      setUploadStatus(prev => {
+        if (prev.progress >= 95) {
+          clearInterval(progressInterval);
+          return prev;
+        }
+        const step = Math.floor(Math.random() * 8) + 4;
+        const nextProgress = Math.min(prev.progress + step, 95);
+        let nextPhase = prev.phase;
+        if (nextProgress > 20 && nextProgress <= 70) {
+          nextPhase = "TRANSMITTING HIGH-FIDELITY MEDIA PACKETS...";
+        } else if (nextProgress > 70) {
+          nextPhase = "SYNCHRONIZING CDN EDGE CACHE...";
+        }
+        return {
+          ...prev,
+          progress: nextProgress,
+          phase: nextPhase
+        };
+      });
+    }, 120);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `services/service_${calibratingServiceSlideshow.id}_${Date.now()}.${fileExt}`;
+
+      // Upload directly to Supabase storage bucket 'studio-vault'
+      const { error: uploadError } = await supabase.storage
+        .from('studio-vault')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('studio-vault')
+        .getPublicUrl(filePath);
+
+      clearInterval(progressInterval);
       
-      // Fallback to FileReader base64 if there's any bucket permission/setup issue
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        const urls = [...newSlideUrls];
-        urls[slotIdx] = base64String;
-        setNewSlideUrls(urls);
-        
-        const filename = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-        const titles = [...newSlideTitles];
-        titles[slotIdx] = filename;
-        setNewSlideTitles(titles);
-      };
-      reader.readAsDataURL(file);
+      setUploadStatus(prev => ({
+        ...prev,
+        progress: 100,
+        phase: "ASSET REGISTERED SUCCESSFULLY!"
+      }));
+
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      setNewServiceSlideUrl(publicUrl);
+      const filename = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+      setNewServiceSlideTitle(filename);
+
+    } catch (err) {
+      console.error("Direct storage upload failed:", err);
+      clearInterval(progressInterval);
+      alert("Direct storage upload failed. Please verify your connection or bucket status.");
     } finally {
       setUploadStatus(prev => ({ ...prev, isUploading: false }));
     }
@@ -1411,6 +1469,7 @@ export default function SettingsPage({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="cyber-modal-overlay"
+            style={{ zIndex: 100005 }}
           >
             <motion.div 
               initial={{ scale: 0.9, y: 15 }}
@@ -1461,6 +1520,7 @@ export default function SettingsPage({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="cyber-modal-overlay"
+            style={{ zIndex: 100006 }}
           >
             <motion.div 
               initial={{ scale: 0.85, opacity: 0 }}
@@ -1959,6 +2019,7 @@ export default function SettingsPage({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="cyber-modal-overlay"
+            style={{ zIndex: 100005 }}
           >
             <motion.div 
               initial={{ scale: 0.9, y: 15 }}
@@ -2138,19 +2199,7 @@ export default function SettingsPage({
                           type="file"
                           accept="image/*,video/*"
                           id="service-local-file"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onload = (event) => {
-                                if (event.target?.result) {
-                                  setNewServiceSlideUrl(event.target.result as string);
-                                  setNewServiceSlideTitle(file.name.split('.')[0]);
-                                }
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
+                          onChange={handleLocalServiceMediaUpload}
                           className="hidden"
                         />
                       </div>
