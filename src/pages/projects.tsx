@@ -134,6 +134,29 @@ export default function Projects({
   const [formClientPhone, setFormClientPhone] = useState("");
   const [formClientAddress, setFormClientAddress] = useState("");
 
+  // QTY / Rate bidirectional calculation state
+  const [formQty, setFormQty] = useState<number>(1);
+  const [formRate, setFormRate] = useState<number | "">(0);
+  const [qtyRateLastCalc, setQtyRateLastCalc] = useState<"rate" | "budget">("rate");
+
+  // Qty or Rate change → recalculate Budget
+  useEffect(() => {
+    if (qtyRateLastCalc !== "budget") {
+      const qty = Number(formQty) || 1;
+      const rate = Number(formRate) || 0;
+      setFormBudget(qty * rate);
+    }
+  }, [formQty, formRate, qtyRateLastCalc]);
+
+  // Budget change → recalculate Rate
+  useEffect(() => {
+    if (qtyRateLastCalc === "budget") {
+      const qty = Number(formQty) || 1;
+      const budget = Number(formBudget) || 0;
+      setFormRate(parseFloat((budget / qty).toFixed(2)));
+    }
+  }, [formBudget, qtyRateLastCalc]);
+
 
   const filtered = projects.filter((p) => {
     const serviceName = p.service || p.name || "";
@@ -187,6 +210,10 @@ export default function Projects({
     const currentCategory = (project.category || "branding").toLowerCase().replace(" ", "_");
     const budgetVal = project.budget !== undefined ? project.budget : (parseFloat(project.quote) || 0);
 
+    // Load QTY and Rate from project data (parsed from JSON_METADATA by getProjects)
+    const loadedQty = Number(project.qty) || 1;
+    const loadedRate = Number(project.rate) || (loadedQty > 0 ? budgetVal / loadedQty : budgetVal);
+
     setFormName(project.service || project.name || "");
     setFormDescription(project.description || project.desc || "");
     setFormStatus(["active", "completed", "on_hold", "cancelled"].includes(formStatusVal) ? formStatusVal : "active");
@@ -202,6 +229,11 @@ export default function Projects({
     setFormClientPhone(project.client?.phone || "");
     setFormClientAddress(project.client?.address || "");
 
+    // Set QTY/Rate state — use 'rate' mode so bidirectional effect doesn't immediately overwrite budget
+    setQtyRateLastCalc("rate");
+    setFormQty(loadedQty);
+    setFormRate(parseFloat(loadedRate.toFixed(2)));
+
     setDialogOpen(true);
   }
 
@@ -209,6 +241,8 @@ export default function Projects({
     e.preventDefault();
     if (editingProject && setProjects) {
       const budgetVal = typeof formBudget === "number" ? formBudget : 0;
+      const qtyVal = Number(formQty) || 1;
+      const rateVal = typeof formRate === "number" ? formRate : (budgetVal / qtyVal);
       const discountInput = typeof formDiscountValue === "number" ? formDiscountValue : 0;
       const statusFormatted = formStatus.charAt(0).toUpperCase() + formStatus.slice(1).replace("_", " ");
       
@@ -228,11 +262,20 @@ export default function Projects({
         paymentStatus = 'part';
       }
 
+      // Serialize qty/rate into JSON_METADATA format (matches getProjects parser)
+      const serializedDescription = `JSON_METADATA:${JSON.stringify({
+        qty: qtyVal,
+        rate: rateVal,
+        description: formDescription
+      })}`;
+
       const updatedProject = {
         ...editingProject,
         service: formName,
         description: formDescription,
         desc: formDescription,
+        qty: qtyVal,
+        rate: rateVal,
         status: statusFormatted,
         category: formCategory,
         quote: budgetVal,
@@ -254,12 +297,12 @@ export default function Projects({
       };
 
       try {
-        // 1. Update project row
+        // 1. Update project row (with serialized qty/rate in description)
         const { error } = await supabase
           .from("projects")
           .update({
             service: updatedProject.service,
-            description: updatedProject.description,
+            description: serializedDescription,
             status: updatedProject.status,
             category: updatedProject.category,
             quote: updatedProject.quote,
@@ -734,13 +777,51 @@ export default function Projects({
                 <p className="text-3xs uppercase tracking-widest text-cyan-400 font-extrabold flex items-center gap-1.5 border-b border-white/5 pb-2">
                   💰 Budget & Timeline
                 </p>
+
+                {/* QTY + Rate row */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Quantity</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={formQty}
+                      onChange={(e) => {
+                        setFormQty(parseInt(e.target.value) || 1);
+                        setQtyRateLastCalc("rate");
+                      }}
+                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
+                      placeholder="1"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Rate (₹)</label>
+                    <Input
+                      type="number"
+                      value={formRate}
+                      onChange={(e) => {
+                        setFormRate(e.target.value === "" ? "" : parseFloat(e.target.value) || 0);
+                        setQtyRateLastCalc("rate");
+                      }}
+                      onFocus={(e) => { if (formRate === 0) setFormRate(""); }}
+                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
+                      placeholder="Rate per unit"
+                      required
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Budget (₹)</label>
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Quote / Budget (₹) <span className="normal-case opacity-60">(Qty×Rate)</span></label>
                     <Input
                       type="number"
                       value={formBudget}
-                      onChange={(e) => setFormBudget(e.target.value === "" ? "" : (parseInt(e.target.value) || 0))}
+                      onChange={(e) => {
+                        setFormBudget(e.target.value === "" ? "" : (parseInt(e.target.value) || 0));
+                        setQtyRateLastCalc("budget");
+                      }}
                       onFocus={(e) => { if (formBudget === 0) setFormBudget(""); }}
                       className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
                       placeholder="0"
