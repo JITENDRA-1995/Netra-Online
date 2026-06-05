@@ -44,6 +44,8 @@ interface SettingsProps {
   onSaveBankingDetails: (details: any) => void;
   adminProfile: any;
   onSaveAdminProfile: (details: any) => void;
+  onAddService: (newService: Service) => void;
+  onDeleteService: (serviceId: number) => void;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -75,7 +77,9 @@ export default function SettingsPage({
   bankingDetails,
   onSaveBankingDetails,
   adminProfile,
-  onSaveAdminProfile
+  onSaveAdminProfile,
+  onAddService,
+  onDeleteService
 }: SettingsProps) {
   const [activeTab, setActiveTab] = useState("CATALOG"); // CATALOG, VISION, BANKING, PROFILE
   const [search, setSearch] = useState("");
@@ -329,6 +333,59 @@ export default function SettingsPage({
     setLocalVisionSettings(next);
   };
 
+  // States for dynamic service addition
+  const [isAddServiceModalOpen, setIsAddServiceModalOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newIcon, setNewIcon] = useState("⚡");
+  const [newTag, setNewTag] = useState("BRANDING");
+  const [newDesc, setNewDesc] = useState("");
+  const [newPrice, setNewPrice] = useState("");
+  const [newDelivery, setNewDelivery] = useState("");
+  const [newFeatures, setNewFeatures] = useState<string[]>([""]);
+
+  const handleAddFeatureField = () => {
+    setNewFeatures([...newFeatures, ""]);
+  };
+
+  const handleRemoveFeatureField = (idx: number) => {
+    setNewFeatures(newFeatures.filter((_, i) => i !== idx));
+  };
+
+  const handleFeatureFieldChange = (idx: number, val: string) => {
+    const next = [...newFeatures];
+    next[idx] = val;
+    setNewFeatures(next);
+  };
+
+  const handleSaveNewService = () => {
+    if (!newTitle.trim() || !newDesc.trim()) {
+      alert("Please enter both Title and Description.");
+      return;
+    }
+    const filteredFeatures = newFeatures.map(f => f.trim()).filter(Boolean);
+    const servicePayload: Service = {
+      id: Date.now(), // Unique ID
+      title: newTitle.trim(),
+      desc: newDesc.trim(),
+      icon: newIcon.trim() || "⚡",
+      tag: newTag,
+      price: newPrice.trim() || "On Quote",
+      delivery: newDelivery.trim() || "Varies",
+      features: filteredFeatures
+    };
+    onAddService(servicePayload);
+    
+    // Reset form fields
+    setNewTitle("");
+    setNewIcon("⚡");
+    setNewTag("BRANDING");
+    setNewDesc("");
+    setNewPrice("");
+    setNewDelivery("");
+    setNewFeatures([""]);
+    setIsAddServiceModalOpen(false);
+  };
+
   // States for interactive slideshow slide calibration preview modal
   const [activePreviewSlide, setActivePreviewSlide] = useState<{
     slotIdx: number;
@@ -560,6 +617,14 @@ export default function SettingsPage({
                 </Button>
               ))}
             </div>
+
+            <Button
+              onClick={() => setIsAddServiceModalOpen(true)}
+              className="bg-[#00e5ff]/20 hover:bg-[#00e5ff]/35 border border-[#00e5ff]/30 text-[#00e5ff] font-bold px-4 py-2.5 rounded-xl flex items-center gap-1.5 hover:shadow-[0_0_15px_rgba(0,229,255,0.25)] transition-all duration-300 cursor-pointer shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              ADD NEW SERVICE
+            </Button>
           </motion.div>
 
           {/* Cards Grid */}
@@ -601,13 +666,25 @@ export default function SettingsPage({
                         <span>{s.features?.length || 0} Features</span>
                       </div>
 
-                      <Button
-                        onClick={() => onOpenCalibrate(s)}
-                        className="w-full bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 font-bold text-xs rounded-xl"
-                      >
-                        <Sliders className="w-3.5 h-3.5 mr-2" />
-                        CALIBRATE SERVICE
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => onOpenCalibrate(s)}
+                          className="flex-1 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 font-bold text-xs rounded-xl py-2"
+                        >
+                          <Sliders className="w-3.5 h-3.5 mr-2" />
+                          CALIBRATE SERVICE
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            if (window.confirm(`Are you absolutely sure you want to delete "${s.title}"? This will also clear any slideshow slots bound to it.`)) {
+                              onDeleteService(s.id);
+                            }
+                          }}
+                          className="bg-red-500/10 hover:bg-red-500/25 border border-red-500/30 text-red-400 font-bold text-xs rounded-xl p-2 cursor-pointer flex items-center justify-center shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </motion.div>
                 );
@@ -1646,6 +1723,169 @@ export default function SettingsPage({
                     className="flex-1 bg-cyan-500/20 hover:bg-cyan-500/35 border border-cyan-500/30 text-cyan-400 font-bold text-xs rounded-xl py-2.5 hover:shadow-[0_0_15px_rgba(0,229,255,0.25)] transition-all"
                   >
                     ADD TO SHOWCASE
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Add New Service Modal Overlay */}
+      <AnimatePresence>
+        {isAddServiceModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="cyber-modal-overlay"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 15 }}
+              className="w-full max-w-[600px] bg-gradient-to-br from-[#080c1c]/95 to-[#04060f]/98 border border-cyan-500/25 rounded-2xl p-6 shadow-[0_0_35px_rgba(0,229,255,0.15)] relative overflow-hidden max-h-[90vh] overflow-y-auto"
+            >
+              <div className="cyber-scanner-line" />
+              
+              <div className="flex items-center justify-between mb-4 border-b border-cyan-500/20 pb-3">
+                <div className="flex items-center gap-2 text-left">
+                  <Plus className="w-5 h-5 text-cyan-400" />
+                  <h3 className="font-mono text-sm font-bold text-cyan-400 uppercase tracking-widest">
+                    Add New Service Card
+                  </h3>
+                </div>
+                <button 
+                  onClick={() => setIsAddServiceModalOpen(false)}
+                  className="text-xs font-mono text-cyan-500/60 hover:text-cyan-400 uppercase cursor-pointer bg-transparent border-0 outline-none"
+                >
+                  [Close]
+                </button>
+              </div>
+
+              <div className="space-y-4 text-left">
+                {/* Title */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider font-semibold">Service Title</label>
+                  <Input
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder="e.g., Brand Identity (Logo)"
+                    className="bg-black/40 border-white/10 text-xs rounded-lg py-2 px-3 text-white placeholder:text-white/20"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Category Tag */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block font-semibold">Category Tag</label>
+                    <select
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      className="w-full bg-[#050508] border border-white/10 rounded-lg py-2 px-3 text-xs font-semibold text-white outline-none focus:border-indigo-400 transition-colors"
+                    >
+                      {["BRANDING", "PRINT", "DIGITAL", "VIDEO", "EVENT", "COMMERCIAL"].map(tag => (
+                        <option key={tag} value={tag}>{tag}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Icon Emoji */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider font-semibold">Icon Emoji</label>
+                    <Input
+                      value={newIcon}
+                      onChange={(e) => setNewIcon(e.target.value)}
+                      placeholder="e.g., 🎨 or 🏢"
+                      className="bg-black/40 border-white/10 text-xs rounded-lg py-2 px-3 text-white placeholder:text-white/20"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Starting Price */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider font-semibold">Starting Price Calibration</label>
+                    <Input
+                      value={newPrice}
+                      onChange={(e) => setNewPrice(e.target.value)}
+                      placeholder="e.g., ₹5,000 or On Quote"
+                      className="bg-black/40 border-white/10 text-xs rounded-lg py-2 px-3 text-white placeholder:text-white/20"
+                    />
+                  </div>
+
+                  {/* Delivery Timeline */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider font-semibold">Delivery Timeline</label>
+                    <Input
+                      value={newDelivery}
+                      onChange={(e) => setNewDelivery(e.target.value)}
+                      placeholder="e.g., 3 Days or Varies"
+                      className="bg-black/40 border-white/10 text-xs rounded-lg py-2 px-3 text-white placeholder:text-white/20"
+                    />
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider font-semibold">Description</label>
+                  <textarea
+                    value={newDesc}
+                    onChange={(e) => setNewDesc(e.target.value)}
+                    placeholder="Provide a clear, high-impact description of the service..."
+                    className="w-full bg-[#050508]/60 border border-white/10 rounded-lg py-2 px-3 text-xs font-semibold text-white outline-none focus:border-indigo-400 transition-colors h-20 resize-none placeholder:text-white/20"
+                  />
+                </div>
+
+                {/* Features List */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-1">
+                    <label className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider font-semibold">Service Features</label>
+                    <button
+                      type="button"
+                      onClick={handleAddFeatureField}
+                      className="text-[9px] font-mono text-cyan-400 hover:text-cyan-300 uppercase cursor-pointer bg-transparent border-0 p-0 outline-none"
+                    >
+                      + Add Feature
+                    </button>
+                  </div>
+
+                  <div className="max-h-[160px] overflow-y-auto space-y-2 pr-1 scrollbar-thin scrollbar-thumb-indigo-500/20">
+                    {newFeatures.map((feat, idx) => (
+                      <div key={idx} className="flex gap-2 items-center">
+                        <Input
+                          value={feat}
+                          onChange={(e) => handleFeatureFieldChange(idx, e.target.value)}
+                          placeholder={`Feature #${idx + 1}`}
+                          className="bg-black/40 border-white/10 text-xs rounded-lg py-1 px-3 text-white placeholder:text-white/20 flex-1"
+                        />
+                        {newFeatures.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFeatureField(idx)}
+                            className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded-lg w-8 h-8 flex items-center justify-center cursor-pointer shrink-0 transition-colors"
+                          >
+                            &times;
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3 border-t border-white/5 pt-4 mt-6">
+                  <Button
+                    onClick={() => setIsAddServiceModalOpen(false)}
+                    className="flex-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-bold text-xs rounded-xl py-2.5 transition-all select-none"
+                  >
+                    DISCARD
+                  </Button>
+                  <Button
+                    onClick={handleSaveNewService}
+                    className="flex-1 bg-cyan-500/20 hover:bg-cyan-500/35 border border-cyan-500/30 text-cyan-400 font-bold text-xs rounded-xl py-2.5 hover:shadow-[0_0_15px_rgba(0,229,255,0.25)] transition-all select-none"
+                  >
+                    SAVE NEW CARD
                   </Button>
                 </div>
               </div>

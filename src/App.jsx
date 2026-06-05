@@ -480,6 +480,59 @@ function App() {
     });
   };
 
+  const handleAddService = async (newService) => {
+    const nextList = [...servicesList, newService];
+    setServicesList(nextList);
+    localStorage.setItem("netra_services", JSON.stringify(nextList));
+
+    // Save globally to Supabase special settings row
+    try {
+      const payload = {
+        address: JSON.stringify({ services: nextList, vision: visionSettings, banking: bankingDetails, profile: adminProfile })
+      };
+      await supabase
+        .from('clients')
+        .update(payload)
+        .eq('email', 'settings@netra.graphics');
+    } catch (dbErr) {
+      console.error("Failed to save services to database:", dbErr);
+    }
+
+    toast({
+      title: "Service Card Added",
+      description: `Successfully created "${newService.title}" dynamically.`
+    });
+  };
+
+  const handleDeleteService = async (serviceId) => {
+    const nextList = servicesList.filter(s => s.id !== serviceId);
+    setServicesList(nextList);
+    localStorage.setItem("netra_services", JSON.stringify(nextList));
+
+    // Also remove any vision slideshow slot that was bound to this service
+    const nextVision = visionSettings.map(v => v.serviceId === serviceId ? { ...v, serviceId: 0, photos: [] } : v);
+    setVisionSettings(nextVision);
+    localStorage.setItem("netra_vision_settings", JSON.stringify(nextVision));
+
+    // Save globally to Supabase special settings row
+    try {
+      const payload = {
+        address: JSON.stringify({ services: nextList, vision: nextVision, banking: bankingDetails, profile: adminProfile })
+      };
+      await supabase
+        .from('clients')
+        .update(payload)
+        .eq('email', 'settings@netra.graphics');
+    } catch (dbErr) {
+      console.error("Failed to delete service from database:", dbErr);
+    }
+
+    toast({
+      title: "Service Card Deleted",
+      description: "Successfully removed card and cleaned up slot bindings."
+    });
+  };
+
   const handleClearAllDemoData = async () => {
     const pw = prompt("🔴 SECURITY ACCESS REQUIRED 🔴\n\nPlease enter the system password to clear all demo data:");
     if (pw !== "73590@Savan") {
@@ -3641,6 +3694,8 @@ function App() {
                             onSaveBankingDetails={handleSaveBankingDetails}
                             adminProfile={adminProfile}
                             onSaveAdminProfile={handleSaveAdminProfile}
+                            onAddService={handleAddService}
+                            onDeleteService={handleDeleteService}
                           />
                         )}
                       </div>
