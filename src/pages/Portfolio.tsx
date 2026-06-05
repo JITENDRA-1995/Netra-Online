@@ -142,22 +142,32 @@ function DynamicSlideshow({ photos }: { photos: { url: string; title: string; du
                   setIndex((prev) => (prev + 1) % photos.length);
                 }
               }}
-              initial={{ opacity: 0, scale: 1.05 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: (currentPhoto.scale ?? 1) * 1.05 }}
+              animate={{ opacity: 1, scale: currentPhoto.scale ?? 1 }}
+              exit={{ opacity: 0, scale: (currentPhoto.scale ?? 1) * 0.95 }}
               transition={{ duration: 0.8, ease: "easeInOut" }}
-              className="w-full h-full object-cover"
+              className="w-full h-full"
+              style={{
+                objectFit: currentPhoto.fit as any || 'cover',
+                objectPosition: `${(currentPhoto.positionX ?? 0) + 50}% ${(currentPhoto.positionY ?? 0) + 50}%`,
+                filter: `brightness(${currentPhoto.brightness ?? 100}%) contrast(${currentPhoto.contrast ?? 100}%) saturate(${currentPhoto.saturation ?? 100}%) grayscale(${currentPhoto.grayscale ?? 0}%) hue-rotate(${currentPhoto.hueRotate ?? 0}deg)`
+              }}
             />
           ) : (
             <motion.img
               key={index}
               src={currentPhoto.url}
               alt={currentPhoto.title || "Slideshow"}
-              initial={{ opacity: 0, scale: 1.05 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: (currentPhoto.scale ?? 1) * 1.05 }}
+              animate={{ opacity: 1, scale: currentPhoto.scale ?? 1 }}
+              exit={{ opacity: 0, scale: (currentPhoto.scale ?? 1) * 0.95 }}
               transition={{ duration: 0.8, ease: "easeInOut" }}
-              className="w-full h-full object-cover"
+              className="w-full h-full"
+              style={{
+                objectFit: currentPhoto.fit as any || 'cover',
+                objectPosition: `${(currentPhoto.positionX ?? 0) + 50}% ${(currentPhoto.positionY ?? 0) + 50}%`,
+                filter: `brightness(${currentPhoto.brightness ?? 100}%) contrast(${currentPhoto.contrast ?? 100}%) saturate(${currentPhoto.saturation ?? 100}%) grayscale(${currentPhoto.grayscale ?? 0}%) hue-rotate(${currentPhoto.hueRotate ?? 0}deg)`
+              }}
             />
           )}
         </AnimatePresence>
@@ -266,18 +276,31 @@ function DynamicSlideshow({ photos }: { photos: { url: string; title: string; du
                     src={currentPhoto.url}
                     autoPlay
                     controls
-                    className="max-w-full max-h-[80vh] object-contain rounded-2xl border border-white/10 shadow-[0_0_50px_rgba(255,255,255,0.05)]"
+                    initial={{ opacity: 0, scale: (currentPhoto.scale ?? 1) * 0.95 }}
+                    animate={{ opacity: 1, scale: currentPhoto.scale ?? 1 }}
+                    exit={{ opacity: 0, scale: (currentPhoto.scale ?? 1) * 0.95 }}
+                    className="max-w-full max-h-[80vh] rounded-2xl border border-white/10 shadow-[0_0_50px_rgba(255,255,255,0.05)]"
+                    style={{
+                      objectFit: currentPhoto.fit as any || 'contain',
+                      objectPosition: `${(currentPhoto.positionX ?? 0) + 50}% ${(currentPhoto.positionY ?? 0) + 50}%`,
+                      filter: `brightness(${currentPhoto.brightness ?? 100}%) contrast(${currentPhoto.contrast ?? 100}%) saturate(${currentPhoto.saturation ?? 100}%) grayscale(${currentPhoto.grayscale ?? 0}%) hue-rotate(${currentPhoto.hueRotate ?? 0}deg)`
+                    }}
                   />
                 ) : (
                   <motion.img
                     key={index}
                     src={currentPhoto.url}
                     alt={currentPhoto.title || "Slideshow"}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
+                    initial={{ opacity: 0, scale: (currentPhoto.scale ?? 1) * 0.95 }}
+                    animate={{ opacity: 1, scale: currentPhoto.scale ?? 1 }}
+                    exit={{ opacity: 0, scale: (currentPhoto.scale ?? 1) * 0.95 }}
                     transition={{ duration: 0.3 }}
-                    className="max-w-full max-h-[80vh] object-contain rounded-2xl border border-white/10 shadow-[0_0_50px_rgba(255,255,255,0.05)]"
+                    className="max-w-full max-h-[80vh] rounded-2xl border border-white/10 shadow-[0_0_50px_rgba(255,255,255,0.05)]"
+                    style={{
+                      objectFit: currentPhoto.fit as any || 'contain',
+                      objectPosition: `${(currentPhoto.positionX ?? 0) + 50}% ${(currentPhoto.positionY ?? 0) + 50}%`,
+                      filter: `brightness(${currentPhoto.brightness ?? 100}%) contrast(${currentPhoto.contrast ?? 100}%) saturate(${currentPhoto.saturation ?? 100}%) grayscale(${currentPhoto.grayscale ?? 0}%) hue-rotate(${currentPhoto.hueRotate ?? 0}deg)`
+                    }}
                   />
                 )}
               </AnimatePresence>

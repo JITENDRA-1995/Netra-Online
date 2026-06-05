@@ -329,11 +329,52 @@ export default function SettingsPage({
     setLocalVisionSettings(next);
   };
 
-  const handleAddSlideToSlot = async (slotIdx: number) => {
+  // States for interactive slideshow slide calibration preview modal
+  const [activePreviewSlide, setActivePreviewSlide] = useState<{
+    slotIdx: number;
+    url: string;
+    title: string;
+    durationStr: string;
+  } | null>(null);
+
+  const [slideFit, setSlideFit] = useState<'cover' | 'contain' | 'fill'>('cover');
+  const [slideScale, setSlideScale] = useState<number>(1);
+  const [slidePositionX, setSlidePositionX] = useState<number>(0);
+  const [slidePositionY, setSlidePositionY] = useState<number>(0);
+  const [slideBrightness, setSlideBrightness] = useState<number>(100);
+  const [slideContrast, setSlideContrast] = useState<number>(100);
+  const [slideSaturation, setSlideSaturation] = useState<number>(100);
+  const [slideGrayscale, setSlideGrayscale] = useState<number>(0);
+  const [slideHueRotate, setSlideHueRotate] = useState<number>(0);
+
+  const handleOpenSlideCalibration = (slotIdx: number) => {
     const url = newSlideUrls[slotIdx].trim();
     const title = newSlideTitles[slotIdx].trim();
     const durationStr = newSlideDurations[slotIdx].trim();
     if (!url) return;
+
+    setActivePreviewSlide({
+      slotIdx,
+      url,
+      title: title || "Slideshow Showcase",
+      durationStr
+    });
+
+    // Reset sliders to default values
+    setSlideFit('cover');
+    setSlideScale(1);
+    setSlidePositionX(0);
+    setSlidePositionY(0);
+    setSlideBrightness(100);
+    setSlideContrast(100);
+    setSlideSaturation(100);
+    setSlideGrayscale(0);
+    setSlideHueRotate(0);
+  };
+
+  const handleConfirmAddSlide = async () => {
+    if (!activePreviewSlide) return;
+    const { slotIdx, url, title, durationStr } = activePreviewSlide;
 
     // Trigger high-tech countdown state tracking
     setAddingSlideStatus({
@@ -341,6 +382,9 @@ export default function SettingsPage({
       countdown: 3,
       fileName: title || "Slideshow Asset"
     });
+
+    // Close preview modal first so they see countdown progress in the background
+    setActivePreviewSlide(null);
 
     // Countdown loop (3s -> 2s -> 1s) to simulate segment indexing and packet compilation
     for (let c = 3; c > 0; c--) {
@@ -357,7 +401,16 @@ export default function SettingsPage({
     currentPhotos.push({ 
       url, 
       title: title || "Slideshow Showcase",
-      duration
+      duration,
+      fit: slideFit,
+      scale: slideScale,
+      positionX: slidePositionX,
+      positionY: slidePositionY,
+      brightness: slideBrightness,
+      contrast: slideContrast,
+      saturation: slideSaturation,
+      grayscale: slideGrayscale,
+      hueRotate: slideHueRotate
     });
     
     next[slotIdx] = {
@@ -822,7 +875,7 @@ export default function SettingsPage({
                           </div>
 
                           <Button
-                            onClick={() => handleAddSlideToSlot(slotIdx)}
+                            onClick={() => handleOpenSlideCalibration(slotIdx)}
                             className="w-full bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 text-cyan-400 font-bold text-xs rounded-lg py-2 mt-2"
                           >
                             <Plus className="w-3.5 h-3.5 mr-2" />
@@ -1316,6 +1369,285 @@ export default function SettingsPage({
                     </div>
                   );
                 })}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Slideshow Slide Calibration & Live Preview Overlay */}
+      <AnimatePresence>
+        {activePreviewSlide && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="cyber-modal-overlay"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 15 }}
+              className="w-full max-w-[1000px] bg-gradient-to-br from-[#080c1c]/95 to-[#04060f]/98 border border-cyan-500/25 rounded-2xl p-6 shadow-[0_0_35px_rgba(0,229,255,0.15)] relative overflow-hidden flex flex-col md:flex-row gap-6 max-h-[95vh] overflow-y-auto"
+            >
+              <div className="cyber-scanner-line" />
+              
+              {/* Left Column: Real-time Live Preview */}
+              <div className="flex-1 flex flex-col gap-4">
+                <h3 className="font-mono text-xs font-bold text-cyan-400 uppercase tracking-widest border-b border-cyan-500/20 pb-3 text-left">
+                  Live Layout Simulation
+                </h3>
+                
+                <div 
+                  className="w-full h-[360px] rounded-3xl border border-white/5 relative overflow-hidden bg-[#080810]/80 self-center"
+                  style={{
+                    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)"
+                  }}
+                >
+                  {/* Styled Image / Video Preview */}
+                  {activePreviewSlide.url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || activePreviewSlide.url.includes("video") || activePreviewSlide.url.startsWith("data:video/") ? (
+                    <video 
+                      src={activePreviewSlide.url} 
+                      className="w-full h-full"
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      style={{
+                        objectFit: slideFit,
+                        objectPosition: `${slidePositionX + 50}% ${slidePositionY + 50}%`,
+                        transform: `scale(${slideScale})`,
+                        filter: `brightness(${slideBrightness}%) contrast(${slideContrast}%) saturate(${slideSaturation}%) grayscale(${slideGrayscale}%) hue-rotate(${slideHueRotate}deg)`
+                      }}
+                    />
+                  ) : (
+                    <img 
+                      src={activePreviewSlide.url} 
+                      alt={activePreviewSlide.title} 
+                      className="w-full h-full"
+                      style={{
+                        objectFit: slideFit,
+                        objectPosition: `${slidePositionX + 50}% ${slidePositionY + 50}%`,
+                        transform: `scale(${slideScale})`,
+                        filter: `brightness(${slideBrightness}%) contrast(${slideContrast}%) saturate(${slideSaturation}%) grayscale(${slideGrayscale}%) hue-rotate(${slideHueRotate}deg)`
+                      }}
+                    />
+                  )}
+                  
+                  {/* Gradient Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent z-1 pointer-events-none"></div>
+                  
+                  {/* Floating Caption Simulation */}
+                  <div className="absolute bottom-6 left-6 right-6 z-10 flex justify-between items-end pointer-events-none">
+                    <div className="backdrop-blur-md bg-black/50 border border-white/10 rounded-2xl px-5 py-3 max-w-[70%] text-left">
+                      <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider block mb-1">PORTFOLIO FLAME</span>
+                      <h4 className="text-xs md:text-sm font-bold text-white tracking-wide truncate">{activePreviewSlide.title || "Showcase Asset"}</h4>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white/[0.02] border border-white/5 rounded-xl text-left text-2xs text-muted-foreground leading-relaxed">
+                  <span className="text-cyan-400 font-bold">PRO TIP:</span> Use the panning offsets and scale controls to crop and frame the image. Color correction sliders help adjust contrast, warmth, and brightness to fit the dark aesthetic.
+                </div>
+              </div>
+
+              {/* Right Column: Calibration Controls */}
+              <div className="w-full md:w-[380px] flex flex-col justify-between border-t md:border-t-0 md:border-l border-white/10 pt-6 md:pt-0 md:pl-6 text-left">
+                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-indigo-500/20">
+                  <h3 className="font-mono text-xs font-bold text-indigo-400 uppercase tracking-widest">
+                    Calibration Parameters
+                  </h3>
+
+                  {/* Slide Title */}
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">Slide Title Overlay</label>
+                    <Input
+                      value={activePreviewSlide.title}
+                      onChange={(e) => setActivePreviewSlide({ ...activePreviewSlide, title: e.target.value })}
+                      placeholder="e.g., Luxe Branding Showcase"
+                      className="bg-black/40 border-white/10 text-xs rounded-lg py-1 px-3 text-white"
+                    />
+                  </div>
+
+                  {/* Size Layout Options / Fit */}
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider block">Best Fit / Auto Fit Option</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['cover', 'contain', 'fill'] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          onClick={() => setSlideFit(mode)}
+                          className={`py-1.5 rounded-lg text-3xs font-bold uppercase tracking-wider transition-all duration-200 border ${
+                            slideFit === mode
+                              ? "bg-indigo-500/20 border-indigo-400 text-indigo-300 shadow-[0_0_10px_rgba(99,102,241,0.2)]"
+                              : "bg-black/20 border-white/5 text-muted-foreground hover:text-white"
+                          }`}
+                        >
+                          {mode === 'cover' ? 'Auto Fit (Cover)' : mode === 'contain' ? 'Contain' : 'Stretch (Fill)'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Zoom / Scaling Slider */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-[9px] font-mono text-muted-foreground uppercase">
+                      <span>Zoom / Scale Factor</span>
+                      <span className="text-cyan-400 font-bold">{slideScale.toFixed(2)}x</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="3"
+                      step="0.05"
+                      value={slideScale}
+                      onChange={(e) => setSlideScale(parseFloat(e.target.value))}
+                      className="w-full accent-cyan-400 bg-white/5 h-1 rounded-lg cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Panning / Cropping X Slider */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-[9px] font-mono text-muted-foreground uppercase">
+                      <span>Horizontal Pan Offset</span>
+                      <span className="text-cyan-400 font-bold">{slidePositionX}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-50"
+                      max="50"
+                      step="1"
+                      value={slidePositionX}
+                      onChange={(e) => setSlidePositionX(parseInt(e.target.value))}
+                      className="w-full accent-cyan-400 bg-white/5 h-1 rounded-lg cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Panning / Cropping Y Slider */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-[9px] font-mono text-muted-foreground uppercase">
+                      <span>Vertical Pan Offset</span>
+                      <span className="text-cyan-400 font-bold">{slidePositionY}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-50"
+                      max="50"
+                      step="1"
+                      value={slidePositionY}
+                      onChange={(e) => setSlidePositionY(parseInt(e.target.value))}
+                      className="w-full accent-cyan-400 bg-white/5 h-1 rounded-lg cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Color Correction Section */}
+                  <div className="border-t border-white/5 pt-3 space-y-3">
+                    <h4 className="text-[10px] font-mono font-bold text-indigo-400/80 uppercase tracking-widest">
+                      Color Correction
+                    </h4>
+
+                    {/* Brightness Slider */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center text-[9px] font-mono text-muted-foreground uppercase">
+                        <span>Brightness</span>
+                        <span className="text-cyan-400 font-bold">{slideBrightness}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="50"
+                        max="200"
+                        step="1"
+                        value={slideBrightness}
+                        onChange={(e) => setSlideBrightness(parseInt(e.target.value))}
+                        className="w-full accent-indigo-400 bg-white/5 h-1 rounded-lg cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Contrast Slider */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center text-[9px] font-mono text-muted-foreground uppercase">
+                        <span>Contrast</span>
+                        <span className="text-cyan-400 font-bold">{slideContrast}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="50"
+                        max="200"
+                        step="1"
+                        value={slideContrast}
+                        onChange={(e) => setSlideContrast(parseInt(e.target.value))}
+                        className="w-full accent-indigo-400 bg-white/5 h-1 rounded-lg cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Saturation Slider */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center text-[9px] font-mono text-muted-foreground uppercase">
+                        <span>Saturation</span>
+                        <span className="text-cyan-400 font-bold">{slideSaturation}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="200"
+                        step="1"
+                        value={slideSaturation}
+                        onChange={(e) => setSlideSaturation(parseInt(e.target.value))}
+                        className="w-full accent-indigo-400 bg-white/5 h-1 rounded-lg cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Grayscale Slider */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center text-[9px] font-mono text-muted-foreground uppercase">
+                        <span>Grayscale</span>
+                        <span className="text-cyan-400 font-bold">{slideGrayscale}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={slideGrayscale}
+                        onChange={(e) => setSlideGrayscale(parseInt(e.target.value))}
+                        className="w-full accent-indigo-400 bg-white/5 h-1 rounded-lg cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Hue Rotate Slider */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center text-[9px] font-mono text-muted-foreground uppercase">
+                        <span>Hue Rotation</span>
+                        <span className="text-cyan-400 font-bold">{slideHueRotate}°</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="360"
+                        step="1"
+                        value={slideHueRotate}
+                        onChange={(e) => setSlideHueRotate(parseInt(e.target.value))}
+                        className="w-full accent-indigo-400 bg-white/5 h-1 rounded-lg cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="flex gap-3 border-t border-white/5 pt-4 mt-4 select-none">
+                  <Button
+                    onClick={() => setActivePreviewSlide(null)}
+                    className="flex-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-bold text-xs rounded-xl py-2.5 transition-all"
+                  >
+                    DISCARD
+                  </Button>
+                  <Button
+                    onClick={handleConfirmAddSlide}
+                    className="flex-1 bg-cyan-500/20 hover:bg-cyan-500/35 border border-cyan-500/30 text-cyan-400 font-bold text-xs rounded-xl py-2.5 hover:shadow-[0_0_15px_rgba(0,229,255,0.25)] transition-all"
+                  >
+                    ADD TO SHOWCASE
+                  </Button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
