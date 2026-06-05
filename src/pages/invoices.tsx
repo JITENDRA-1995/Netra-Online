@@ -17,7 +17,8 @@ import {
   Percent,
   Coins,
   ShieldCheck,
-  QrCode
+  QrCode,
+  Edit
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ interface InvoicesPageProps {
   bankingDetails: any;
   projects?: any[];
   services?: any[];
+  onEditInvoice?: (invoice: any) => void;
 }
 
 const containerVariants = {
@@ -62,7 +64,8 @@ export default function InvoicesPage({
   setSelectedVaultInvoices,
   bankingDetails,
   projects = [],
-  services = []
+  services = [],
+  onEditInvoice
 }: InvoicesPageProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -1097,6 +1100,19 @@ export default function InvoicesPage({
                           }}
                         >
                           <FileText className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="w-7 h-7 hover:bg-amber-500/10 hover:text-amber-400"
+                          title="Edit Invoice Details"
+                          onClick={() => {
+                            if (onEditInvoice) {
+                              onEditInvoice(inv);
+                            }
+                          }}
+                        >
+                          <Edit className="w-3.5 h-3.5" />
                         </Button>
                         <Button
                           size="icon"

@@ -47,7 +47,9 @@ export const saveInvoice = async (invoiceData) => {
         project_id: invoiceData.projectId || invoiceData.project_id || invoiceData.rawProject?.id,
         client_name: invoiceData.clientName || invoiceData.client_name,
         project_service: invoiceData.projectService || invoiceData.project_service,
-        issue_date: invoiceData.issueDate ? new Date(invoiceData.issueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        issue_date: (invoiceData.issueDate && !isNaN(new Date(invoiceData.issueDate).getTime()))
+          ? new Date(invoiceData.issueDate).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0],
         grand_total: invoiceData.grandTotal || invoiceData.grand_total
       }
     ])
@@ -70,3 +72,28 @@ export const deleteInvoice = async (invoiceId) => {
   if (error) throw error;
   return true;
 };
+
+/**
+ * Update an existing invoice
+ */
+export const updateInvoice = async (invoiceId, invoiceData) => {
+  const { data, error } = await supabase
+    .from('invoices')
+    .update({
+      invoice_no: invoiceData.invoiceNo || invoiceData.invoice_no,
+      project_id: invoiceData.projectId || invoiceData.project_id || invoiceData.rawProject?.id,
+      client_name: invoiceData.clientName || invoiceData.client_name,
+      project_service: invoiceData.projectService || invoiceData.project_service,
+      issue_date: (invoiceData.issueDate && !isNaN(new Date(invoiceData.issueDate).getTime())) 
+        ? new Date(invoiceData.issueDate).toISOString().split('T')[0] 
+        : undefined,
+      grand_total: invoiceData.grandTotal || invoiceData.grand_total
+    })
+    .eq('id', invoiceId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+

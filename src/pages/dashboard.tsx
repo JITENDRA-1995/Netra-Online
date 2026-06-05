@@ -71,12 +71,12 @@ function AnimatedNumber({ value, prefix = "", suffix = "" }: { value: number; pr
   return <span>{prefix}{display.toLocaleString()}{suffix}</span>;
 }
 
-const containerVariants = {
+const containerVariants: any = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.08 } },
 };
 
-const itemVariants = {
+const itemVariants: any = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
 };
@@ -99,17 +99,10 @@ export default function Dashboard({
   const totalClients = clients.filter(c => c.email !== 'settings@netra.graphics').length;
 
   const totalRevenue = useMemo(() => {
-    return projects.reduce((sum, p) => {
-      if ((p.status || "").toLowerCase() === "cancelled") return sum;
-      const baseQuote = parseFloat(p.quote) || 0;
-      const discountVal = parseFloat(p.discount) || 0;
-      const finalQuote = baseQuote - discountVal;
-      const isPaid = p.paymentStatus === 'paid' || (p.status || "").toLowerCase() === "completed";
-      const adv = parseFloat(p.advanceAmount) || 0;
-      const hasAdvance = adv > 0;
-      return sum + (isPaid ? finalQuote : (hasAdvance ? adv : 0));
-    }, 0);
-  }, [projects]);
+    return (cashbookEntries || [])
+      .filter(entry => entry.type === "INCOME")
+      .reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0);
+  }, [cashbookEntries]);
 
   const pendingInvoices = useMemo(() => {
     return projects.reduce((sum, p) => {
@@ -237,11 +230,14 @@ export default function Dashboard({
       prefix: "₹",
       icon: TrendingUp,
       trend: 12.5,
+      trendLabel: undefined,
+      overdue: undefined,
       color: "#00d4ff",
     },
     {
       label: "Active Projects",
       value: activeProjects,
+      prefix: undefined,
       icon: Briefcase,
       trend: projects.filter(p => {
         if (p.status !== 'Ongoing') return false;
@@ -249,12 +245,17 @@ export default function Dashboard({
         return !isNaN(pDate.getTime()) && pDate.getMonth() === new Date().getMonth();
       }).length,
       trendLabel: "this month",
+      overdue: undefined,
       color: "#8b5cf6",
     },
     {
       label: "Total Clients",
       value: totalClients,
+      prefix: undefined,
       icon: Users,
+      trend: undefined,
+      trendLabel: undefined,
+      overdue: undefined,
       color: "#10b981",
     },
     {
@@ -262,10 +263,12 @@ export default function Dashboard({
       value: pendingInvoices,
       prefix: "₹",
       icon: FileText,
+      trend: undefined,
+      trendLabel: undefined,
       overdue: overdueInvoicesCount,
       color: "#f59e0b",
     },
-  ] as const;
+  ];
 
   return (
     <motion.div

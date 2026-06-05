@@ -23,7 +23,7 @@ import {
   getInquiries, createInquiry, updateInquiry, deleteInquiry,
   getClients, createClientProfile, verifyClientVaultKey, updateClientProfile,
   getProjects, igniteProject, updateProjectState, toggleMilestone, addProjectActivityLog, sendChatMessage, subscribeToChats, uploadMediaVaultAsset,
-  getInvoices, saveInvoice, deleteInvoice
+  getInvoices, saveInvoice, deleteInvoice, updateInvoice
 } from './supabase/database';
 
 
@@ -535,7 +535,8 @@ function App() {
     const saved = localStorage.getItem('netra_services');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         console.error("Failed to parse saved services:", e);
       }
@@ -567,7 +568,8 @@ function App() {
     const saved = localStorage.getItem('netra_banking_details');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
       } catch (e) {
         console.error("Failed to parse saved banking details:", e);
       }
@@ -579,7 +581,8 @@ function App() {
     const saved = localStorage.getItem('netra_admin_profile');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
       } catch (e) {
         console.error("Failed to parse saved admin profile:", e);
       }
@@ -1169,7 +1172,8 @@ function App() {
     const saved = localStorage.getItem('netra_clients');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         console.error("Failed to parse saved clients:", e);
       }
@@ -1207,6 +1211,9 @@ function App() {
   const [isWarningDismissed, setIsWarningDismissed] = useState(false);
   const [projectsSearchQuery, setProjectsSearchQuery] = useState("");
   const [inquiriesSearchQuery, setInquiriesSearchQuery] = useState("");
+  const [projectToDelete, setProjectToDelete] = useState(null);
+  const [deleteStrategy, setDeleteStrategy] = useState('purge'); // 'purge' or 'keep'
+  const [editingInvoiceData, setEditingInvoiceData] = useState(null);
 
   useEffect(() => {
     localStorage.setItem('netra_admin_active', isCommandCenterActive);
@@ -1308,7 +1315,15 @@ function App() {
 
   const [readFlames, setReadFlames] = useState(() => {
     const saved = localStorage.getItem("netra_read_flames");
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.error("Failed to parse netra_read_flames:", e);
+      }
+    }
+    return [];
   });
 
   const sparks = inquiries.filter(q => {
@@ -1420,6 +1435,22 @@ function App() {
   const [ledgerSearch, setLedgerSearch] = useState('');
   const [invoiceProject, setInvoiceProject] = useState(null);
   const [invoices, setInvoices] = useState([]);
+  const [cashbookEntries, setCashbookEntries] = useState(() => {
+    const saved = localStorage.getItem('netra_cashbook');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.error("Failed to parse cashbook entries from localStorage:", e);
+      }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('netra_cashbook', JSON.stringify(cashbookEntries));
+  }, [cashbookEntries]);
   const [selectedBatchProjects, setSelectedBatchProjects] = useState([]);
   const [selectedVaultInvoices, setSelectedVaultInvoices] = useState([]);
 
@@ -1428,6 +1459,16 @@ function App() {
     const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '');
     const serialStr = serial.toString().padStart(4, '0');
     return `NG/${dateStr}/${serialStr}`;
+  };
+
+  const getUniqueInvoiceNumber = (date) => {
+    let serial = invoices.length + 1;
+    let invNo = getInvoiceNumber(date, serial);
+    while (invoices.some(i => i.invoiceNo === invNo)) {
+      serial++;
+      invNo = getInvoiceNumber(date, serial);
+    }
+    return invNo;
   };
 
   const formatCurrencyValue = (val) => {
@@ -1572,6 +1613,108 @@ function App() {
       setInvoices(prev => [formattedInvoice, ...prev]);
     } catch (err) {
       console.error("Failed to save invoice to Supabase:", err);
+      toast({
+        title: "Failed to Save Invoice",
+        description: err.message || JSON.stringify(err),
+        variant: "destructive"
+      });
+    }
+  };
+
+  const updateSavedInvoice = async (updated) => {
+    const existing = invoices.find(inv => inv.id === updated.id || inv.invoiceNo === updated.invoiceNo);
+
+    const subtotal = parseFloat(updated.quote) || 0;
+    const discount = parseFloat(updated.discount) || 0;
+    const advance = parseFloat(updated.advanceAmount) || 0;
+    const grandTotal = subtotal - discount - advance;
+
+    let clientNamePayload = updated.name;
+    const isCustomOrBatch = (existing && existing.clientName.startsWith("JSON_MOCK:")) || updated.items?.length > 0;
+    if (isCustomOrBatch) {
+      const mockClientPayload = {
+        name: updated.name,
+        address: updated.address || "",
+        email: updated.email || "",
+        phone: updated.phone || "",
+        gst: updated.gst || "",
+        service: updated.service,
+        quote: updated.quote,
+        discount: updated.discount,
+        advanceAmount: updated.advanceAmount,
+        items: updated.items || []
+      };
+      clientNamePayload = `JSON_MOCK:${JSON.stringify(mockClientPayload)}`;
+    }
+
+    const invoiceData = {
+      invoiceNo: updated.invoiceNo,
+      clientName: clientNamePayload,
+      projectService: updated.service,
+      grandTotal: grandTotal,
+      projectId: existing ? existing.projectId : (updated.id?.toString().startsWith('custom-') ? null : updated.id)
+    };
+
+    if (existing) {
+      try {
+        await updateInvoice(existing.id, invoiceData);
+        setInvoices(prev => prev.map(inv => {
+          if (inv.id === existing.id) {
+            return {
+              ...inv,
+              invoiceNo: updated.invoiceNo,
+              clientName: updated.name,
+              projectService: updated.service,
+              grandTotal: grandTotal,
+              rawProject: {
+                id: inv.rawProject?.id || inv.id,
+                name: updated.name,
+                service: updated.service,
+                quote: updated.quote,
+                discount: updated.discount,
+                advanceAmount: updated.advanceAmount,
+                phone: updated.phone,
+                email: updated.email,
+                address: updated.address,
+                gst: updated.gst,
+                items: updated.items
+              }
+            };
+          }
+          return inv;
+        }));
+        toast({ title: "Invoice details updated in vault" });
+      } catch (err) {
+        console.error("Failed to update invoice in Supabase:", err);
+        setInvoices(prev => prev.map(inv => {
+          if (inv.id === existing.id) {
+            return {
+              ...inv,
+              invoiceNo: updated.invoiceNo,
+              clientName: updated.name,
+              projectService: updated.service,
+              grandTotal: grandTotal,
+              rawProject: {
+                id: inv.rawProject?.id || inv.id,
+                name: updated.name,
+                service: updated.service,
+                quote: updated.quote,
+                discount: updated.discount,
+                advanceAmount: updated.advanceAmount,
+                phone: updated.phone,
+                email: updated.email,
+                address: updated.address,
+                gst: updated.gst,
+                items: updated.items
+              }
+            };
+          }
+          return inv;
+        }));
+        toast({ title: "Invoice details updated locally" });
+      }
+    } else {
+      toast({ title: "Preview updated" });
     }
   };
 
@@ -1718,6 +1861,21 @@ function App() {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
+    // 1. Calculate total revenue and monthly revenue from cashbook entries (INCOME type)
+    cashbookEntries.forEach(entry => {
+      if (entry.type !== "INCOME") return;
+      const amt = parseFloat(entry.amount) || 0;
+      totalRevenue += amt;
+
+      if (entry.date) {
+        const entryDate = new Date(entry.date);
+        if (!isNaN(entryDate.getTime()) && entryDate.getMonth() === currentMonth && entryDate.getFullYear() === currentYear) {
+          monthlyRevenue += amt;
+        }
+      }
+    });
+
+    // 2. Calculate pending dues from ignitionQueue (unpaid portions of active projects)
     ignitionQueue.forEach(p => {
       const isCancelled = (p.status || "").toLowerCase() === "cancelled";
       if (isCancelled) return;
@@ -1730,29 +1888,17 @@ function App() {
       const isPaid = p.paymentStatus === 'paid' || (p.status || "").toLowerCase() === "completed";
       const hasAdvance = adv > 0;
 
-      let revenueFromProject = 0;
       let duesFromProject = 0;
 
       if (isPaid) {
-        revenueFromProject = finalQuote;
         duesFromProject = 0;
       } else if (hasAdvance) {
-        revenueFromProject = adv;
         duesFromProject = Math.max(0, finalQuote - adv);
       } else {
-        revenueFromProject = 0;
         duesFromProject = finalQuote;
       }
 
-      totalRevenue += revenueFromProject;
       pendingDues += duesFromProject;
-
-      if (p.deadline) {
-        const pDate = new Date(p.deadline);
-        if (!isNaN(pDate.getTime()) && pDate.getMonth() === currentMonth && pDate.getFullYear() === currentYear) {
-          monthlyRevenue += revenueFromProject;
-        }
-      }
     });
 
     return {
@@ -1761,28 +1907,13 @@ function App() {
       monthlyRevenue,
       targetProgress: Math.min((monthlyRevenue / monthlyTarget) * 100, 100)
     };
-  }, [ignitionQueue, monthlyTarget]);
+  }, [ignitionQueue, cashbookEntries, monthlyTarget]);
 
   // --- CASHBOOK SYSTEM ---
   const [financialTab, setFinancialTab] = useState("PROJECTS"); // PROJECTS, CASHBOOK, INVOICES
   const [isCashbookEditModalOpen, setIsCashbookEditModalOpen] = useState(false);
   const [selectedCashbookEntry, setSelectedCashbookEntry] = useState(null);
   const [customPaymentPrompt, setCustomPaymentPrompt] = useState(null);
-  const [cashbookEntries, setCashbookEntries] = useState(() => {
-    const saved = localStorage.getItem('netra_cashbook');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error("Failed to parse cashbook entries from localStorage:", e);
-      }
-    }
-    return [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('netra_cashbook', JSON.stringify(cashbookEntries));
-  }, [cashbookEntries]);
 
 
   const cashbookMetrics = useMemo(() => {
@@ -2459,10 +2590,25 @@ function App() {
       let clientInfo;
       let clientDbId = null;
 
+      // 1. Fetch fresh clients from DB to verify selection and keep local state synchronized
+      const dbClients = await getClients();
+      const freshClients = dbClients ? dbClients.map(c => ({
+        ...c,
+        joinedDate: c.joined_date || c.joinedDate,
+        accessKey: c.access_key || c.accessKey
+      })) : [];
+      
+      setClients(freshClients);
+      localStorage.setItem('netra_clients', JSON.stringify(freshClients));
+
       if (ignitionClientType === "EXISTING") {
         const clientId = formData.get('existingClientId');
-        const existingClient = clients.find(c => c.id === parseInt(clientId));
-        if (!existingClient) return alert("Please select a valid visionary.");
+        const existingClient = freshClients.find(c => c.id === parseInt(clientId));
+        if (!existingClient) {
+          alert("Selected visionary no longer exists in the database. The client list has been synchronized. Please choose again.");
+          btn.innerText = "IGNITE PROJECT";
+          return;
+        }
         clientInfo = {
           name: existingClient.name,
           phone: existingClient.phone,
@@ -2471,23 +2617,63 @@ function App() {
         };
         clientDbId = existingClient.id;
       } else {
-        clientInfo = {
-          name: formData.get('clientName'),
-          phone: formData.get('whatsapp'),
-          email: formData.get('email'),
-          address: formData.get('address')
-        };
+        const rawName = formData.get('clientName')?.trim();
+        const rawEmail = formData.get('email')?.trim();
+        const rawPhone = formData.get('whatsapp')?.trim();
+        const rawAddress = formData.get('address')?.trim();
 
-        // Register new client with access key passcode
-        const randomAccessKey = Math.random().toString(36).substring(2, 8).toUpperCase();
-        const newClient = await createClientProfile({
-          ...clientInfo,
-          accessKey: randomAccessKey,
-          status: 'Active'
-        });
+        if (!rawName) {
+          alert("Please enter a valid client name.");
+          btn.innerText = "IGNITE PROJECT";
+          return;
+        }
 
-        clientDbId = newClient.id;
-        setClients(prev => [...prev, newClient]);
+        // Check if client with this email already exists in DB
+        let existingClient = null;
+        if (rawEmail) {
+          existingClient = freshClients.find(c => c.email.toLowerCase() === rawEmail.toLowerCase());
+        }
+
+        if (existingClient) {
+          // Auto-link project to the existing client profile
+          clientInfo = {
+            name: existingClient.name,
+            phone: existingClient.phone,
+            email: existingClient.email,
+            address: existingClient.address
+          };
+          clientDbId = existingClient.id;
+        } else {
+          // Generate a unique fallback email if empty to satisfy UNIQUE NOT NULL DB constraint
+          const clientEmail = rawEmail || `${rawName.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Date.now()}@netra.graphics`;
+
+          clientInfo = {
+            name: rawName,
+            phone: rawPhone,
+            email: clientEmail,
+            address: rawAddress
+          };
+
+          // Register new client with access key passcode
+          const randomAccessKey = Math.random().toString(36).substring(2, 8).toUpperCase();
+          const newClient = await createClientProfile({
+            ...clientInfo,
+            accessKey: randomAccessKey,
+            status: 'Active'
+          });
+
+          clientDbId = newClient.id;
+          
+          setClients(prev => {
+            const next = [...prev, {
+              ...newClient,
+              joinedDate: newClient.joined_date || newClient.joinedDate,
+              accessKey: newClient.access_key || newClient.accessKey
+            }];
+            localStorage.setItem('netra_clients', JSON.stringify(next));
+            return next;
+          });
+        }
       }
 
       const milestoneNames = ["Discovery", "Moodboard", "Sketching", "Final Flame"];
@@ -2532,13 +2718,19 @@ function App() {
 
       const newProject = {
         ...projectPayload,
-        id: savedProjCore.id
+        id: savedProjCore.id,
+        createdAt: savedProjCore.created_at ? new Date(savedProjCore.created_at).getTime() : Date.now()
       };
 
       setIgnitionQueue(prev => [...prev, newProject]);
       triggerBellPulse();
 
+      // Auto-generate and save draft invoice in vault
+      const draftInvNo = getUniqueInvoiceNumber(newProject.createdAt);
+      saveInvoiceToVault(newProject, draftInvNo);
+
       if (advanceVal > 0) {
+        const advPaymentMethod = formData.get('advancePaymentMethod') || "UPI";
         const advanceEntry = {
           id: Date.now(),
           projectId: savedProjCore.id,
@@ -2546,7 +2738,7 @@ function App() {
           desc: `Advance: ${serviceName} - ${clientInfo.name}`,
           amount: advanceVal,
           type: "INCOME",
-          mode: "UPI",
+          mode: advPaymentMethod,
           category: "Project",
           isAdvance: true
         };
@@ -2773,6 +2965,43 @@ function App() {
       console.warn("Failed to update project status in Supabase:", err);
     }
 
+    if (type === 'retainer') {
+      const completedProjectForInvoice = {
+        ...project,
+        ...updatedFields,
+        status: 'Completed',
+        stage: 4
+      };
+      const existingInvoice = invoices.find(i => i.rawProject?.id === project.id || i.projectId === project.id);
+      if (!existingInvoice) {
+        const invNo = getUniqueInvoiceNumber(project.createdAt);
+        saveInvoiceToVault(completedProjectForInvoice, invNo);
+      } else {
+        const subtotal = parseFloat(project.quote) || 0;
+        const discount = parseFloat(project.discount) || 0;
+        const finalGrandTotal = subtotal - discount;
+        try {
+          await updateInvoice(existingInvoice.id, {
+            ...existingInvoice,
+            projectId: project.id,
+            grandTotal: finalGrandTotal
+          });
+          setInvoices(prev => prev.map(inv => {
+            if (inv.id === existingInvoice.id) {
+              return {
+                ...inv,
+                grandTotal: finalGrandTotal,
+                rawProject: completedProjectForInvoice
+              };
+            }
+            return inv;
+          }));
+        } catch (err) {
+          console.error("Failed to update existing draft invoice grand total in handleMarkMilestonePaid:", err);
+        }
+      }
+    }
+
     setIgnitionQueue(prev => prev.map(p => {
       if (p.id === project.id) {
         return {
@@ -2877,55 +3106,87 @@ function App() {
     const formData = new FormData(e.target);
 
     try {
+      // 1. Fetch fresh clients from DB to check uniqueness and keep state synchronized
+      const dbClients = await getClients();
+      const freshClients = dbClients ? dbClients.map(c => ({
+        ...c,
+        joinedDate: c.joined_date || c.joinedDate,
+        accessKey: c.access_key || c.accessKey
+      })) : [];
+
+      setClients(freshClients);
+      localStorage.setItem('netra_clients', JSON.stringify(freshClients));
+
+      const rawName = formData.get('name')?.trim();
+      const rawEmail = formData.get('email')?.trim();
+      const rawPhone = formData.get('phone')?.trim();
+      const rawAddress = formData.get('address')?.trim();
+      const gst = formData.get('gst') || '';
+
+      if (!rawName) {
+        alert("Please enter a valid client name.");
+        return;
+      }
+
+      // Generate a unique fallback email if empty to satisfy UNIQUE NOT NULL DB constraint
+      const emailVal = rawEmail || `${rawName.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Date.now()}@netra.graphics`;
+
       if (selectedClient) {
+        // Check if another client has this email
+        const duplicateClient = freshClients.find(c => c.id !== selectedClient.id && c.email.toLowerCase() === emailVal.toLowerCase());
+        if (duplicateClient) {
+          alert(`Error: A client with the email "${emailVal}" already exists (Client name: ${duplicateClient.name}). Please use a unique email.`);
+          return;
+        }
+
         const clientData = {
-          name: formData.get('name'),
-          email: formData.get('email'),
-          phone: formData.get('phone'),
-          address: formData.get('address'),
-          gst: formData.get('gst') || '',
+          name: rawName,
+          email: emailVal,
+          phone: rawPhone,
+          address: rawAddress,
+          gst: gst,
           status: selectedClient.status || 'Active'
         };
-        let updatedClient;
-        try {
-          updatedClient = await updateClientProfile(selectedClient.id, clientData);
-        } catch (dbErr) {
-          console.warn("Supabase update failed, falling back to local memory:", dbErr);
-          updatedClient = {
-            ...selectedClient,
-            ...clientData
-          };
-        }
+
+        const updatedClient = await updateClientProfile(selectedClient.id, clientData);
+        
         setClients(prev => {
-          const next = prev.map(c => c.id === selectedClient.id ? updatedClient : c);
+          const next = prev.map(c => c.id === selectedClient.id ? {
+            ...updatedClient,
+            joinedDate: updatedClient.joined_date || updatedClient.joinedDate,
+            accessKey: updatedClient.access_key || updatedClient.accessKey
+          } : c);
           localStorage.setItem("netra_clients", JSON.stringify(next));
           return next;
         });
         toast({ title: "Client Updated Successfully", description: `Updated visionary: ${clientData.name}` });
       } else {
+        // Check if a client with this email already exists
+        const duplicateClient = freshClients.find(c => c.email.toLowerCase() === emailVal.toLowerCase());
+        if (duplicateClient) {
+          alert(`Error: A client with the email "${emailVal}" already exists (Client name: ${duplicateClient.name}). Please use a unique email or edit the existing client.`);
+          return;
+        }
+
         const randomAccessKey = Math.random().toString(36).substring(2, 8).toUpperCase();
         const clientData = {
-          name: formData.get('name'),
-          email: formData.get('email'),
-          phone: formData.get('phone'),
-          address: formData.get('address'),
-          gst: formData.get('gst') || '',
+          name: rawName,
+          email: emailVal,
+          phone: rawPhone,
+          address: rawAddress,
+          gst: gst,
           status: 'Active',
           accessKey: randomAccessKey
         };
-        let newClient;
-        try {
-          newClient = await createClientProfile(clientData);
-        } catch (dbErr) {
-          console.warn("Supabase insert failed, falling back to local memory:", dbErr);
-          newClient = {
-            id: Date.now(),
-            ...clientData,
-            joinedDate: new Date().toLocaleDateString()
-          };
-        }
+
+        const newClient = await createClientProfile(clientData);
+
         setClients(prev => {
-          const next = [...prev, newClient];
+          const next = [...prev, {
+            ...newClient,
+            joinedDate: newClient.joined_date || newClient.joinedDate,
+            accessKey: newClient.access_key || newClient.accessKey
+          }];
           localStorage.setItem("netra_clients", JSON.stringify(next));
           return next;
         });
@@ -3929,6 +4190,12 @@ function App() {
                             handleUpdateProjectStatusHandy={handleUpdateProjectStatusHandy}
                             setCashbookEntries={setCashbookEntries}
                             initialSearch={projectsSearchQuery}
+                            onDeleteProject={(id) => {
+                              const proj = ignitionQueue.find(p => p.id === id);
+                              if (proj) {
+                                setProjectToDelete(proj);
+                              }
+                            }}
                           />
 
                         )}
@@ -3967,6 +4234,24 @@ function App() {
                             bankingDetails={bankingDetails}
                             projects={ignitionQueue}
                             services={services}
+                            onEditInvoice={(inv) => {
+                              setEditingInvoiceData({
+                                id: inv.id,
+                                invoiceNo: inv.invoiceNo,
+                                name: inv.rawProject?.name || inv.clientName || "",
+                                address: inv.rawProject?.address || getClientAddress(inv.clientName) || "",
+                                phone: inv.rawProject?.phone || clients.find(c => c.name.toLowerCase() === (inv.rawProject?.name || inv.clientName || "").toLowerCase())?.phone || "",
+                                email: inv.rawProject?.email || clients.find(c => c.name.toLowerCase() === (inv.rawProject?.name || inv.clientName || "").toLowerCase())?.email || "",
+                                gst: inv.rawProject?.gst || clients.find(c => c.name.toLowerCase() === (inv.rawProject?.name || inv.clientName || "").toLowerCase())?.gst || "",
+                                service: inv.projectService || inv.rawProject?.service || "",
+                                quote: inv.rawProject?.quote || inv.grandTotal || 0,
+                                discount: inv.rawProject?.discount || 0,
+                                advanceAmount: inv.rawProject?.advanceAmount || 0,
+                                qty: inv.rawProject?.qty || 1,
+                                rate: inv.rawProject?.rate || (inv.rawProject?.quote / (inv.rawProject?.qty || 1)) || inv.grandTotal || 0,
+                                items: inv.rawProject?.items || []
+                              });
+                            }}
                           />
                         )}
 
@@ -4128,6 +4413,28 @@ function App() {
                                   <div className="input-group">
                                     <label>Advance Payment (₹)</label>
                                     <input type="number" name="advanceAmount" placeholder="0" />
+                                  </div>
+                                </div>
+
+                                <div className="form-row">
+                                  <div className="input-group" style={{ opacity: 0, pointerEvents: 'none' }}>
+                                    <label>Spacer</label>
+                                    <input type="text" disabled />
+                                  </div>
+                                  <div className="input-group" style={{ opacity: 0, pointerEvents: 'none' }}>
+                                    <label>Spacer</label>
+                                    <input type="text" disabled />
+                                  </div>
+                                  <div className="input-group">
+                                    <label>Advance Payment Method</label>
+                                    <select
+                                      name="advancePaymentMethod"
+                                      className="ignition-input"
+                                      style={{ width: '100%', padding: '0.8rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '4px', outline: 'none', height: '42px' }}
+                                    >
+                                      <option value="UPI">UPI / Online</option>
+                                      <option value="CASH">Cash</option>
+                                    </select>
                                   </div>
                                 </div>
 
@@ -4914,10 +5221,33 @@ function App() {
                           stage: 4,
                           paymentStatus: "paid"
                         };
-                        const existingInvoice = invoices.find(i => i.rawProject?.id === customPaymentPrompt.p.id);
+                        const existingInvoice = invoices.find(i => i.rawProject?.id === customPaymentPrompt.p.id || i.projectId === customPaymentPrompt.p.id);
                         if (!existingInvoice) {
-                          const invNo = getInvoiceNumber(customPaymentPrompt.p.createdAt, invoices.length + 1);
+                          const invNo = getUniqueInvoiceNumber(customPaymentPrompt.p.createdAt);
                           saveInvoiceToVault(completedProjectForInvoice, invNo);
+                        } else {
+                          const subtotal = parseFloat(customPaymentPrompt.p.quote) || 0;
+                          const discount = parseFloat(customPaymentPrompt.p.discount) || 0;
+                          const finalGrandTotal = subtotal - discount;
+                          try {
+                            await updateInvoice(existingInvoice.id, {
+                              ...existingInvoice,
+                              projectId: customPaymentPrompt.p.id,
+                              grandTotal: finalGrandTotal
+                            });
+                            setInvoices(prev => prev.map(inv => {
+                              if (inv.id === existingInvoice.id) {
+                                return {
+                                  ...inv,
+                                  grandTotal: finalGrandTotal,
+                                  rawProject: completedProjectForInvoice
+                                };
+                              }
+                              return inv;
+                            }));
+                          } catch (err) {
+                            console.error("Failed to update existing draft invoice grand total:", err);
+                          }
                         }
 
                         setIgnitionQueue(prev => prev.map(proj =>
@@ -4974,7 +5304,7 @@ function App() {
                   {(() => {
                     const rowsPerPage = 6;
                     const existingInvoice = invoices.find(inv => inv.rawProject?.id === invoiceProject.id);
-                    const stableInvoiceNo = existingInvoice ? existingInvoice.invoiceNo : (invoiceProject.invoiceNo || getInvoiceNumber(invoiceProject.createdAt, invoices.length + 1));
+                    const stableInvoiceNo = existingInvoice ? existingInvoice.invoiceNo : (invoiceProject.invoiceNo || getUniqueInvoiceNumber(invoiceProject.createdAt));
 
                     // If it's a batch project, use its internal items, otherwise use single project as one item
                     const allItems = (invoiceProject.items && invoiceProject.items.length > 0)
@@ -5339,6 +5669,29 @@ function App() {
                             Send via WhatsApp
                           </button>
                           <button
+                            className="action-btn btn-edit"
+                            onClick={() => {
+                              setEditingInvoiceData({
+                                id: existingInvoice?.id || invoiceProject.id,
+                                invoiceNo: stableInvoiceNo,
+                                name: invoiceProject.name,
+                                address: getClientAddress(invoiceProject.name),
+                                phone: invoiceProject.phone || clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase())?.phone || "",
+                                email: invoiceProject.email || clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase())?.email || "",
+                                gst: invoiceProject.gst || clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase())?.gst || "",
+                                service: invoiceProject.service,
+                                quote: invoiceProject.quote,
+                                discount: invoiceProject.discount || 0,
+                                advanceAmount: invoiceProject.advanceAmount || 0,
+                                qty: invoiceProject.qty || 1,
+                                rate: invoiceProject.rate || (invoiceProject.quote / (invoiceProject.qty || 1)),
+                                items: invoiceProject.items || []
+                              });
+                            }}
+                          >
+                            Edit Details
+                          </button>
+                          <button
                             className="action-btn btn-close"
                             onClick={() => {
                               setIsInvoicePreviewOpen(false);
@@ -5523,6 +5876,559 @@ function App() {
                       IGNITE CALIBRATION
                     </button>
                   </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* Project Delete Confirmation Modal */}
+          <AnimatePresence>
+            {projectToDelete && (
+              <div className="modal-overlay z-[10005]" style={{ zIndex: 10050 }}>
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="ignition-modal max-w-lg w-[90vw] border border-red-500/30 bg-[#0e0a0b]/98"
+                >
+                  <button
+                    type="button"
+                    className="close-modal text-red-400 hover:text-red-300"
+                    onClick={() => setProjectToDelete(null)}
+                  >
+                    ×
+                  </button>
+
+                  <div className="modal-header border-b border-red-500/10 pb-4 mb-5">
+                    <h2 className="font-extrabold text-red-500 text-lg flex items-center gap-2">
+                      ⚠️ TERMINATE MISSION & PURGE RECORD
+                    </h2>
+                    <p className="text-xs text-muted-foreground">Permanent deletion of database entities and financial reconciliation</p>
+                  </div>
+
+                  <div className="space-y-4 text-left text-xs text-white/80">
+                    <div className="p-4 rounded-xl border border-red-500/10 bg-red-500/[0.02] space-y-1">
+                      <div className="text-[10px] font-bold text-red-400 uppercase tracking-widest">Project Parameters</div>
+                      <div className="text-sm font-black text-white">{(projectToDelete.service || '').toUpperCase()}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase font-mono">Client: {projectToDelete.name || ''}</div>
+                    </div>
+
+                    {/* Invoices warning */}
+                    {(() => {
+                      const relatedInvs = invoices.filter(inv => inv.rawProject?.id === projectToDelete.id || inv.projectId === projectToDelete.id);
+                      if (relatedInvs.length === 0) return null;
+                      return (
+                        <div className="p-4 rounded-xl border border-amber-500/10 bg-amber-500/[0.01] space-y-1.5">
+                          <div className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">📁 Linked Invoices ({relatedInvs.length})</div>
+                          <p className="text-3xs text-muted-foreground">The following generated documents will be permanently purged from the vault:</p>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {relatedInvs.map(inv => (
+                              <span key={inv.id} className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-mono text-[9px] font-bold">
+                                {inv.invoiceNo}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Cashbook warning */}
+                    {(() => {
+                      const relatedEntries = cashbookEntries.filter(entry => entry.projectId === projectToDelete.id);
+                      if (relatedEntries.length === 0) return null;
+                      return (
+                        <div className="p-4 rounded-xl border border-cyan-500/10 bg-cyan-500/[0.01] space-y-1.5">
+                          <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest">💰 Linked Cashbook Entries ({relatedEntries.length})</div>
+                          <p className="text-3xs text-muted-foreground">The following financial logs will be removed and reverted from the cashbook:</p>
+                          <div className="space-y-1 divide-y divide-white/5 max-h-32 overflow-y-auto pr-1">
+                            {relatedEntries.map(entry => (
+                              <div key={entry.id} className="flex justify-between items-center text-[10px] py-1">
+                                <span className="text-white/60 truncate max-w-[180px]">{entry.desc}</span>
+                                <span className={`font-mono font-bold ${entry.type === 'EXPENSE' ? 'text-red-400' : 'text-emerald-400'}`}>
+                                  {entry.type === 'EXPENSE' ? '-' : '+'}₹{parseFloat(entry.amount).toLocaleString()}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Details Summary */}
+                    <div className="p-4 rounded-xl border border-white/5 bg-white/[0.01] space-y-2">
+                      <div className="text-[10px] font-bold text-white uppercase tracking-widest mb-1">Financial Reconciliation Summary</div>
+                      
+                      <div className="flex justify-between text-[10px] border-b border-white/5 pb-1">
+                        <span className="text-white/40">Advance Payment Received:</span>
+                        <span className="font-mono font-bold text-emerald-400">₹{parseFloat(projectToDelete.advanceAmount || 0).toLocaleString()}</span>
+                      </div>
+                      
+                      <div className="flex justify-between text-[10px] border-b border-white/5 pb-1">
+                        <span className="text-white/40">Total Project Quote:</span>
+                        <span className="font-mono font-bold text-white">₹{parseFloat(projectToDelete.quote || 0).toLocaleString()}</span>
+                      </div>
+
+                      <div className="flex justify-between text-[10px] pt-1">
+                        <span className="text-white/40">Total Reverted from Cashbook:</span>
+                        <span className="font-mono font-bold text-red-400">
+                          -₹{(() => {
+                            if (deleteStrategy === 'keep' && projectToDelete.status === 'Completed') {
+                              return "0";
+                            }
+                            const relatedEntries = cashbookEntries.filter(entry => entry.projectId === projectToDelete.id);
+                            const sum = relatedEntries.reduce((acc, entry) => {
+                              const amt = parseFloat(entry.amount) || 0;
+                              return entry.type === 'EXPENSE' ? acc - amt : acc + amt;
+                            }, 0);
+                            return Math.max(0, sum).toLocaleString();
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Keep / Purge choice for Completed Projects */}
+                    {projectToDelete.status === 'Completed' && (
+                      <div className="p-4 rounded-xl border border-cyan-500/10 bg-cyan-500/[0.01] space-y-3">
+                        <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest">Completed Project Deletion Strategy</div>
+                        <div className="flex flex-col gap-2">
+                          <label className="flex items-center gap-2 cursor-pointer text-[11px] text-white/80 select-none">
+                            <input
+                              type="radio"
+                              name="deleteStrategy"
+                              value="keep"
+                              checked={deleteStrategy === 'keep'}
+                              onChange={() => setDeleteStrategy('keep')}
+                              className="accent-cyan-500"
+                            />
+                            <span>Keep/Preserve associated log entries and invoices in the Vault</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer text-[11px] text-white/80 select-none">
+                            <input
+                              type="radio"
+                              name="deleteStrategy"
+                              value="purge"
+                              checked={deleteStrategy === 'purge'}
+                              onChange={() => setDeleteStrategy('purge')}
+                              className="accent-red-500"
+                            />
+                            <span className="text-red-400 font-semibold">Purge project along with associated log entries and invoices</span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center pt-5 border-t border-white/5 mt-6">
+                    <button
+                      type="button"
+                      onClick={() => setProjectToDelete(null)}
+                      className="border border-white/10 text-white hover:bg-white/5 text-xs rounded-xl px-5 h-9 bg-transparent cursor-pointer font-bold transition-all"
+                    >
+                      CANCEL
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const targetId = projectToDelete.id;
+                        try {
+                          const relatedInvs = invoices.filter(inv => inv.rawProject?.id === targetId || inv.projectId === targetId);
+                          
+                          if (deleteStrategy === 'keep' && projectToDelete.status === 'Completed') {
+                            // Keep strategy: unlink invoice and serialize metadata to JSON_MOCK
+                            for (const inv of relatedInvs) {
+                              try {
+                                const mockClientPayload = {
+                                  name: projectToDelete.client?.name || projectToDelete.name,
+                                  address: projectToDelete.client?.address || projectToDelete.address || "",
+                                  email: projectToDelete.client?.email || projectToDelete.email || "",
+                                  phone: projectToDelete.client?.phone || projectToDelete.whatsapp || projectToDelete.phone || "",
+                                  gst: projectToDelete.client?.gst || projectToDelete.gst || "",
+                                  service: projectToDelete.service,
+                                  quote: parseFloat(projectToDelete.quote) || 0,
+                                  discount: parseFloat(projectToDelete.discount) || 0,
+                                  advanceAmount: parseFloat(projectToDelete.advanceAmount) || 0,
+                                  qty: parseFloat(projectToDelete.qty) || 1,
+                                  rate: parseFloat(projectToDelete.rate) || parseFloat(projectToDelete.quote) || 0,
+                                  items: projectToDelete.items || []
+                                };
+                                const { error: invErr } = await supabase.from('invoices').update({
+                                  project_id: null,
+                                  client_name: `JSON_MOCK:${JSON.stringify(mockClientPayload)}`
+                                }).eq('id', inv.id);
+                                if (invErr) throw invErr;
+                              } catch (err) {
+                                console.warn(`Failed to unlink invoice ${inv.id} before project deletion:`, err);
+                              }
+                            }
+                          } else {
+                            // Purge strategy: delete invoices from Supabase
+                            for (const inv of relatedInvs) {
+                              try {
+                                await deleteInvoice(inv.id);
+                              } catch (invErr) {
+                                console.warn(`Failed to delete invoice ${inv.id} from Supabase:`, invErr);
+                              }
+                            }
+                          }
+
+                          // Always delete the project itself from Supabase
+                          const { error: pError } = await supabase.from('projects').delete().eq('id', targetId);
+                          if (pError) throw pError;
+
+                          // Update local states
+                          if (deleteStrategy === 'keep' && projectToDelete.status === 'Completed') {
+                            setInvoices(prev => prev.map(inv => {
+                              if (inv.rawProject?.id === targetId || inv.projectId === targetId) {
+                                const mockClientPayload = {
+                                  name: projectToDelete.client?.name || projectToDelete.name,
+                                  address: projectToDelete.client?.address || projectToDelete.address || "",
+                                  email: projectToDelete.client?.email || projectToDelete.email || "",
+                                  phone: projectToDelete.client?.phone || projectToDelete.whatsapp || projectToDelete.phone || "",
+                                  gst: projectToDelete.client?.gst || projectToDelete.gst || "",
+                                  service: projectToDelete.service,
+                                  quote: parseFloat(projectToDelete.quote) || 0,
+                                  discount: parseFloat(projectToDelete.discount) || 0,
+                                  advanceAmount: parseFloat(projectToDelete.advanceAmount) || 0,
+                                  qty: parseFloat(projectToDelete.qty) || 1,
+                                  rate: parseFloat(projectToDelete.rate) || parseFloat(projectToDelete.quote) || 0,
+                                  items: projectToDelete.items || []
+                                };
+                                return {
+                                  ...inv,
+                                  clientName: mockClientPayload.name,
+                                  projectId: null,
+                                  rawProject: {
+                                    id: inv.id,
+                                    ...mockClientPayload
+                                  }
+                                };
+                              }
+                              return inv;
+                            }));
+
+                            setCashbookEntries(prev => prev.map(entry =>
+                              entry.projectId === targetId ? { ...entry, projectId: null } : entry
+                            ));
+                            toast({ title: "Deletion Complete", description: "Project deleted. Associated invoices and cashbook records preserved in Vault/Ledger." });
+                          } else {
+                            setInvoices(prev => prev.filter(inv => inv.rawProject?.id !== targetId && inv.projectId !== targetId));
+                            setCashbookEntries(prev => prev.filter(entry => entry.projectId !== targetId));
+                            toast({ title: "Purge Complete", description: "Project, linked invoices, and cashbook records successfully deleted." });
+                          }
+                          
+                          setIgnitionQueue(prev => prev.filter(p => p.id !== targetId));
+                        } catch (err) {
+                          console.error("Deletion/Purge failed:", err);
+                          toast({ title: "Operation failed", description: err.message || JSON.stringify(err), variant: "destructive" });
+                        } finally {
+                          setProjectToDelete(null);
+                          setSelectedProjectTab(null);
+                        }
+                      }}
+                      className={deleteStrategy === 'keep' && projectToDelete.status === 'Completed' ? "bg-cyan-500 hover:bg-cyan-600 text-black font-extrabold text-xs rounded-xl px-6 h-9 shadow-lg shadow-cyan-500/10 cursor-pointer border-none transition-all" : "bg-red-500 hover:bg-red-600 text-white font-extrabold text-xs rounded-xl px-6 h-9 shadow-lg shadow-red-500/10 cursor-pointer border-none transition-all"}
+                    >
+                      {deleteStrategy === 'keep' && projectToDelete.status === 'Completed' ? "CONFIRM DELETION" : "CONFIRM PURGE & REVERT"}
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* Edit Invoice Details Modal */}
+          <AnimatePresence>
+            {editingInvoiceData && (
+              <div className="modal-overlay z-[10010]" style={{ zIndex: 10050 }}>
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="ignition-modal max-w-2xl w-[90vw] max-h-[90vh] overflow-y-auto"
+                >
+                  <button
+                    type="button"
+                    className="close-modal"
+                    onClick={() => setEditingInvoiceData(null)}
+                  >
+                    ×
+                  </button>
+
+                  <div className="modal-header border-b border-white/5 pb-4 mb-5">
+                    <h2 className="font-extrabold text-cyan-400 text-lg flex items-center gap-2">
+                      ✏️ EDIT INVOICE DETAILS
+                    </h2>
+                    <p className="text-xs text-muted-foreground">Modify metadata, client credentials, and pricing catalog for this invoice</p>
+                  </div>
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const formData = new FormData(e.currentTarget);
+                      const updated = {
+                        id: editingInvoiceData.id,
+                        invoiceNo: formData.get("invoiceNo"),
+                        name: formData.get("name"),
+                        address: formData.get("address"),
+                        phone: formData.get("phone"),
+                        email: formData.get("email"),
+                        gst: formData.get("gst"),
+                        service: formData.get("service") || editingInvoiceData.service,
+                        quote: parseFloat(formData.get("quote")) || 0,
+                        discount: parseFloat(formData.get("discount")) || 0,
+                        advanceAmount: parseFloat(formData.get("advanceAmount")) || 0,
+                        qty: parseInt(formData.get("qty")) || 1,
+                        rate: parseFloat(formData.get("rate")) || 0,
+                        items: editingInvoiceData.items || []
+                      };
+                      
+                      if (!updated.items || updated.items.length === 0) {
+                        updated.quote = updated.rate * updated.qty;
+                      } else {
+                        updated.quote = updated.items.reduce((sum, item) => sum + (parseFloat(item.rate || item.quote) * (item.qty || 1)), 0);
+                        updated.discount = updated.items.reduce((sum, item) => sum + (parseFloat(item.discount) || 0), 0);
+                      }
+
+                      updateSavedInvoice(updated);
+                      setInvoiceProject(prev => prev ? {
+                        ...prev,
+                        name: updated.name,
+                        address: updated.address,
+                        phone: updated.phone,
+                        email: updated.email,
+                        gst: updated.gst,
+                        service: updated.service,
+                        quote: updated.quote,
+                        discount: updated.discount,
+                        qty: updated.qty,
+                        rate: updated.rate,
+                        advanceAmount: updated.advanceAmount,
+                        invoiceNo: updated.invoiceNo,
+                        items: updated.items
+                      } : null);
+                      setEditingInvoiceData(null);
+                    }}
+                    className="space-y-4 text-left text-xs"
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="input-group">
+                        <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Invoice Number</label>
+                        <input
+                          type="text"
+                          name="invoiceNo"
+                          defaultValue={editingInvoiceData.invoiceNo}
+                          required
+                          className="bg-white/5 border border-white/10 rounded p-2 text-white outline-none w-full"
+                        />
+                      </div>
+                      <div className="input-group">
+                        <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Client / Business Name</label>
+                        <input
+                          type="text"
+                          name="name"
+                          defaultValue={editingInvoiceData.name}
+                          required
+                          className="bg-white/5 border border-white/10 rounded p-2 text-white outline-none w-full"
+                        />
+                      </div>
+                      <div className="input-group md:col-span-2">
+                        <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Billing Address</label>
+                        <input
+                          type="text"
+                          name="address"
+                          defaultValue={editingInvoiceData.address}
+                          required
+                          className="bg-white/5 border border-white/10 rounded p-2 text-white outline-none w-full"
+                        />
+                      </div>
+                      <div className="input-group">
+                        <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Phone Number</label>
+                        <input
+                          type="text"
+                          name="phone"
+                          defaultValue={editingInvoiceData.phone}
+                          className="bg-white/5 border border-white/10 rounded p-2 text-white outline-none w-full"
+                        />
+                      </div>
+                      <div className="input-group">
+                        <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Email Address</label>
+                        <input
+                          type="email"
+                          name="email"
+                          defaultValue={editingInvoiceData.email}
+                          className="bg-white/5 border border-white/10 rounded p-2 text-white outline-none w-full"
+                        />
+                      </div>
+                      <div className="input-group md:col-span-2">
+                        <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">GSTIN</label>
+                        <input
+                          type="text"
+                          name="gst"
+                          defaultValue={editingInvoiceData.gst}
+                          className="bg-white/5 border border-white/10 rounded p-2 text-white outline-none w-full"
+                        />
+                      </div>
+                    </div>
+
+                    {editingInvoiceData.items && editingInvoiceData.items.length > 0 ? (
+                      <div className="border border-white/5 bg-white/[0.01] p-4 rounded-xl space-y-3">
+                        <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest">Multiple Items Catalog</div>
+                        <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
+                          {editingInvoiceData.items.map((item, idx) => (
+                            <div key={idx} className="flex gap-2 items-end border-b border-white/5 pb-3">
+                              <div className="flex-1">
+                                <label className="text-[8px] text-muted-foreground block mb-0.5">Description</label>
+                                <input
+                                  type="text"
+                                  value={item.service}
+                                  onChange={(e) => {
+                                    const next = [...editingInvoiceData.items];
+                                    next[idx].service = e.target.value;
+                                    setEditingInvoiceData({ ...editingInvoiceData, items: next });
+                                  }}
+                                  required
+                                  className="bg-white/5 border border-white/10 rounded p-1 text-white text-[11px] outline-none w-full"
+                                />
+                              </div>
+                              <div style={{ width: '50px' }}>
+                                <label className="text-[8px] text-muted-foreground block mb-0.5">Qty</label>
+                                <input
+                                  type="number"
+                                  value={item.qty || 1}
+                                  onChange={(e) => {
+                                    const next = [...editingInvoiceData.items];
+                                    next[idx].qty = parseInt(e.target.value) || 1;
+                                    setEditingInvoiceData({ ...editingInvoiceData, items: next });
+                                  }}
+                                  required
+                                  className="bg-white/5 border border-white/10 rounded p-1 text-white text-[11px] outline-none w-full text-center"
+                                />
+                              </div>
+                              <div style={{ width: '80px' }}>
+                                <label className="text-[8px] text-muted-foreground block mb-0.5">Rate</label>
+                                <input
+                                  type="number"
+                                  value={item.rate || item.quote || 0}
+                                  onChange={(e) => {
+                                    const next = [...editingInvoiceData.items];
+                                    const val = parseFloat(e.target.value) || 0;
+                                    next[idx].rate = val;
+                                    next[idx].quote = val * (next[idx].qty || 1);
+                                    setEditingInvoiceData({ ...editingInvoiceData, items: next });
+                                  }}
+                                  required
+                                  className="bg-white/5 border border-white/10 rounded p-1 text-white text-[11px] outline-none w-full text-right"
+                                />
+                              </div>
+                              <div style={{ width: '80px' }}>
+                                <label className="text-[8px] text-muted-foreground block mb-0.5">Disc</label>
+                                <input
+                                  type="number"
+                                  value={item.discount || 0}
+                                  onChange={(e) => {
+                                    const next = [...editingInvoiceData.items];
+                                    next[idx].discount = parseFloat(e.target.value) || 0;
+                                    setEditingInvoiceData({ ...editingInvoiceData, items: next });
+                                  }}
+                                  className="bg-white/5 border border-white/10 rounded p-1 text-white text-[11px] outline-none w-full text-right"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded p-1 text-[11px] h-[26px]"
+                                onClick={() => {
+                                  const next = editingInvoiceData.items.filter((_, i) => i !== idx);
+                                  setEditingInvoiceData({ ...editingInvoiceData, items: next });
+                                }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          className="bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-[10px] font-bold py-1 px-3 rounded-lg"
+                          onClick={() => {
+                            const next = [...(editingInvoiceData.items || []), { service: "", qty: 1, rate: 0, discount: 0, quote: 0 }];
+                            setEditingInvoiceData({ ...editingInvoiceData, items: next });
+                          }}
+                        >
+                          + ADD SERVICE ITEM
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="border border-white/5 bg-white/[0.01] p-4 rounded-xl space-y-3">
+                        <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest font-mono">Service Details</div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="input-group md:col-span-2">
+                            <label className="text-[8px] text-muted-foreground uppercase">Service Description</label>
+                            <input
+                              type="text"
+                              name="service"
+                              defaultValue={editingInvoiceData.service}
+                              required
+                              className="bg-white/5 border border-white/10 rounded p-2 text-white outline-none w-full"
+                            />
+                          </div>
+                          <div className="input-group">
+                            <label className="text-[8px] text-muted-foreground uppercase">Quantity</label>
+                            <input
+                              type="number"
+                              name="qty"
+                              defaultValue={editingInvoiceData.qty}
+                              required
+                              className="bg-white/5 border border-white/10 rounded p-2 text-white outline-none w-full"
+                            />
+                          </div>
+                          <div className="input-group">
+                            <label className="text-[8px] text-muted-foreground uppercase">Rate (₹)</label>
+                            <input
+                              type="number"
+                              name="rate"
+                              defaultValue={editingInvoiceData.rate}
+                              required
+                              className="bg-white/5 border border-white/10 rounded p-2 text-white outline-none w-full"
+                            />
+                          </div>
+                          <div className="input-group md:col-span-2">
+                            <label className="text-[8px] text-muted-foreground uppercase">Discount (₹)</label>
+                            <input
+                              type="number"
+                              name="discount"
+                              defaultValue={editingInvoiceData.discount}
+                              className="bg-white/5 border border-white/10 rounded p-2 text-white outline-none w-full"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="input-group">
+                      <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Advance Payment Received (₹)</label>
+                      <input
+                        type="number"
+                        name="advanceAmount"
+                        defaultValue={editingInvoiceData.advanceAmount}
+                        className="bg-white/5 border border-white/10 rounded p-2 text-white outline-none w-full"
+                      />
+                    </div>
+
+                    <div className="flex justify-between items-center pt-5 border-t border-white/5 mt-6">
+                      <button
+                        type="button"
+                        onClick={() => setEditingInvoiceData(null)}
+                        className="border border-white/10 text-white hover:bg-white/5 text-xs rounded-xl px-5 h-9 bg-transparent cursor-pointer font-bold transition-all"
+                      >
+                        CANCEL
+                      </button>
+                      <button
+                        type="submit"
+                        className="bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-600 hover:to-indigo-600 text-black font-extrabold text-xs rounded-xl px-6 h-9 shadow-lg shadow-cyan-500/10 border-none cursor-pointer transition-all"
+                      >
+                        SAVE INVOICE CHANGES
+                      </button>
+                    </div>
+                  </form>
                 </motion.div>
               </div>
             )}

@@ -61,6 +61,7 @@ interface ProjectsProps {
   handleUpdateProjectStatusHandy?: (projectId: number, newProjectStatus: string) => void;
   setCashbookEntries?: React.Dispatch<React.SetStateAction<any[]>>;
   initialSearch?: string;
+  onDeleteProject?: (id: number) => void;
 }
 
 const containerVariants = {
@@ -81,7 +82,8 @@ export default function Projects({
   onDownloadInvoice,
   handleUpdateProjectStatusHandy,
   setCashbookEntries,
-  initialSearch = ""
+  initialSearch = "",
+  onDeleteProject
 }: ProjectsProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -328,6 +330,10 @@ export default function Projects({
   }
 
   async function handleDelete(id: number) {
+    if (onDeleteProject) {
+      onDeleteProject(id);
+      return;
+    }
     if (window.confirm("ARE YOU SURE YOU WANT TO TERMINATE THIS MISSION? ALL DATA FOR THIS PROJECT WILL BE PURGED.")) {
       try {
         const { error } = await supabase.from("projects").delete().eq("id", id);
