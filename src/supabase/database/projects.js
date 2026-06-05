@@ -23,53 +23,79 @@ export const getProjects = async () => {
   if (error) throw error;
   
   // Format to match the frontend expected nested state objects
-  return data.map(project => ({
-    id: project.id,
-    name: project.name,
-    service: project.service,
-    stage: project.stage,
-    status: project.status,
-    createdAt: new Date(project.created_at).getTime(),
-    deadline: project.deadline,
-    quote: parseFloat(project.quote),
-    discount: parseFloat(project.discount || 0),
-    discountValue: project.discount_value,
-    discountType: project.discount_type,
-    advanceAmount: parseFloat(project.advance_amount || 0),
-    paymentStatus: project.payment_status,
-    description: project.description || '',
-    category: project.category || 'branding',
-    progress: project.progress || 0,
-    client: project.clients ? {
-      id: project.clients.id,
-      name: project.clients.name,
-      phone: project.clients.phone,
-      email: project.clients.email,
-      address: project.clients.address
-    } : null,
-    milestones: (project.project_milestones || [])
-      .sort((a, b) => a.position - b.position)
-      .map(m => ({ name: m.name, completed: m.completed })),
-    activityLog: (project.project_activity_logs || [])
-      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-      .map(l => ({ action: l.action, time: new Date(l.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) })),
-    collaborationStream: (project.project_chats || [])
-      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-      .map(c => ({ id: c.id, sender: c.sender, text: c.message, time: new Date(c.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) })),
-    mediaVault: (project.project_media || []).map(m => ({
-      id: m.id,
-      name: m.file_name,
-      url: m.file_url,
-      type: m.file_type,
-      time: new Date(m.uploaded_at).toLocaleDateString()
-    }))
-  }));
+  return data.map(project => {
+    let qty = 1;
+    let rate = parseFloat(project.quote);
+    let descText = project.description || '';
+
+    if (descText.startsWith("JSON_METADATA:")) {
+      try {
+        const parsed = JSON.parse(descText.substring(14));
+        qty = parsed.qty || 1;
+        rate = parsed.rate || (parseFloat(project.quote) / qty);
+        descText = parsed.description || '';
+      } catch (e) {
+        console.error("Failed to parse JSON_METADATA in project description:", e);
+      }
+    }
+
+    return {
+      id: project.id,
+      name: project.name,
+      service: project.service,
+      stage: project.stage,
+      status: project.status,
+      createdAt: new Date(project.created_at).getTime(),
+      deadline: project.deadline,
+      quote: parseFloat(project.quote),
+      discount: parseFloat(project.discount || 0),
+      discountValue: project.discount_value,
+      discountType: project.discount_type,
+      advanceAmount: parseFloat(project.advance_amount || 0),
+      paymentStatus: project.payment_status,
+      description: descText,
+      qty: qty,
+      rate: rate,
+      category: project.category || 'branding',
+      progress: project.progress || 0,
+      client: project.clients ? {
+        id: project.clients.id,
+        name: project.clients.name,
+        phone: project.clients.phone,
+        email: project.clients.email,
+        address: project.clients.address
+      } : null,
+      milestones: (project.project_milestones || [])
+        .sort((a, b) => a.position - b.position)
+        .map(m => ({ name: m.name, completed: m.completed })),
+      activityLog: (project.project_activity_logs || [])
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+        .map(l => ({ action: l.action, time: new Date(l.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) })),
+      collaborationStream: (project.project_chats || [])
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+        .map(c => ({ id: c.id, sender: c.sender, text: c.message, time: new Date(c.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) })),
+      mediaVault: (project.project_media || []).map(m => ({
+        id: m.id,
+        name: m.file_name,
+        url: m.file_url,
+        type: m.file_type,
+        time: new Date(m.uploaded_at).toLocaleDateString()
+      }))
+    };
+  });
 };
 
 /**
  * Ignites a new project with initial milestones and logs
  */
 export const igniteProject = async (projectData) => {
+  const desc = projectData.description || '';
+  const serializedDesc = `JSON_METADATA:${JSON.stringify({
+    qty: projectData.qty || 1,
+    rate: projectData.rate || (projectData.quote / (projectData.qty || 1)),
+    description: desc
+  })}`;
+
   // 1. Insert core project details
   const { data: project, error: pError } = await supabase
     .from('projects')
@@ -87,7 +113,7 @@ export const igniteProject = async (projectData) => {
         payment_status: projectData.paymentStatus || 'part',
         deadline: projectData.deadline,
         client_id: projectData.client_id,
-        description: projectData.description || '',
+        description: serializedDesc,
         category: projectData.category || 'branding',
         progress: projectData.progress || 0
       }
@@ -148,9 +174,48 @@ export const updateProjectState = async (projectId, updates) => {
     updatePayload.payment_status = updates.paymentStatus !== undefined ? updates.paymentStatus : updates.payment_status;
   }
   if (updates.deadline !== undefined) updatePayload.deadline = updates.deadline;
-  if (updates.description !== undefined) updatePayload.description = updates.description;
   if (updates.category !== undefined) updatePayload.category = updates.category;
   if (updates.progress !== undefined) updatePayload.progress = updates.progress;
+
+  // Handle QTY and Rate serialization if description, quote, qty, or rate are updated
+  if (updates.description !== undefined || updates.qty !== undefined || updates.rate !== undefined || updates.quote !== undefined) {
+    // 1. Fetch current description and quote to extract existing metadata
+    const { data: currentProj } = await supabase
+      .from('projects')
+      .select('description, quote')
+      .eq('id', projectId)
+      .maybeSingle();
+
+    let existingQty = 1;
+    let existingRate = currentProj ? parseFloat(currentProj.quote) : 0;
+    let existingDesc = currentProj ? (currentProj.description || '') : '';
+
+    if (existingDesc.startsWith("JSON_METADATA:")) {
+      try {
+        const parsed = JSON.parse(existingDesc.substring(14));
+        existingQty = parsed.qty || 1;
+        existingRate = parsed.rate || (currentProj ? parseFloat(currentProj.quote) / existingQty : 0);
+        existingDesc = parsed.description || '';
+      } catch (e) {
+        console.error("Failed to parse JSON_METADATA during project update:", e);
+      }
+    }
+
+    const newQty = updates.qty !== undefined ? updates.qty : existingQty;
+    let newRate = updates.rate !== undefined ? updates.rate : existingRate;
+    const newDesc = updates.description !== undefined ? updates.description : existingDesc;
+    
+    // If quote is updated but rate is not, recalculate rate to match new quote
+    if (updates.quote !== undefined && updates.rate === undefined) {
+      newRate = parseFloat(updates.quote) / newQty;
+    }
+
+    updatePayload.description = `JSON_METADATA:${JSON.stringify({
+      qty: newQty,
+      rate: newRate,
+      description: newDesc
+    })}`;
+  }
 
   const { data, error } = await supabase
     .from('projects')

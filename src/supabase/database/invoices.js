@@ -22,16 +22,36 @@ export const getInvoices = async () => {
     projectService: inv.project_service,
     issueDate: new Date(inv.issue_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
     grandTotal: parseFloat(inv.grand_total),
-    rawProject: inv.projects ? {
-      id: inv.projects.id,
-      name: inv.projects.name,
-      service: inv.projects.service,
-      stage: inv.projects.stage,
-      status: inv.projects.status,
-      quote: parseFloat(inv.projects.quote),
-      discount: parseFloat(inv.projects.discount || 0),
-      advanceAmount: parseFloat(inv.projects.advance_amount || 0)
-    } : null
+    rawProject: inv.projects ? (() => {
+      let qty = 1;
+      let rate = parseFloat(inv.projects.quote);
+      let descText = inv.projects.description || '';
+
+      if (descText.startsWith("JSON_METADATA:")) {
+        try {
+          const parsed = JSON.parse(descText.substring(14));
+          qty = parsed.qty || 1;
+          rate = parsed.rate || (parseFloat(inv.projects.quote) / qty);
+          descText = parsed.description || '';
+        } catch (e) {
+          console.error("Failed to parse JSON_METADATA in invoice project description:", e);
+        }
+      }
+
+      return {
+        id: inv.projects.id,
+        name: inv.projects.name,
+        service: inv.projects.service,
+        stage: inv.projects.stage,
+        status: inv.projects.status,
+        quote: parseFloat(inv.projects.quote),
+        discount: parseFloat(inv.projects.discount || 0),
+        advanceAmount: parseFloat(inv.projects.advance_amount || 0),
+        qty,
+        rate,
+        description: descText
+      };
+    })() : null
   }));
 };
 

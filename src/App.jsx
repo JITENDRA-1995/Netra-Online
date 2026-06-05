@@ -1159,6 +1159,77 @@ function App() {
     return localStorage.getItem('netra_client_active') === 'true';
   });
   const [isIgnitionModalOpen, setIsIgnitionModalOpen] = useState(false);
+  const [ignitionQty, setIgnitionQty] = useState(1);
+  const [ignitionRate, setIgnitionRate] = useState("");
+  const [ignitionQuote, setIgnitionQuote] = useState("");
+  const [ignitionLastCalculatedBy, setIgnitionLastCalculatedBy] = useState("rate");
+
+  useEffect(() => {
+    const qtyVal = Number(ignitionQty) || 1;
+    const rateVal = parseFloat(ignitionRate);
+    if (!isNaN(rateVal) && ignitionLastCalculatedBy !== "quote") {
+      setIgnitionQuote((qtyVal * rateVal).toFixed(2));
+    }
+  }, [ignitionQty, ignitionRate, ignitionLastCalculatedBy]);
+
+  useEffect(() => {
+    const qtyVal = Number(ignitionQty) || 1;
+    const quoteVal = parseFloat(ignitionQuote);
+    if (!isNaN(quoteVal) && ignitionLastCalculatedBy === "quote") {
+      setIgnitionRate((quoteVal / qtyVal).toFixed(2));
+    }
+  }, [ignitionQty, ignitionQuote, ignitionLastCalculatedBy]);
+
+  useEffect(() => {
+    if (isIgnitionModalOpen) {
+      setIgnitionQty(1);
+      setIgnitionRate("");
+      setIgnitionQuote("");
+      setIgnitionLastCalculatedBy("rate");
+    }
+  }, [isIgnitionModalOpen]);
+
+  // Edit Project Modal – QTY / Rate / Quote state with bidirectional calculation
+  const [editQty, setEditQty] = useState(1);
+  const [editRate, setEditRate] = useState("");
+  const [editQuote, setEditQuote] = useState("");
+  const [editLastCalculatedBy, setEditLastCalculatedBy] = useState("rate");
+
+  // Qty or Rate changes → recalculate Quote (unless user is typing in Quote field)
+  useEffect(() => {
+    const qtyVal = Number(editQty) || 1;
+    const rateVal = parseFloat(editRate);
+    if (!isNaN(rateVal) && editLastCalculatedBy !== "quote") {
+      setEditQuote((qtyVal * rateVal).toFixed(2));
+    }
+  }, [editQty, editRate, editLastCalculatedBy]);
+
+  // Quote changes → recalculate Rate (when user types in Quote field)
+  useEffect(() => {
+    const qtyVal = Number(editQty) || 1;
+    const quoteVal = parseFloat(editQuote);
+    if (!isNaN(quoteVal) && editLastCalculatedBy === "quote") {
+      setEditRate((quoteVal / qtyVal).toFixed(2));
+    }
+  }, [editQty, editQuote, editLastCalculatedBy]);
+
+  // Populate edit state from the selected project whenever the edit modal opens
+  const [isProjectEditModalOpen, setIsProjectEditModalOpen] = useState(false);
+  useEffect(() => {
+    if (isProjectEditModalOpen) {
+      const currentProj = ignitionQueue.find(p => p.id === selectedProjectTab);
+      if (currentProj) {
+        const loadedQty = currentProj.qty || 1;
+        const loadedQuote = currentProj.quote || 0;
+        const loadedRate = currentProj.rate || (loadedQty > 0 ? (loadedQuote / loadedQty) : 0);
+        setEditQty(loadedQty);
+        setEditRate(loadedRate.toFixed(2));
+        setEditQuote(loadedQuote.toString());
+        setEditLastCalculatedBy("rate");
+      }
+    }
+  }, [isProjectEditModalOpen]);
+
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [notifTab, setNotifTab] = useState("SPARKS");
   const [selectedKanbanProject, setSelectedKanbanProject] = useState(null);
@@ -1206,7 +1277,7 @@ function App() {
   const [showSparkToast, setShowSparkToast] = useState(false);
   const [bellPulse, setBellPulse] = useState(false);
   const [ignitionClientType, setIgnitionClientType] = useState("NEW"); // NEW, EXISTING
-  const [isProjectEditModalOpen, setIsProjectEditModalOpen] = useState(false);
+  // isProjectEditModalOpen is declared above with edit qty/rate state
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [isWarningDismissed, setIsWarningDismissed] = useState(false);
   const [projectsSearchQuery, setProjectsSearchQuery] = useState("");
@@ -2677,7 +2748,9 @@ function App() {
       }
 
       const milestoneNames = ["Discovery", "Moodboard", "Sketching", "Final Flame"];
-      const quoteVal = parseInt(formData.get('quote')) || 15000;
+      const qtyVal = parseInt(formData.get('qty')) || 1;
+      const rateVal = parseFloat(formData.get('rate')) || 0;
+      const quoteVal = parseFloat(formData.get('quote')) || (qtyVal * rateVal) || 15000;
       const discountVal = parseInt(formData.get('discount')) || 0;
       const discountPct = ((discountVal / quoteVal) * 100).toFixed(2);
       const advanceVal = parseInt(formData.get('advanceAmount')) || 0;
@@ -2698,6 +2771,8 @@ function App() {
         isManual: true,
         client: clientInfo,
         milestones: milestoneNames.map((name, idx) => ({ name, completed: name === "Discovery" })),
+        qty: qtyVal,
+        rate: rateVal,
         quote: quoteVal,
         discountValue: discountVal.toString(),
         discountType: 'rs',
@@ -2843,10 +2918,15 @@ function App() {
     const serviceVal = formData.get('service');
     const serviceName = serviceVal || "Custom Service";
 
-    const quoteVal = parseInt(formData.get('quote')) || 0;
+    // Use controlled state values for qty/rate/quote (bidirectional logic)
+    const qtyVal = Number(editQty) || 1;
+    const rateVal = parseFloat(editRate) || 0;
+    // Quote is the gross amount (qty * rate); discount is subtracted to get final amount
+    const quoteVal = parseFloat(editQuote) || (qtyVal * rateVal) || 0;
     const discountVal = parseInt(formData.get('discount')) || 0;
-    const advanceVal = parseInt(formData.get('advanceAmount')) || 0;
+    // finalQuote = total amount client pays = Quote − Discount
     const finalQuote = quoteVal - discountVal;
+    const advanceVal = parseInt(formData.get('advanceAmount')) || 0;
     let paymentStatus = 'unpaid';
     if (advanceVal >= finalQuote) {
       paymentStatus = 'paid';
@@ -2859,8 +2939,10 @@ function App() {
     const updatedFields = {
       service: serviceName,
       deadline: formData.get('deadline'),
+      qty: qtyVal,
+      rate: rateVal,
       quote: quoteVal,
-      discountValue: (formData.get('discount') || '0').toString(),
+      discountValue: (discountVal).toString(),
       discountType: 'rs',
       discountPercent: discountPercentVal,
       discount: discountVal,
@@ -4403,8 +4485,49 @@ function App() {
 
                                 <div className="form-row">
                                   <div className="input-group">
+                                    <label>Quantity</label>
+                                    <input
+                                      type="number"
+                                      name="qty"
+                                      min="1"
+                                      value={ignitionQty}
+                                      onChange={(e) => {
+                                        setIgnitionQty(parseInt(e.target.value) || 1);
+                                        setIgnitionLastCalculatedBy("qty");
+                                      }}
+                                      required
+                                    />
+                                  </div>
+                                  <div className="input-group">
+                                    <label>Rate (₹)</label>
+                                    <input
+                                      type="number"
+                                      name="rate"
+                                      value={ignitionRate}
+                                      onChange={(e) => {
+                                        setIgnitionRate(e.target.value);
+                                        setIgnitionLastCalculatedBy("rate");
+                                      }}
+                                      placeholder="Rate per unit"
+                                      required
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="form-row">
+                                  <div className="input-group">
                                     <label>Estimated Quote (₹)</label>
-                                    <input type="number" name="quote" placeholder="Suggested base: ₹15,000" />
+                                    <input
+                                      type="number"
+                                      name="quote"
+                                      value={ignitionQuote}
+                                      onChange={(e) => {
+                                        setIgnitionQuote(e.target.value);
+                                        setIgnitionLastCalculatedBy("quote");
+                                      }}
+                                      placeholder="Auto-calculated (Rate × Qty)"
+                                      required
+                                    />
                                   </div>
                                   <div className="input-group">
                                     <label>Special Discount (₹)</label>
@@ -4549,19 +4672,62 @@ function App() {
                                         <label>Deadline Adjustment</label>
                                         <input type="date" name="deadline" defaultValue={currentProject?.deadline} required />
                                       </div>
-                                      <div className="form-row">
-                                        <div className="input-group">
-                                          <label>Quote Calibration (₹)</label>
-                                          <input type="number" name="quote" defaultValue={currentProject?.quote} required />
-                                        </div>
-                                        <div className="input-group">
-                                          <label>Discount Calibration (₹)</label>
-                                          <input type="number" name="discount" defaultValue={currentProject?.discount} />
-                                        </div>
-                                        <div className="input-group">
-                                          <label>Advance Payment Calibration (₹)</label>
-                                          <input type="number" name="advanceAmount" defaultValue={currentProject?.advanceAmount} />
-                                        </div>
+                                    </div>
+
+                                    {/* QTY / Rate / Quote — bidirectional calculation */}
+                                    <div className="form-row">
+                                      <div className="input-group">
+                                        <label>Quantity</label>
+                                        <input
+                                          type="number"
+                                          name="qty"
+                                          min="1"
+                                          value={editQty}
+                                          onChange={(e) => {
+                                            setEditQty(parseInt(e.target.value) || 1);
+                                            setEditLastCalculatedBy("qty");
+                                          }}
+                                          required
+                                        />
+                                      </div>
+                                      <div className="input-group">
+                                        <label>Rate (₹)</label>
+                                        <input
+                                          type="number"
+                                          name="rate"
+                                          value={editRate}
+                                          onChange={(e) => {
+                                            setEditRate(e.target.value);
+                                            setEditLastCalculatedBy("rate");
+                                          }}
+                                          placeholder="Rate per unit"
+                                          required
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div className="form-row">
+                                      <div className="input-group">
+                                        <label>Estimated Quote (₹) <span style={{fontSize:'0.75em', opacity:0.6}}>(Qty × Rate)</span></label>
+                                        <input
+                                          type="number"
+                                          name="quote"
+                                          value={editQuote}
+                                          onChange={(e) => {
+                                            setEditQuote(e.target.value);
+                                            setEditLastCalculatedBy("quote");
+                                          }}
+                                          placeholder="Auto-calculated"
+                                          required
+                                        />
+                                      </div>
+                                      <div className="input-group">
+                                        <label>Special Discount (₹) <span style={{fontSize:'0.75em', opacity:0.6}}>(subtracted from Quote)</span></label>
+                                        <input type="number" name="discount" defaultValue={currentProject?.discount || 0} placeholder="0" />
+                                      </div>
+                                      <div className="input-group">
+                                        <label>Advance Payment (₹)</label>
+                                        <input type="number" name="advanceAmount" defaultValue={currentProject?.advanceAmount || 0} placeholder="0" />
                                       </div>
                                     </div>
 
