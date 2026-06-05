@@ -670,6 +670,7 @@ export default function Projects({
         )}
       </motion.div>
 
+
       {/* Edit Modal — 2-Step Wizard */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditStep(1); }}>
         <DialogContent className="bg-[#080c18] border border-white/10 max-w-xl w-full p-0 overflow-hidden flex flex-col max-h-[90vh]" data-testid="dialog-project-form">
@@ -682,252 +683,174 @@ export default function Projects({
               </DialogTitle>
               <p className="text-3xs text-muted-foreground mt-0.5 uppercase tracking-widest">{formName || 'Project'}</p>
             </div>
-            {/* Step indicator */}
             <div className="flex items-center gap-2">
-              <div className={`flex items-center justify-center w-7 h-7 rounded-full text-2xs font-black border transition-all ${
-                editStep === 1 ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' : 'bg-white/5 border-white/10 text-muted-foreground'
-              }`}>1</div>
+              <div className={`flex items-center justify-center w-7 h-7 rounded-full text-2xs font-black border transition-all ${editStep === 1 ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' : 'bg-white/5 border-white/10 text-muted-foreground'}`}>1</div>
               <div className="w-8 h-px bg-white/10"/>
-              <div className={`flex items-center justify-center w-7 h-7 rounded-full text-2xs font-black border transition-all ${
-                editStep === 2 ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' : 'bg-white/5 border-white/10 text-muted-foreground'
-              }`}>2</div>
+              <div className={`flex items-center justify-center w-7 h-7 rounded-full text-2xs font-black border transition-all ${editStep === 2 ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-400' : 'bg-white/5 border-white/10 text-muted-foreground'}`}>2</div>
             </div>
           </div>
 
-          {/* Step labels */}
-          <div className="flex border-b border-white/5 flex-shrink-0">
-            <button type="button" onClick={() => setEditStep(1)}
-              className={`flex-1 py-2.5 text-3xs font-extrabold uppercase tracking-widest transition-all ${
-                editStep === 1 ? 'text-cyan-400 border-b-2 border-cyan-400 bg-cyan-500/5' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >📋 Mission Details</button>
-            <button type="button" onClick={() => setEditStep(2)}
-              className={`flex-1 py-2.5 text-3xs font-extrabold uppercase tracking-widest transition-all ${
-                editStep === 2 ? 'text-cyan-400 border-b-2 border-cyan-400 bg-cyan-500/5' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >💰 Financial Matrix</button>
-          </div>
-
+          {/* All tabs and content inside ONE form — prevents Radix Dialog close on tab button click */}
           <form onSubmit={handleSave} className="flex flex-col flex-1 min-h-0">
+
+            {/* Tab bar inside the form */}
+            <div className="flex border-b border-white/5 flex-shrink-0">
+              <button type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditStep(1); }}
+                className={`flex-1 py-2.5 text-3xs font-extrabold uppercase tracking-widest transition-all ${editStep === 1 ? 'text-cyan-400 border-b-2 border-cyan-400 bg-cyan-500/5' : 'text-muted-foreground hover:text-foreground'}`}
+              >📋 Mission Details</button>
+              <button type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditStep(2); }}
+                className={`flex-1 py-2.5 text-3xs font-extrabold uppercase tracking-widest transition-all ${editStep === 2 ? 'text-cyan-400 border-b-2 border-cyan-400 bg-cyan-500/5' : 'text-muted-foreground hover:text-foreground'}`}
+              >💰 Financial Matrix</button>
+            </div>
+
             <div className="overflow-y-auto flex-1 px-6 py-5">
 
-              {/* ── STEP 1: Mission Details ── */}
-              {editStep === 1 && (
-                <div className="space-y-4">
-
-                  {/* Service */}
+              {/* STEP 1 — always mounted, CSS hidden when not active */}
+              <div style={{ display: editStep === 1 ? 'block' : 'none' }} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Service / Project Title</label>
+                  <Input value={formName} onChange={(e) => setFormName(e.target.value)}
+                    className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
+                    placeholder="e.g. Logo Design, Wedding Invite..." list="services-list" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Service / Project Title</label>
-                    <Input
-                      value={formName}
-                      onChange={(e) => setFormName(e.target.value)}
-                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
-                      placeholder="e.g. Logo Design, Wedding Invite..."
-                      list="services-list"
-                      required
-                    />
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Status</label>
+                    <select className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer"
+                      value={formStatus} onChange={(e) => setFormStatus(e.target.value)}>
+                      <option value="active">Active</option>
+                      <option value="completed">Completed</option>
+                      <option value="on_hold">On Hold</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
                   </div>
-
-                  {/* Status + Category */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Status</label>
-                      <select
-                        className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer"
-                        value={formStatus}
-                        onChange={(e) => setFormStatus(e.target.value)}
-                      >
-                        <option value="active">Active</option>
-                        <option value="completed">Completed</option>
-                        <option value="on_hold">On Hold</option>
-                        <option value="cancelled">Cancelled</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Category</label>
-                      <select
-                        className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer"
-                        value={formCategory}
-                        onChange={(e) => setFormCategory(e.target.value)}
-                      >
-                        <option value="branding">Branding</option>
-                        <option value="web">Web App/UI</option>
-                        <option value="print">Print Media</option>
-                        <option value="motion">Motion Graphics</option>
-                        <option value="illustration">Illustration</option>
-                        <option value="social_media">Social Media</option>
-                        <option value="packaging">Packaging</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Deadline + Progress */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Deadline</label>
-                      <Input
-                        type="date"
-                        value={formDeadline}
-                        onChange={(e) => setFormDeadline(e.target.value)}
-                        className="bg-white/5 border-white/10 rounded-xl text-xs focus:border-cyan-400"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Progress (%)</label>
-                      <Input
-                        type="number"
-                        value={formProgress}
-                        onChange={(e) => setFormProgress(e.target.value === "" ? "" : Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                        onFocus={() => { if (formProgress === 0) setFormProgress(""); }}
-                        className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
-                        min={0} max={100} placeholder="0"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Client contact */}
-                  <div className="pt-1">
-                    <p className="text-3xs uppercase tracking-widest text-cyan-400/70 font-extrabold mb-3 border-b border-white/5 pb-2">👤 Client Contact</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Email (optional)</label>
-                        <Input type="email" value={formClientEmail} onChange={(e) => setFormClientEmail(e.target.value)}
-                          className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="client@email.com" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Mobile</label>
-                        <Input type="tel" value={formClientPhone} onChange={(e) => setFormClientPhone(e.target.value)}
-                          className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="+91 XXXXX XXXXX" />
-                      </div>
-                    </div>
-                    <div className="space-y-1.5 mt-3">
-                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Billing Address</label>
-                      <Input value={formClientAddress} onChange={(e) => setFormClientAddress(e.target.value)}
-                        className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="Official billing address" />
-                    </div>
-                  </div>
-
-                  {/* Notes */}
                   <div className="space-y-1.5">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Mission Brief / Notes</label>
-                    <Input value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
-                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="Project objectives and notes" />
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Category</label>
+                    <select className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer"
+                      value={formCategory} onChange={(e) => setFormCategory(e.target.value)}>
+                      <option value="branding">Branding</option>
+                      <option value="web">Web App/UI</option>
+                      <option value="print">Print Media</option>
+                      <option value="motion">Motion Graphics</option>
+                      <option value="illustration">Illustration</option>
+                      <option value="social_media">Social Media</option>
+                      <option value="packaging">Packaging</option>
+                    </select>
                   </div>
                 </div>
-              )}
-
-              {/* ── STEP 2: Financial Matrix ── */}
-              {editStep === 2 && (
-                <div className="space-y-4">
-
-                  {/* Qty + Rate */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Quantity</label>
-                      <Input
-                        type="number" min={1} value={formQty}
-                        onChange={(e) => { setNetQuoteUserTyped(false); setFormQty(parseInt(e.target.value) || 1); }}
-                        className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
-                        placeholder="1" required
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Rate (₹) per unit</label>
-                      <Input
-                        type="number" value={formRate}
-                        onChange={(e) => { setNetQuoteUserTyped(false); setFormRate(e.target.value === "" ? "" : parseFloat(e.target.value) || 0); }}
-                        onFocus={() => { if (formRate === 0) setFormRate(""); }}
-                        className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
-                        placeholder="Rate per unit" required
-                      />
-                    </div>
-                  </div>
-
-                  {/* Gross quote display (read-only) */}
-                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/3 border border-white/8">
-                    <span className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold flex-1">Gross Quote (Qty × Rate)</span>
-                    <span className="font-black text-sm text-foreground">₹{(Number(formQty) * Number(formRate) || 0).toLocaleString('en-IN')}</span>
-                  </div>
-
-                  {/* Estimated Quote (after discount) — bidirectional */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">
-                        Special Discount (₹)
-                        <span className="ml-1 normal-case opacity-60">subtracted from gross</span>
-                      </label>
-                      <Input
-                        type="number" value={formDiscountValue}
-                        onChange={(e) => setFormDiscountValue(e.target.value === "" ? "" : parseFloat(e.target.value) || 0)}
-                        onFocus={() => { if (formDiscountValue === 0) setFormDiscountValue(""); }}
-                        className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">
-                        Estimated Quote (₹)
-                        <span className="ml-1 normal-case opacity-60">after discount</span>
-                      </label>
-                      <Input
-                        type="number" value={formNetQuote}
-                        onChange={(e) => {
-                          setNetQuoteUserTyped(true);
-                          setFormNetQuote(e.target.value === "" ? "" : parseFloat(e.target.value) || 0);
-                        }}
-                        onFocus={() => { if (formNetQuote === 0) setFormNetQuote(""); }}
-                        className="bg-white/5 border-cyan-500/30 rounded-xl focus:border-cyan-400 text-cyan-300"
-                        placeholder="Auto-calculated"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {/* Live summary bar */}
-                  <div className="grid grid-cols-3 gap-2 rounded-xl border border-white/8 overflow-hidden">
-                    {[
-                      { label: 'Gross', val: `₹${(Number(formQty) * Number(formRate) || 0).toLocaleString('en-IN')}`, color: 'text-foreground' },
-                      { label: 'Discount', val: `-₹${(typeof formDiscountValue === 'number' ? formDiscountValue : 0).toLocaleString('en-IN')}`, color: 'text-amber-400' },
-                      { label: 'Net Payable', val: `₹${(typeof formNetQuote === 'number' ? formNetQuote : 0).toLocaleString('en-IN')}`, color: 'text-cyan-400' },
-                    ].map(({ label, val, color }) => (
-                      <div key={label} className="flex flex-col items-center py-3 bg-white/3">
-                        <span className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">{label}</span>
-                        <span className={`font-black text-sm mt-0.5 ${color}`}>{val}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Advance payment */}
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Advance Payment Received (₹)</label>
-                    <Input
-                      type="number" value={formAdvanceAmount}
-                      onChange={(e) => setFormAdvanceAmount(e.target.value === "" ? "" : parseFloat(e.target.value) || 0)}
-                      onFocus={() => { if (formAdvanceAmount === 0) setFormAdvanceAmount(""); }}
-                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400"
-                      placeholder="0"
-                    />
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Deadline</label>
+                    <Input type="date" value={formDeadline} onChange={(e) => setFormDeadline(e.target.value)}
+                      className="bg-white/5 border-white/10 rounded-xl text-xs focus:border-cyan-400" />
                   </div>
-
-                  {/* Balance due */}
-                  {(() => {
-                    const net = typeof formNetQuote === 'number' ? formNetQuote : 0;
-                    const adv = typeof formAdvanceAmount === 'number' ? formAdvanceAmount : 0;
-                    const bal = Math.max(0, net - adv);
-                    return (
-                      <div className={`flex items-center justify-between px-4 py-3 rounded-xl border ${
-                        bal === 0 ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-amber-500/5 border-amber-500/20'
-                      }`}>
-                        <span className="text-3xs uppercase tracking-widest font-semibold text-muted-foreground">Balance Due</span>
-                        <span className={`font-black text-sm ${bal === 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                          {bal === 0 ? '✓ Fully Paid' : `₹${bal.toLocaleString('en-IN')}`}
-                        </span>
-                      </div>
-                    );
-                  })()}
+                  <div className="space-y-1.5">
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Progress (%)</label>
+                    <Input type="number" value={formProgress}
+                      onChange={(e) => setFormProgress(e.target.value === "" ? "" : Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                      onFocus={() => { if (formProgress === 0) setFormProgress(""); }}
+                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" min={0} max={100} placeholder="0" />
+                  </div>
                 </div>
-              )}
+                <div className="pt-1">
+                  <p className="text-3xs uppercase tracking-widest text-cyan-400/70 font-extrabold mb-3 border-b border-white/5 pb-2">👤 Client Contact</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Email (optional)</label>
+                      <Input type="email" value={formClientEmail} onChange={(e) => setFormClientEmail(e.target.value)}
+                        className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="client@email.com" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Mobile</label>
+                      <Input type="tel" value={formClientPhone} onChange={(e) => setFormClientPhone(e.target.value)}
+                        className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="+91 XXXXX XXXXX" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 mt-3">
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Billing Address</label>
+                    <Input value={formClientAddress} onChange={(e) => setFormClientAddress(e.target.value)}
+                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="Official billing address" />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Mission Brief / Notes</label>
+                  <Input value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
+                    className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="Project objectives and notes" />
+                </div>
+              </div>
+
+              {/* STEP 2 — always mounted, CSS hidden when not active */}
+              <div style={{ display: editStep === 2 ? 'block' : 'none' }} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Quantity</label>
+                    <Input type="number" min={1} value={formQty}
+                      onChange={(e) => { setNetQuoteUserTyped(false); setFormQty(parseInt(e.target.value) || 1); }}
+                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="1" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Rate (₹) per unit</label>
+                    <Input type="number" value={formRate}
+                      onChange={(e) => { setNetQuoteUserTyped(false); setFormRate(e.target.value === "" ? "" : parseFloat(e.target.value) || 0); }}
+                      onFocus={() => { if (formRate === 0) setFormRate(""); }}
+                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="Rate per unit" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 border border-white/10">
+                  <span className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold flex-1">Gross Quote (Qty × Rate)</span>
+                  <span className="font-black text-sm text-foreground">₹{(Number(formQty) * Number(formRate) || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Special Discount (₹) <span className="normal-case opacity-60">from gross</span></label>
+                    <Input type="number" value={formDiscountValue}
+                      onChange={(e) => setFormDiscountValue(e.target.value === "" ? "" : parseFloat(e.target.value) || 0)}
+                      onFocus={() => { if (formDiscountValue === 0) setFormDiscountValue(""); }}
+                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="0" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Estimated Quote (₹) <span className="normal-case opacity-60">after discount</span></label>
+                    <Input type="number" value={formNetQuote}
+                      onChange={(e) => { setNetQuoteUserTyped(true); setFormNetQuote(e.target.value === "" ? "" : parseFloat(e.target.value) || 0); }}
+                      onFocus={() => { if (formNetQuote === 0) setFormNetQuote(""); }}
+                      className="bg-white/5 border-cyan-500/30 rounded-xl focus:border-cyan-400 text-cyan-300" placeholder="Auto-calculated" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 rounded-xl border border-white/10 overflow-hidden">
+                  {[
+                    { label: 'Gross', val: `₹${(Number(formQty) * Number(formRate) || 0).toLocaleString('en-IN')}`, color: 'text-foreground' },
+                    { label: 'Discount', val: `-₹${(typeof formDiscountValue === 'number' ? formDiscountValue : 0).toLocaleString('en-IN')}`, color: 'text-amber-400' },
+                    { label: 'Net Payable', val: `₹${(typeof formNetQuote === 'number' ? formNetQuote : 0).toLocaleString('en-IN')}`, color: 'text-cyan-400' },
+                  ].map(({ label, val, color }) => (
+                    <div key={label} className="flex flex-col items-center py-3 bg-white/5">
+                      <span className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">{label}</span>
+                      <span className={`font-black text-sm mt-0.5 ${color}`}>{val}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Advance Payment Received (₹)</label>
+                  <Input type="number" value={formAdvanceAmount}
+                    onChange={(e) => setFormAdvanceAmount(e.target.value === "" ? "" : parseFloat(e.target.value) || 0)}
+                    onFocus={() => { if (formAdvanceAmount === 0) setFormAdvanceAmount(""); }}
+                    className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="0" />
+                </div>
+                {(() => {
+                  const net = typeof formNetQuote === 'number' ? formNetQuote : 0;
+                  const adv = typeof formAdvanceAmount === 'number' ? formAdvanceAmount : 0;
+                  const bal = Math.max(0, net - adv);
+                  return (
+                    <div className={`flex items-center justify-between px-4 py-3 rounded-xl border ${bal === 0 ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-amber-500/5 border-amber-500/20'}`}>
+                      <span className="text-3xs uppercase tracking-widest font-semibold text-muted-foreground">Balance Due</span>
+                      <span className={`font-black text-sm ${bal === 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                        {bal === 0 ? '✓ Fully Paid' : `₹${bal.toLocaleString('en-IN')}`}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
 
             </div>
 
@@ -935,18 +858,18 @@ export default function Projects({
             <div className="flex gap-3 px-6 py-4 border-t border-white/10 bg-[#080c18] flex-shrink-0">
               {editStep === 1 ? (
                 <>
-                  <button type="button" onClick={() => setDialogOpen(false)}
+                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDialogOpen(false); }}
                     className="flex-1 h-10 rounded-xl border border-white/10 text-muted-foreground text-xs font-semibold hover:bg-white/5 hover:text-foreground transition-all">
                     ✕ Cancel
                   </button>
-                  <button type="button" onClick={() => setEditStep(2)}
+                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditStep(2); }}
                     className="flex-1 h-10 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400 text-xs font-bold tracking-wide transition-all">
                     Next: Financial Matrix →
                   </button>
                 </>
               ) : (
                 <>
-                  <button type="button" onClick={() => setEditStep(1)}
+                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditStep(1); }}
                     className="flex-1 h-10 rounded-xl border border-white/10 text-muted-foreground text-xs font-semibold hover:bg-white/5 hover:text-foreground transition-all">
                     ← Back
                   </button>
@@ -961,6 +884,6 @@ export default function Projects({
         </DialogContent>
       </Dialog>
 
-            </motion.div>
+    </motion.div>
   );
 }
