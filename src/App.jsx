@@ -3536,7 +3536,7 @@ function App() {
                           { id: "CLIENTS", title: "CLIENTS", desc: "Full CRM database of the Netra network.", icon: "👥" },
                           { id: "INVOICES", title: "INVOICE VAULT", desc: "Interactive standalone invoice workspace & documents ledger.", icon: "📄" },
                           { id: "FINANCIALS", title: "FINANCIALS", desc: "Cashbook ledger, profit analytics and revenue ignition.", icon: "💰" },
-                          { id: "SETTINGS", title: "SETTINGS", desc: "Calibrating the 20 service cards and pricing.", icon: "⚙️" },
+                          { id: "SETTINGS", title: "SETTINGS", desc: "Configure service pricing catalogs, portfolio slideshows, banking information, and profile settings.", icon: "⚙️" },
                           { id: "LOGOUT", title: "LOGOUT", desc: "Safe session termination and return to Home.", icon: "🚪" }
                         ].map((card) => (
                           <div
