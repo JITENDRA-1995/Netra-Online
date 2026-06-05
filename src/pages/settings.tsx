@@ -65,17 +65,6 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 };
 
-// Preset high-fidelity design images in case they want templates
-const PRESET_MOCK_IMAGES = [
-  { url: "https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&fit=crop&w=800&q=80", title: "Premium Brandmark Concept" },
-  { url: "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=800&q=80", title: "Modernist Layout" },
-  { url: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=800&q=80", title: "Clean Mockup" },
-  { url: "https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=800&q=80", title: "Digital Dashboard" },
-  { url: "https://images.unsplash.com/photo-1581291518655-9523c932ded7?auto=format&fit=crop&w=800&q=80", title: "UX Interface Wireframe" },
-  { url: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=800&q=80", title: "Cinematic Film Frames" },
-  { url: "https://images.unsplash.com/photo-1517502884422-41eaaced0168?auto=format&fit=crop&w=800&q=80", title: "Minimal Coffee Box" },
-  { url: "https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=800&q=80", title: "Organic Cosmetic Bottles" }
-];
 
 export default function SettingsPage({
   servicesList,
@@ -405,20 +394,6 @@ export default function SettingsPage({
     setLocalVisionSettings(next);
   };
 
-  const handleApplyPresetToSlot = (slotIdx: number, preset: typeof PRESET_MOCK_IMAGES[0]) => {
-    const next = [...localVisionSettings];
-    const currentPhotos = next[slotIdx].photos ? [...next[slotIdx].photos] : [];
-    // Avoid duplicates
-    if (!currentPhotos.some(p => p.url === preset.url)) {
-      currentPhotos.push(preset);
-      next[slotIdx] = {
-        ...next[slotIdx],
-        photos: currentPhotos
-      };
-      setLocalVisionSettings(next);
-    }
-  };
-
   return (
     <motion.div
       variants={containerVariants}
@@ -733,21 +708,6 @@ export default function SettingsPage({
                           </div>
                         )}
 
-                        {/* Presets suggestions */}
-                        <div className="space-y-1.5 pt-2">
-                          <div className="text-[10px] font-mono text-muted-foreground/70 uppercase">Quick Add design Templates:</div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {PRESET_MOCK_IMAGES.map((preset, prIdx) => (
-                              <button
-                                key={prIdx}
-                                onClick={() => handleApplyPresetToSlot(slotIdx, preset)}
-                                className="text-[9px] font-mono border border-white/5 bg-white/[0.01] hover:bg-indigo-500/10 hover:border-indigo-500/20 text-white/50 hover:text-indigo-400 px-2.5 py-1 rounded-full transition-all"
-                              >
-                                + {preset.title.split(" ")[0]}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
                       </div>
 
                       {/* Right: Add new photo form */}

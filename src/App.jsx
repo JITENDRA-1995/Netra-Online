@@ -331,46 +331,11 @@ const defaultServices = [
 ];
 
 const defaultVisionSettings = [
-  {
-    serviceId: 1, // Brand Identity (Logo)
-    photos: [
-      { url: "https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&fit=crop&w=800&q=80", title: "Modern Brandmark" },
-      { url: "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=800&q=80", title: "Signature Logo" },
-      { url: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=800&q=80", title: "Corporate Style Guide" }
-    ]
-  },
-  {
-    serviceId: 3, // Digital Interactive Brochures
-    photos: [
-      { url: "https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=800&q=80", title: "NovaTech UI Concept" },
-      { url: "https://images.unsplash.com/photo-1581291518655-9523c932ded7?auto=format&fit=crop&w=800&q=80", title: "Interactive Mockups" },
-      { url: "https://images.unsplash.com/photo-1586717791821-3f44a563fa4c?auto=format&fit=crop&w=800&q=80", title: "User Flows" }
-    ]
-  },
-  {
-    serviceId: 7, // Cinematic Video Packages
-    photos: [
-      { url: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=800&q=80", title: "Motion Teaser Reel" },
-      { url: "https://images.unsplash.com/photo-1542204172-e7052809f852?auto=format&fit=crop&w=800&q=80", title: "3D Motion Shaders" },
-      { url: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=800&q=80", title: "Cinematic Cuts" }
-    ]
-  },
-  {
-    serviceId: 9, // Editorial Design
-    photos: [
-      { url: "https://images.unsplash.com/photo-1561070791-26c113006238?auto=format&fit=crop&w=800&q=80", title: "Strata Lookbook grid" },
-      { url: "https://images.unsplash.com/photo-1547891654-e66ed7edd96c?auto=format&fit=crop&w=800&q=80", title: "Swiss Constructivist Layout" },
-      { url: "https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?auto=format&fit=crop&w=800&q=80", title: "Typographic Art Poster" }
-    ]
-  },
-  {
-    serviceId: 6, // Large Format Media
-    photos: [
-      { url: "https://images.unsplash.com/photo-1517502884422-41eaaced0168?auto=format&fit=crop&w=800&q=80", title: "Oru Water Sustainable Pack" },
-      { url: "https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=800&q=80", title: "Hana Cosmetics Jar Concept" },
-      { url: "https://images.unsplash.com/photo-1605615740060-5f2d472288b6?auto=format&fit=crop&w=800&q=80", title: "Textured Premium Box Mockup" }
-    ]
-  }
+  { serviceId: 0, photos: [] },
+  { serviceId: 0, photos: [] },
+  { serviceId: 0, photos: [] },
+  { serviceId: 0, photos: [] },
+  { serviceId: 0, photos: [] }
 ];
 
 const defaultBankingDetails = {
@@ -408,7 +373,13 @@ function App() {
     const saved = localStorage.getItem('netra_vision_settings');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.map(item => ({
+            ...item,
+            photos: (item.photos || []).filter(p => p.url && !p.url.includes("unsplash.com"))
+          }));
+        }
       } catch (e) {
         console.error("Failed to parse saved vision settings:", e);
       }
@@ -759,8 +730,12 @@ function App() {
               localStorage.setItem('netra_services', JSON.stringify(parsed.services));
             }
             if (parsed.vision && parsed.vision.length > 0) {
-              setVisionSettings(parsed.vision);
-              localStorage.setItem('netra_vision_settings', JSON.stringify(parsed.vision));
+              const cleanedVision = parsed.vision.map(item => ({
+                ...item,
+                photos: (item.photos || []).filter(p => p.url && !p.url.includes("unsplash.com"))
+              }));
+              setVisionSettings(cleanedVision);
+              localStorage.setItem('netra_vision_settings', JSON.stringify(cleanedVision));
             }
             if (parsed.banking) {
               setBankingDetails(parsed.banking);
