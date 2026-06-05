@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Inbox,
@@ -40,6 +40,7 @@ interface InquiriesProps {
   setInquiries: React.Dispatch<React.SetStateAction<Inquiry[]>>;
   services: any[];
   handleIgniteFromInquiry: (inq: Inquiry) => void;
+  initialSearch?: string;
 }
 
 const LOCATION_COLORS = ["#00d4ff", "#8b5cf6", "#10b981", "#f59e0b", "#ec4899", "#3b82f6"];
@@ -58,10 +59,17 @@ export default function Inquiries({
   inquiries,
   setInquiries,
   services,
-  handleIgniteFromInquiry
+  handleIgniteFromInquiry,
+  initialSearch = ""
 }: InquiriesProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (initialSearch !== undefined) {
+      setSearch(initialSearch);
+    }
+  }, [initialSearch]);
   const [filterService, setFilterService] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterDate, setFilterDate] = useState("");

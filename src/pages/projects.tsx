@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Plus, Search, Pencil, Trash2, FileText } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
@@ -60,6 +60,7 @@ interface ProjectsProps {
   onDownloadInvoice?: (p: any) => void;
   handleUpdateProjectStatusHandy?: (projectId: number, newProjectStatus: string) => void;
   setCashbookEntries?: React.Dispatch<React.SetStateAction<any[]>>;
+  initialSearch?: string;
 }
 
 const containerVariants = {
@@ -79,10 +80,17 @@ export default function Projects({
   setCustomPaymentPrompt,
   onDownloadInvoice,
   handleUpdateProjectStatusHandy,
-  setCashbookEntries
+  setCashbookEntries,
+  initialSearch = ""
 }: ProjectsProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (initialSearch !== undefined) {
+      setSearch(initialSearch);
+    }
+  }, [initialSearch]);
   const [filterStatus, setFilterStatus] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<any | null>(null);

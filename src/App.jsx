@@ -1203,6 +1203,10 @@ function App() {
   const [bellPulse, setBellPulse] = useState(false);
   const [ignitionClientType, setIgnitionClientType] = useState("NEW"); // NEW, EXISTING
   const [isProjectEditModalOpen, setIsProjectEditModalOpen] = useState(false);
+  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
+  const [isWarningDismissed, setIsWarningDismissed] = useState(false);
+  const [projectsSearchQuery, setProjectsSearchQuery] = useState("");
+  const [inquiriesSearchQuery, setInquiriesSearchQuery] = useState("");
 
   useEffect(() => {
     localStorage.setItem('netra_admin_active', isCommandCenterActive);
@@ -1322,6 +1326,45 @@ function App() {
     const diff = deadline - now;
     return diff <= 5 * 24 * 60 * 60 * 1000 && !readFlames.includes(q.id);
   });
+
+  const hasUrgentAlert = flames.length > 0 || sparks.length > 0;
+
+  useEffect(() => {
+    setUnreadSparksCount(sparks.length);
+  }, [inquiries, sparks.length]);
+
+  useEffect(() => {
+    if (!isAdminGridActive) {
+      setIsWarningDismissed(false);
+    }
+  }, [isAdminGridActive]);
+
+  const markAllAlertsAsRead = async () => {
+    // 1. Mark all flames as read
+    const flameIds = flames.map(f => f.id);
+    if (flameIds.length > 0) {
+      setReadFlames(prev => {
+        const next = [...prev, ...flameIds];
+        localStorage.setItem("netra_read_flames", JSON.stringify(next));
+        return next;
+      });
+    }
+
+    // 2. Mark all sparks as read in Supabase and locally
+    if (sparks.length > 0) {
+      const sparkIds = sparks.map(s => s.id);
+      for (const id of sparkIds) {
+        try {
+          await supabase.from('inquiries').update({ status: 'Read' }).eq('id', id);
+        } catch (dbErr) {
+          console.warn("Supabase update failed:", dbErr);
+        }
+      }
+      setInquiries(prev => prev.map(inq => sparkIds.includes(inq.id) ? { ...inq, status: 'Read' } : inq));
+    }
+
+    toast({ title: "All emergency alerts acknowledged" });
+  };
 
   const getFlameNotifText = (project) => {
     if (!project.deadline) return "Project Calibration Required";
@@ -3012,6 +3055,8 @@ function App() {
                           setIsIgnitionModalOpen(false); // Auto-close modal on navigation
                           setIsMobileSidebarOpen(false); // Auto-close mobile sidebar drawer
                           if (link.id === "INQUIRIES") setShowInquiryBadge(false);
+                          setProjectsSearchQuery("");
+                          setInquiriesSearchQuery("");
                         }}
                         data-testid={`link-sidebar-${link.label.toLowerCase()}`}
                       >
@@ -3769,7 +3814,7 @@ function App() {
                   /* Welcome / Administrative Modules Grid */
                   <motion.div
                     key="welcome"
-                    className="admin-welcome-screen"
+                    className={`admin-welcome-screen ${hasUrgentAlert ? 'urgent-alarm-theme' : ''}`}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0, x: -50 }}
@@ -3785,6 +3830,13 @@ function App() {
                       <div className="admin-grid-overlay"></div>
                     </div>
                     <div className="vault-content modules-grid-layout">
+                      {hasUrgentAlert && (
+                        <div className="flashing-emergency-banner animate-pulse" onClick={() => setIsEmergencyModalOpen(true)}>
+                          <span className="emergency-icon">🚨</span>
+                          <span className="emergency-text">EMERGENCY ALERTS DETECTED: {flames.length} DEADLINE{flames.length !== 1 ? 'S' : ''} & {sparks.length} NEW SPARK{sparks.length !== 1 ? 'S' : ''} PENDING CALIBRATION</span>
+                          <span className="emergency-action-btn">CLICK TO RESOLVE</span>
+                        </div>
+                      )}
                       <div className="modules-header">
                         <span className="header-bar"></span>
                         <h2>ADMINISTRATIVE MODULES</h2>
@@ -3863,7 +3915,7 @@ function App() {
                           />
                         )}
 
-                        {activeAdminModule === "PROJECTS" && (
+                         {activeAdminModule === "PROJECTS" && (
                           <Projects
                             projects={ignitionQueue}
                             setProjects={setIgnitionQueue}
@@ -3876,6 +3928,7 @@ function App() {
                             }}
                             handleUpdateProjectStatusHandy={handleUpdateProjectStatusHandy}
                             setCashbookEntries={setCashbookEntries}
+                            initialSearch={projectsSearchQuery}
                           />
 
                         )}
@@ -3886,6 +3939,7 @@ function App() {
                             setInquiries={setInquiries}
                             services={services}
                             handleIgniteFromInquiry={handleIgniteFromInquiry}
+                            initialSearch={inquiriesSearchQuery}
                           />
                         )}
 
@@ -4219,6 +4273,67 @@ function App() {
                           </div>
                         )}
                       </AnimatePresence>
+
+                      {/* Emergency Alert Resolution Modal moved to global scope */}
+
+                      {/* Fullscreen Alert Warning Overlay */}
+                      <AnimatePresence>
+                        {isAdminGridActive && hasUrgentAlert && !isWarningDismissed && (
+                          <motion.div
+                            className="fullscreen-warning-overlay"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            <div className="fullscreen-warning-content">
+                              <div className="warning-pulse-icon">⚠️</div>
+                              <h2>CRITICAL UNRESOLVED SYSTEM ALERTS</h2>
+                              <p className="warning-desc">
+                                Active project deadlines are overdue or new client inquiries (Sparks) are pending. 
+                                Acknowledge or navigate to resolve them before interacting with sub-modules.
+                              </p>
+
+                              <div className="warning-details-row">
+                                <div className="warning-details-card">
+                                  <h3>PENDING DEADLINES</h3>
+                                  <span className="warning-count">{flames.length}</span>
+                                </div>
+                                <div className="warning-details-card">
+                                  <h3>NEW INQUIRIES</h3>
+                                  <span className="warning-count">{sparks.length}</span>
+                                </div>
+                              </div>
+
+                              <div className="warning-actions">
+                                <button 
+                                  className="warning-btn primary-warning-btn"
+                                  onClick={() => {
+                                    setIsAdminGridActive(false);
+                                    setIsWarningDismissed(false);
+                                    pushPageToHistory('admin', { activeAdminModule: 'DASHBOARD', isAdminGridActive: false });
+                                  }}
+                                >
+                                  RETURN TO MODULES GRID
+                                </button>
+                                <button 
+                                  className="warning-btn secondary-warning-btn"
+                                  onClick={() => setIsWarningDismissed(true)}
+                                >
+                                  ACKNOWLEDGE & PROCEED
+                                </button>
+                                <button 
+                                  className="warning-btn success-warning-btn"
+                                  onClick={markAllAlertsAsRead}
+                                >
+                                  MARK ALL AS READ
+                                </button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
                       <AnimatePresence>
                         {isCashbookEditModalOpen && selectedCashbookEntry && (
                           <div className="modal-overlay">
@@ -4294,6 +4409,119 @@ function App() {
                         )}
                       </AnimatePresence>
                     </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Emergency Alert Resolution Modal */}
+              <AnimatePresence>
+                {isEmergencyModalOpen && (
+                  <motion.div 
+                    className="emergency-modal-overlay"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <motion.div
+                      className="emergency-modal"
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.9, opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <button className="close-modal" onClick={() => setIsEmergencyModalOpen(false)}>×</button>
+                      <div className="modal-header">
+                        <h2>🚨 SECURE EMERGENCY RESOLUTION</h2>
+                        <p>Acknowledge critical deadlines or navigate to pending sparks</p>
+                      </div>
+
+                      <div className="emergency-modal-columns">
+                        {/* Column 1: Deadlines */}
+                        <div className="emergency-column">
+                          <h3>⚠️ DEADLINE ALERTS ({flames.length})</h3>
+                          <div className="emergency-list">
+                            {flames.map(p => (
+                              <div key={p.id} className="emergency-item">
+                                <div className="emergency-item-info">
+                                  <span className="emergency-item-title">{p.service}</span>
+                                  <span className="emergency-item-detail">Visionary: {p.clientName || p.client?.name || p.name}</span>
+                                  <span className="emergency-item-status overdue">{getFlameNotifText(p)}</span>
+                                </div>
+                                <div className="emergency-item-actions">
+                                  <button 
+                                    className="emergency-item-btn read" 
+                                    onClick={() => markFlameAsRead(p.id)}
+                                    title="Mark as Read"
+                                  >
+                                    ✓
+                                  </button>
+                                  <button 
+                                    className="emergency-item-btn go"
+                                    onClick={() => {
+                                      setProjectsSearchQuery(p.service || p.name || "");
+                                      setActiveAdminModule("PROJECTS");
+                                      setIsAdminGridActive(true);
+                                      setIsEmergencyModalOpen(false);
+                                    }}
+                                    title="Go to Project"
+                                  >
+                                    →
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                            {flames.length === 0 && <p className="dim-text small-hint">No pending deadlines</p>}
+                          </div>
+                        </div>
+
+                        {/* Column 2: New Sparks */}
+                        <div className="emergency-column">
+                          <h3>📥 NEW SPARKS ({sparks.length})</h3>
+                          <div className="emergency-list">
+                            {sparks.map(s => (
+                              <div key={s.id} className="emergency-item">
+                                <div className="emergency-item-info">
+                                  <span className="emergency-item-title">{s.name}</span>
+                                  <span className="emergency-item-detail">Service: {s.service}</span>
+                                  <span className="emergency-item-status new">New Inquiry</span>
+                                </div>
+                                <div className="emergency-item-actions">
+                                  <button 
+                                    className="emergency-item-btn read"
+                                    onClick={() => markInquiryAsRead(s.id)}
+                                    title="Mark as Read"
+                                  >
+                                    ✓
+                                  </button>
+                                  <button 
+                                    className="emergency-item-btn go"
+                                    onClick={() => {
+                                      setInquiriesSearchQuery(s.name || "");
+                                      setActiveAdminModule("INQUIRIES");
+                                      setIsAdminGridActive(true);
+                                      setIsEmergencyModalOpen(false);
+                                    }}
+                                    title="Go to Spark"
+                                  >
+                                    →
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                            {sparks.length === 0 && <p className="dim-text small-hint">No new inquiries</p>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="modal-actions">
+                        <button className="cancel-mission-btn" onClick={markAllAlertsAsRead}>
+                          MARK ALL AS READ
+                        </button>
+                        <button className="ignite-submit-btn" onClick={() => setIsEmergencyModalOpen(false)}>
+                          CLOSE RESOLUTION VAULT
+                        </button>
+                      </div>
+                    </motion.div>
                   </motion.div>
                 )}
               </AnimatePresence>
