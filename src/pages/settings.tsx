@@ -32,6 +32,7 @@ interface Service {
   price: string;
   delivery: string;
   features: string[];
+  slideshow?: any[];
 }
 
 interface SettingsProps {
@@ -46,6 +47,7 @@ interface SettingsProps {
   onSaveAdminProfile: (details: any) => void;
   onAddService: (newService: Service) => void;
   onDeleteService: (serviceId: number) => void;
+  onUpdateService: (s: Service) => void;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -79,7 +81,8 @@ export default function SettingsPage({
   adminProfile,
   onSaveAdminProfile,
   onAddService,
-  onDeleteService
+  onDeleteService,
+  onUpdateService
 }: SettingsProps) {
   const [activeTab, setActiveTab] = useState("CATALOG"); // CATALOG, VISION, BANKING, PROFILE
   const [search, setSearch] = useState("");
@@ -136,6 +139,12 @@ export default function SettingsPage({
       setProfileGst(adminProfile.gst || "");
     }
   }, [adminProfile]);
+
+  // Service Work Slideshow state
+  const [calibratingServiceSlideshow, setCalibratingServiceSlideshow] = useState<Service | null>(null);
+  const [newServiceSlideUrl, setNewServiceSlideUrl] = useState("");
+  const [newServiceSlideTitle, setNewServiceSlideTitle] = useState("");
+  const [newServiceSlideDuration, setNewServiceSlideDuration] = useState("");
 
   // High-fidelity UI feedback states
   const [isSaving, setIsSaving] = useState(false);
@@ -431,7 +440,7 @@ export default function SettingsPage({
 
   const handleConfirmAddSlide = async () => {
     if (!activePreviewSlide) return;
-    const { slotIdx, url, title, durationStr } = activePreviewSlide;
+    const { slotIdx, serviceId, url, title, durationStr } = activePreviewSlide;
 
     // Trigger high-tech countdown state tracking
     setAddingSlideStatus({
@@ -447,6 +456,39 @@ export default function SettingsPage({
     for (let c = 3; c > 0; c--) {
       setAddingSlideStatus(prev => ({ ...prev, countdown: c }));
       await new Promise(resolve => setTimeout(resolve, 800));
+    }
+
+    if (serviceId !== undefined) {
+      const duration = durationStr ? parseFloat(durationStr) : undefined;
+      const newSlide = {
+        url,
+        title: title || "Work Showcase",
+        duration,
+        fit: slideFit,
+        scale: slideScale,
+        positionX: slidePositionX,
+        positionY: slidePositionY,
+        brightness: slideBrightness,
+        contrast: slideContrast,
+        saturation: slideSaturation,
+        grayscale: slideGrayscale,
+        hueRotate: slideHueRotate
+      };
+
+      if (calibratingServiceSlideshow) {
+        const updatedSlides = [...(calibratingServiceSlideshow.slideshow || [])];
+        updatedSlides.push(newSlide);
+        setCalibratingServiceSlideshow({
+          ...calibratingServiceSlideshow,
+          slideshow: updatedSlides
+        });
+      }
+
+      setNewServiceSlideUrl("");
+      setNewServiceSlideTitle("");
+      setNewServiceSlideDuration("");
+      setAddingSlideStatus(prev => ({ ...prev, isAdding: false }));
+      return;
     }
 
     const next = [...localVisionSettings];
@@ -666,23 +708,37 @@ export default function SettingsPage({
                         <span>{s.features?.length || 0} Features</span>
                       </div>
 
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={() => onOpenCalibrate(s)}
-                          className="flex-1 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 font-bold text-xs rounded-xl py-2"
-                        >
-                          <Sliders className="w-3.5 h-3.5 mr-2" />
-                          CALIBRATE SERVICE
-                        </Button>
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => onOpenCalibrate(s)}
+                            className="flex-1 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 font-bold text-xs rounded-xl py-2 select-none"
+                          >
+                            <Sliders className="w-3.5 h-3.5 mr-2" />
+                            CALIBRATE SERVICE
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              if (window.confirm(`Are you absolutely sure you want to delete "${s.title}"? This will also clear any slideshow slots bound to it.`)) {
+                                onDeleteService(s.id);
+                              }
+                            }}
+                            className="bg-red-500/10 hover:bg-red-500/25 border border-red-500/30 text-red-400 font-bold text-xs rounded-xl p-2 cursor-pointer flex items-center justify-center shrink-0 select-none"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                         <Button
                           onClick={() => {
-                            if (window.confirm(`Are you absolutely sure you want to delete "${s.title}"? This will also clear any slideshow slots bound to it.`)) {
-                              onDeleteService(s.id);
-                            }
+                            setCalibratingServiceSlideshow({ ...s, slideshow: s.slideshow ? [...s.slideshow] : [] });
+                            setNewServiceSlideUrl("");
+                            setNewServiceSlideTitle("");
+                            setNewServiceSlideDuration("");
                           }}
-                          className="bg-red-500/10 hover:bg-red-500/25 border border-red-500/30 text-red-400 font-bold text-xs rounded-xl p-2 cursor-pointer flex items-center justify-center shrink-0"
+                          className="w-full bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 font-bold text-xs rounded-xl py-2 flex items-center justify-center gap-1.5 select-none"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          CALIBRATE WORK SLIDESHOW
                         </Button>
                       </div>
                     </div>
@@ -1460,6 +1516,7 @@ export default function SettingsPage({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="cyber-modal-overlay"
+            style={{ zIndex: 100001 }}
           >
             <motion.div 
               initial={{ scale: 0.9, y: 15 }}
@@ -1940,6 +1997,237 @@ export default function SettingsPage({
                   <div className="flex justify-between items-center text-[8px] font-mono text-muted-foreground/60">
                     <span>SECTOR: SLIDECK_CALIBRATE</span>
                     <span className="animate-pulse text-cyan-400">INDEXING ASSETS...</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Service Slideshow Calibration Modal */}
+      <AnimatePresence>
+        {calibratingServiceSlideshow && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="cyber-modal-overlay"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 15 }}
+              className="w-full max-w-[850px] bg-[#070913] border border-cyan-500/25 rounded-2xl p-6 shadow-[0_0_35px_rgba(0,229,255,0.15)] relative overflow-hidden flex flex-col md:flex-row gap-6 max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="cyber-scanner-line" />
+
+              {/* Left Column: Configured Slides List */}
+              <div className="flex-1 flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-white/5 pb-2 text-left">
+                  <h3 className="font-bold text-sm uppercase tracking-wider text-cyan-400">
+                    {calibratingServiceSlideshow.title} Slideshow
+                  </h3>
+                  <Badge className="text-3xs bg-cyan-500/10 text-cyan-400 border-0">
+                    {(calibratingServiceSlideshow.slideshow || []).length} Slides
+                  </Badge>
+                </div>
+
+                <div className="flex-1 max-h-[350px] overflow-y-auto space-y-2 pr-1 scrollbar-thin scrollbar-thumb-indigo-500/20 text-left">
+                  {(calibratingServiceSlideshow.slideshow || []).length > 0 ? (
+                    (calibratingServiceSlideshow.slideshow || []).map((slide, sIdx) => {
+                      const isVid = slide.url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || slide.url.includes("video") || slide.url.startsWith("data:video/");
+                      return (
+                        <div key={sIdx} className="flex items-center justify-between p-2 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors">
+                          <div className="flex items-center gap-3">
+                            {isVid ? (
+                              <video src={slide.url} className="w-12 h-10 object-cover rounded-lg border border-white/10" muted />
+                            ) : (
+                              <img src={slide.url} alt={slide.title} className="w-12 h-10 object-cover rounded-lg border border-white/10" />
+                            )}
+                            <div>
+                              <div className="text-xs font-semibold text-white/90 line-clamp-1 flex items-center gap-1.5">
+                                {slide.title}
+                                {slide.duration !== undefined && slide.duration > 0 && (
+                                  <span className="text-[8px] font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1 py-0.25 rounded-md font-bold">
+                                    {slide.duration}s
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[9px] font-mono text-muted-foreground/60 line-clamp-1 max-w-[200px]">
+                                {slide.url.startsWith("data:") ? "[Local Media File]" : slide.url}
+                              </div>
+                            </div>
+                          </div>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              const updatedSlides = [...(calibratingServiceSlideshow.slideshow || [])];
+                              updatedSlides.splice(sIdx, 1);
+                              setCalibratingServiceSlideshow({
+                                ...calibratingServiceSlideshow,
+                                slideshow: updatedSlides
+                              });
+                            }}
+                            className="w-8 h-8 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="h-[200px] border border-white/5 border-dashed rounded-xl flex flex-col items-center justify-center text-muted-foreground/30 text-2xs uppercase tracking-widest font-mono">
+                      <span>No photos added yet</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 border-t border-white/5 pt-4">
+                  <Button
+                    onClick={() => setCalibratingServiceSlideshow(null)}
+                    className="flex-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-bold text-xs rounded-xl py-2.5 transition-all select-none"
+                  >
+                    DISCARD CHANGES
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      onUpdateService(calibratingServiceSlideshow);
+                      setCalibratingServiceSlideshow(null);
+                    }}
+                    className="flex-1 bg-[#00e5ff]/25 hover:bg-[#00e5ff]/35 border border-[#00e5ff]/30 text-[#00e5ff] font-bold text-xs rounded-xl py-2.5 hover:shadow-[0_0_15px_rgba(0,229,255,0.25)] transition-all select-none cursor-pointer"
+                  >
+                    SAVE WORK SLIDESHOW
+                  </Button>
+                </div>
+              </div>
+
+              {/* Right Column: Add Slide Form */}
+              <div className="w-full md:w-[320px] flex flex-col justify-between border-t md:border-t-0 md:border-l border-white/10 pt-6 md:pt-0 md:pl-6 text-left">
+                <div className="space-y-4">
+                  <h3 className="font-mono text-xs font-bold text-indigo-400 uppercase tracking-widest">
+                    + Add portfolio Media
+                  </h3>
+
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">Media URL</label>
+                        <div className="flex items-center gap-3">
+                          {newServiceSlideUrl && (
+                            <button
+                              onClick={() => {
+                                setNewServiceSlideUrl("");
+                                setNewServiceSlideTitle("");
+                              }}
+                              className="text-[9px] font-mono text-red-400 hover:text-red-300 uppercase cursor-pointer flex items-center gap-1 hover:underline bg-transparent border-0 p-0 outline-none"
+                            >
+                              🗑️ Clear
+                            </button>
+                          )}
+                          <label
+                            htmlFor="service-local-file"
+                            className="text-[9px] font-mono text-indigo-400 hover:text-indigo-300 uppercase cursor-pointer flex items-center gap-1 hover:underline"
+                          >
+                            📁 Choose Local File
+                          </label>
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*,video/*"
+                          id="service-local-file"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (event) => {
+                                if (event.target?.result) {
+                                  setNewServiceSlideUrl(event.target.result as string);
+                                  setNewServiceSlideTitle(file.name.split('.')[0]);
+                                }
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                          className="hidden"
+                        />
+                      </div>
+                      <Input
+                        value={newServiceSlideUrl.startsWith("data:") ? "[Local Media Selected]" : newServiceSlideUrl}
+                        disabled={newServiceSlideUrl.startsWith("data:")}
+                        onChange={(e) => setNewServiceSlideUrl(e.target.value)}
+                        placeholder="https://images.unsplash.com/... or choose local file"
+                        className="bg-black/40 border-white/10 text-xs rounded-lg py-1 px-3 text-white placeholder:text-white/20 disabled:opacity-85"
+                      />
+                    </div>
+
+                    {newServiceSlideUrl && (
+                      <div className="flex items-center gap-2 p-2 rounded-xl bg-indigo-500/5 border border-indigo-500/20">
+                        {newServiceSlideUrl.startsWith("data:video/") || 
+                         newServiceSlideUrl.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || 
+                         newServiceSlideUrl.includes("video") ? (
+                          <video src={newServiceSlideUrl} className="w-12 h-10 object-cover rounded-lg border border-indigo-500/30" muted />
+                        ) : (
+                          <img src={newServiceSlideUrl} alt="local preview" className="w-12 h-10 object-cover rounded-lg border border-indigo-500/30" />
+                        )}
+                        <div className="text-[9px] font-mono text-indigo-400 uppercase tracking-widest font-bold">
+                          Local Media Selected ✓
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">Slide Title Overlay</label>
+                      <Input
+                        value={newServiceSlideTitle}
+                        onChange={(e) => setNewServiceSlideTitle(e.target.value)}
+                        placeholder="e.g., Brand Strategy Workshop"
+                        className="bg-black/40 border-white/10 text-xs rounded-lg py-1 px-3 text-white placeholder:text-white/20"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">Running Duration (seconds)</label>
+                      <Input
+                        type="number"
+                        min="0.5"
+                        step="0.5"
+                        value={newServiceSlideDuration}
+                        onChange={(e) => setNewServiceSlideDuration(e.target.value)}
+                        placeholder="e.g., 5 (Blank for default)"
+                        className="bg-black/40 border-white/10 text-xs rounded-lg py-1 px-3 text-white placeholder:text-white/20"
+                      />
+                    </div>
+
+                    <Button
+                      onClick={() => {
+                        const url = newServiceSlideUrl.trim();
+                        if (!url) return;
+                        // Open the visual calibration preview modal!
+                        setActivePreviewSlide({
+                          serviceId: calibratingServiceSlideshow.id, // Marker that we are calibrating a service slide!
+                          url,
+                          title: newServiceSlideTitle.trim() || "Work Showcase",
+                          durationStr: newServiceSlideDuration.trim()
+                        });
+                        // Reset visual parameters to defaults
+                        setSlideFit('cover');
+                        setSlideScale(1);
+                        setSlidePositionX(0);
+                        setSlidePositionY(0);
+                        setSlideBrightness(100);
+                        setSlideContrast(100);
+                        setSlideSaturation(100);
+                        setSlideGrayscale(0);
+                        setSlideHueRotate(0);
+                      }}
+                      className="w-full bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 text-cyan-400 font-bold text-xs rounded-lg py-2 mt-2 select-none"
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-2" />
+                      ADD SLIDE TO SHOWCASE
+                    </Button>
                   </div>
                 </div>
               </div>

@@ -14,7 +14,7 @@ import Financials from '@/pages/financials';
 import SettingsPage from '@/pages/settings';
 import { Portfolio } from '@/pages/Portfolio';
 import { useToast } from '@/hooks/use-toast';
-import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail, Menu, Volume2, VolumeX, Coins } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ChevronLeft, X, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail, Menu, Volume2, VolumeX, Coins } from 'lucide-react';
 import InvoicesPage from '@/pages/invoices';
 
 const queryClient = new QueryClient();
@@ -354,6 +354,174 @@ const defaultAdminProfile = {
   gst: "24AAAAA0000A1Z5"
 };
 
+function ServiceSlideshowContent({ service, onClose }) {
+  const photos = service.slideshow || [];
+  const [index, setIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+  const [videoDuration, setVideoDuration] = useState(null);
+  const [videoCurrentTime, setVideoCurrentTime] = useState(0);
+
+  const currentPhoto = photos && photos[index];
+  const isVideo = currentPhoto && (
+    currentPhoto.url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || 
+    currentPhoto.url.includes("video") || 
+    currentPhoto.url.startsWith("data:video/")
+  );
+  const hasCustomDuration = currentPhoto && currentPhoto.duration !== undefined && currentPhoto.duration > 0;
+
+  const delay = hasCustomDuration 
+    ? currentPhoto.duration * 1000 
+    : 5000;
+
+  const handlePrev = (e) => {
+    e?.stopPropagation();
+    setIndex((prev) => (prev - 1 + photos.length) % photos.length);
+  };
+
+  const handleNext = (e) => {
+    e?.stopPropagation();
+    setIndex((prev) => (prev + 1) % photos.length);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        onClose();
+      } else if (e.key === "ArrowLeft") {
+        handlePrev();
+      } else if (e.key === "ArrowRight") {
+        handleNext();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [photos.length]);
+
+  useEffect(() => {
+    if (isHovered || !photos || photos.length <= 1 || !currentPhoto) return;
+    if (isVideo && !hasCustomDuration) return;
+
+    const timer = setTimeout(() => {
+      setIndex((prev) => (prev + 1) % photos.length);
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [index, isHovered, photos, isVideo, hasCustomDuration, delay]);
+
+  if (!currentPhoto) return null;
+
+  const slideStyle = {
+    objectFit: currentPhoto.fit || 'cover',
+    objectPosition: `${(currentPhoto.positionX || 0) + 50}% ${(currentPhoto.positionY || 0) + 50}%`,
+    transform: `scale(${currentPhoto.scale || 1})`,
+    filter: `brightness(${currentPhoto.brightness || 100}%) contrast(${currentPhoto.contrast || 100}%) saturate(${currentPhoto.saturation || 100}%) grayscale(${currentPhoto.grayscale || 0}%) hue-rotate(${currentPhoto.hueRotate || 0}deg)`,
+    transition: 'transform 0.4s ease, filter 0.4s ease',
+    width: '100%',
+    height: '100%'
+  };
+
+  return (
+    <div 
+      className="service-slideshow-container"
+      onClick={(e) => e.stopPropagation()}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Autoplay progress bar */}
+      {photos.length > 1 && !isHovered && (
+        <div className="service-slideshow-progress-bar">
+          {isVideo && !hasCustomDuration ? (
+            <div 
+              className="service-slideshow-progress-fill transition-all duration-100 ease-out"
+              style={{ width: `${(videoCurrentTime / (videoDuration || 1)) * 100}%` }}
+            />
+          ) : (
+            <motion.div 
+              key={index}
+              initial={{ width: "0%" }}
+              animate={{ width: "100%" }}
+              transition={{ duration: delay / 1000, ease: "linear" }}
+              className="service-slideshow-progress-fill"
+            />
+          )}
+        </div>
+      )}
+
+      {/* Close Button */}
+      <button className="service-slideshow-close" onClick={onClose}>
+        <X className="w-5 h-5" />
+      </button>
+
+      {/* Media Viewport */}
+      <div className="service-slideshow-viewport">
+        <AnimatePresence mode="wait">
+          {isVideo ? (
+            <motion.video
+              key={index}
+              src={currentPhoto.url}
+              autoPlay
+              loop={photos.length === 1 || hasCustomDuration}
+              muted
+              playsInline
+              onTimeUpdate={(e) => {
+                const video = e.currentTarget;
+                if (video.duration) {
+                  setVideoCurrentTime(video.currentTime);
+                  setVideoDuration(video.duration);
+                }
+              }}
+              onEnded={() => {
+                if (!hasCustomDuration) {
+                  setIndex((prev) => (prev + 1) % photos.length);
+                }
+              }}
+              initial={{ opacity: 0, scale: (currentPhoto.scale || 1) * 1.03 }}
+              animate={{ opacity: 1, scale: currentPhoto.scale || 1 }}
+              exit={{ opacity: 0, scale: (currentPhoto.scale || 1) * 0.97 }}
+              transition={{ duration: 0.5, ease: "easeInOut" }}
+              style={slideStyle}
+            />
+          ) : (
+            <motion.img
+              key={index}
+              src={currentPhoto.url}
+              alt={currentPhoto.title}
+              initial={{ opacity: 0, scale: (currentPhoto.scale || 1) * 1.03 }}
+              animate={{ opacity: 1, scale: currentPhoto.scale || 1 }}
+              exit={{ opacity: 0, scale: (currentPhoto.scale || 1) * 0.97 }}
+              transition={{ duration: 0.5, ease: "easeInOut" }}
+              style={slideStyle}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Navigation chevrons */}
+      {photos.length > 1 && (
+        <>
+          <button className="service-slideshow-nav-btn prev" onClick={handlePrev}>
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <button className="service-slideshow-nav-btn next" onClick={handleNext}>
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </>
+      )}
+
+      {/* Floating Caption & Slideshow Counter */}
+      <div className="service-slideshow-caption">
+        <div className="service-slideshow-caption-box">
+          <span>{service.title} Portfolio</span>
+          <h4>{currentPhoto.title || "Showcase Asset"}</h4>
+        </div>
+        <div className="service-slideshow-counter">
+          {String(index + 1).padStart(2, '0')} / {String(photos.length).padStart(2, '0')}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [servicesList, setServicesList] = useState(() => {
     const saved = localStorage.getItem('netra_services');
@@ -530,6 +698,30 @@ function App() {
     toast({
       title: "Service Card Deleted",
       description: "Successfully removed card and cleaned up slot bindings."
+    });
+  };
+
+  const handleUpdateService = async (updatedService) => {
+    const nextList = servicesList.map(s => s.id === updatedService.id ? updatedService : s);
+    setServicesList(nextList);
+    localStorage.setItem("netra_services", JSON.stringify(nextList));
+
+    // Save globally to Supabase special settings row
+    try {
+      const payload = {
+        address: JSON.stringify({ services: nextList, vision: visionSettings, banking: bankingDetails, profile: adminProfile })
+      };
+      await supabase
+        .from('clients')
+        .update(payload)
+        .eq('email', 'settings@netra.graphics');
+    } catch (dbErr) {
+      console.error("Failed to save updated service to database:", dbErr);
+    }
+
+    toast({
+      title: "Service Slideshow Updated",
+      description: `Successfully synchronized work slideshow for "${updatedService.title}".`
     });
   };
 
@@ -874,6 +1066,7 @@ function App() {
   const [isContactActive, setIsContactActive] = useState(false);
   const [showConstruction, setShowConstruction] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
+  const [activeServiceSlideshow, setActiveServiceSlideshow] = useState(null);
   const [isServicesActive, setIsServicesActive] = useState(false);
   const isNavVertical = isVaultActive && !isContactActive && !isServicesActive;
   const [isSuccess, setIsSuccess] = useState(false);
@@ -3018,17 +3211,29 @@ function App() {
                         </div>
                       </div>
 
-                      {/* Get Started Button */}
-                      <button
-                        className="popup-cta-btn"
-                        onClick={() => {
-                          setShowConstruction(false);
-                          setSelectedService(null);
-                          goToContact();
-                        }}
-                      >
-                        Get Started
-                      </button>
+                      {/* Action CTA Buttons */}
+                      <div className="popup-cta-container">
+                        {selectedService.slideshow && selectedService.slideshow.length > 0 && (
+                          <button
+                            className="popup-cta-btn secondary"
+                            onClick={() => {
+                              setActiveServiceSlideshow(selectedService);
+                            }}
+                          >
+                            View Our Work
+                          </button>
+                        )}
+                        <button
+                          className="popup-cta-btn"
+                          onClick={() => {
+                            setShowConstruction(false);
+                            setSelectedService(null);
+                            goToContact();
+                          }}
+                        >
+                          Get Started
+                        </button>
+                      </div>
                     </motion.div>
                   </motion.div>
                 )}
@@ -3696,6 +3901,7 @@ function App() {
                             onSaveAdminProfile={handleSaveAdminProfile}
                             onAddService={handleAddService}
                             onDeleteService={handleDeleteService}
+                            onUpdateService={handleUpdateService}
                           />
                         )}
                       </div>
@@ -5034,6 +5240,24 @@ function App() {
                   </div>
                 </motion.div>
               </div>
+            )}
+          </AnimatePresence>
+
+          {/* Fullscreen Service Slideshow Player Modal */}
+          <AnimatePresence>
+            {activeServiceSlideshow && (
+              <motion.div
+                className="service-slideshow-overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setActiveServiceSlideshow(null)}
+              >
+                <ServiceSlideshowContent 
+                  service={activeServiceSlideshow} 
+                  onClose={() => setActiveServiceSlideshow(null)} 
+                />
+              </motion.div>
             )}
           </AnimatePresence>
         </div>
