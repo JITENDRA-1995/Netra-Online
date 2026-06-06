@@ -4380,6 +4380,18 @@ function App() {
                             onAddService={handleAddService}
                             onDeleteService={handleDeleteService}
                             onUpdateService={handleUpdateService}
+                            projectsList={ignitionQueue}
+                            invoicesList={invoices}
+                            cashbookEntries={cashbookEntries}
+                            clients={clients}
+                            setClients={setClients}
+                            setIgnitionQueue={setIgnitionQueue}
+                            setInvoices={setInvoices}
+                            setCashbookEntries={setCashbookEntries}
+                            setServicesList={setServicesList}
+                            setVisionSettings={setVisionSettings}
+                            setBankingDetails={setBankingDetails}
+                            setAdminProfile={setAdminProfile}
                           />
                         )}
                       </div>
