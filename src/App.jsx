@@ -347,11 +347,11 @@ const defaultVisionSettings = [
 ];
 
 const defaultBankingDetails = {
-  bankName: "SBI",
-  accountName: "Netra Graphics",
-  accountNumber: "20198798116",
-  ifscCode: "SBIN0060152",
-  upiId: "hiraparasavan989@okaxis"
+  bankName: "AXIS BANK",
+  accountName: "HIRPARA SAVAN PARSOTTAMBHAI",
+  accountNumber: "924010037070904",
+  ifscCode: "UTIB0004734",
+  upiId: "7359093035@ptaxis"
 };
 
 const defaultAdminProfile = {
@@ -1355,6 +1355,8 @@ function App() {
                     email: parsed.email,
                     address: parsed.address,
                     gst: parsed.gst,
+                    status: 'Completed',
+                    isStandalone: true,
                     items: (parsed.items && parsed.items.length > 0) ? parsed.items : [{
                       service: parsed.service,
                       quote: parsed.rate * parsed.qty,
@@ -1524,6 +1526,7 @@ function App() {
   }, [cashbookEntries]);
   const [selectedBatchProjects, setSelectedBatchProjects] = useState([]);
   const [selectedVaultInvoices, setSelectedVaultInvoices] = useState([]);
+  const [highlightedCashbookId, setHighlightedCashbookId] = useState(null);
 
   const getInvoiceNumber = (date, serial = 1) => {
     const d = new Date(date || Date.now());
@@ -1694,11 +1697,14 @@ function App() {
 
   const updateSavedInvoice = async (updated) => {
     const existing = invoices.find(inv => inv.id === updated.id || inv.invoiceNo === updated.invoiceNo);
+    const isStandalone = !updated.projectId && (updated.id?.toString().startsWith('custom-') || !existing?.projectId || existing?.rawProject?.isStandalone || updated.isStandalone);
 
     const subtotal = parseFloat(updated.quote) || 0;
     const discount = parseFloat(updated.discount) || 0;
     const advance = parseFloat(updated.advanceAmount) || 0;
-    const grandTotal = subtotal - discount - advance;
+    
+    const isCompleted = isStandalone || (updated.status || existing?.rawProject?.status || '').toLowerCase() === 'completed';
+    const grandTotal = isCompleted ? (subtotal - discount) : (subtotal - discount - advance);
 
     let clientNamePayload = updated.name;
     const isCustomOrBatch = (existing && existing.clientName.startsWith("JSON_MOCK:")) || updated.items?.length > 0;
@@ -1713,6 +1719,8 @@ function App() {
         quote: updated.quote,
         discount: updated.discount,
         advanceAmount: updated.advanceAmount,
+        status: isStandalone ? 'Completed' : (existing?.rawProject?.status || 'Active'),
+        isStandalone: isStandalone ? true : undefined,
         items: updated.items || []
       };
       clientNamePayload = `JSON_MOCK:${JSON.stringify(mockClientPayload)}`;
@@ -1725,6 +1733,20 @@ function App() {
       grandTotal: grandTotal,
       projectId: existing ? existing.projectId : (updated.id?.toString().startsWith('custom-') ? null : updated.id)
     };
+
+    // Update cashbook entries for this standalone/custom invoice if it exists in cashbook
+    setCashbookEntries(prev => prev.map(entry => {
+      const isMatch = entry.invoiceId === updated.id || (entry.invoiceNo && entry.invoiceNo === existing?.invoiceNo);
+      if (isMatch) {
+        return {
+          ...entry,
+          invoiceNo: updated.invoiceNo,
+          desc: `Custom Invoice: ${updated.service} - ${updated.name} [${updated.invoiceNo}]`,
+          amount: grandTotal
+        };
+      }
+      return entry;
+    }));
 
     if (existing) {
       try {
@@ -1748,7 +1770,9 @@ function App() {
                 email: updated.email,
                 address: updated.address,
                 gst: updated.gst,
-                items: updated.items
+                items: updated.items,
+                status: isStandalone ? 'Completed' : (inv.rawProject?.status || 'Active'),
+                isStandalone: isStandalone ? true : undefined
               }
             };
           }
@@ -1776,7 +1800,9 @@ function App() {
                 email: updated.email,
                 address: updated.address,
                 gst: updated.gst,
-                items: updated.items
+                items: updated.items,
+                status: isStandalone ? 'Completed' : (inv.rawProject?.status || 'Active'),
+                isStandalone: isStandalone ? true : undefined
               }
             };
           }
@@ -2122,6 +2148,50 @@ function App() {
       setCashbookEntries(newEntries);
     }
   }, [ignitionQueue, cashbookEntries, customPaymentPrompt]);
+
+  // Reconcile cashbook entries with standalone invoices to ensure alignment
+  useEffect(() => {
+    if (!invoices || invoices.length === 0) return;
+
+    let updated = false;
+    let newEntries = [...cashbookEntries];
+
+    invoices.forEach(inv => {
+      // Standalone invoices have projectId === null
+      const isStandalone = !inv.projectId && inv.clientName;
+      if (!isStandalone) return;
+
+      const hasEntry = newEntries.some(entry => 
+        entry.invoiceId === inv.id || 
+        (entry.invoiceNo && entry.invoiceNo === inv.invoiceNo) ||
+        (entry.desc && entry.desc.includes(inv.invoiceNo))
+      );
+
+      if (!hasEntry && inv.grandTotal > 0) {
+        newEntries.push({
+          id: Date.now() + Math.random(),
+          invoiceId: inv.id,
+          invoiceNo: inv.invoiceNo,
+          date: (() => {
+            if (!inv.issueDate) return new Date().toISOString().split('T')[0];
+            const parsedDate = new Date(inv.issueDate);
+            if (isNaN(parsedDate.getTime())) return new Date().toISOString().split('T')[0];
+            return parsedDate.toISOString().split('T')[0];
+          })(),
+          desc: `Custom Invoice: ${inv.projectService} - ${inv.clientName} [${inv.invoiceNo}]`,
+          amount: inv.grandTotal,
+          type: "INCOME",
+          mode: "UPI",
+          category: "Service"
+        });
+        updated = true;
+      }
+    });
+
+    if (updated) {
+      setCashbookEntries(newEntries);
+    }
+  }, [invoices, cashbookEntries]);
 
   const kanbanColumns = [
     { id: 1, title: "SPARK", desc: "Discovery" },
@@ -4316,25 +4386,30 @@ function App() {
                             bankingDetails={bankingDetails}
                             projects={ignitionQueue}
                             services={services}
-                            onEditInvoice={(inv) => {
-                              setEditingInvoiceData({
-                                id: inv.id,
-                                invoiceNo: inv.invoiceNo,
-                                name: inv.rawProject?.name || inv.clientName || "",
-                                address: inv.rawProject?.address || getClientAddress(inv.clientName) || "",
-                                phone: inv.rawProject?.phone || clients.find(c => c.name.toLowerCase() === (inv.rawProject?.name || inv.clientName || "").toLowerCase())?.phone || "",
-                                email: inv.rawProject?.email || clients.find(c => c.name.toLowerCase() === (inv.rawProject?.name || inv.clientName || "").toLowerCase())?.email || "",
-                                gst: inv.rawProject?.gst || clients.find(c => c.name.toLowerCase() === (inv.rawProject?.name || inv.clientName || "").toLowerCase())?.gst || "",
-                                service: inv.projectService || inv.rawProject?.service || "",
-                                quote: inv.rawProject?.quote || inv.grandTotal || 0,
-                                discount: inv.rawProject?.discount || 0,
-                                advanceAmount: inv.rawProject?.advanceAmount || 0,
-                                qty: inv.rawProject?.qty || 1,
-                                rate: inv.rawProject?.rate || (inv.rawProject?.quote / (inv.rawProject?.qty || 1)) || inv.grandTotal || 0,
-                                items: inv.rawProject?.items || []
-                              });
-                            }}
-                          />
+                             onEditInvoice={(inv) => {
+                               const isStandalone = !inv.projectId || inv.invoiceNo?.includes('/C') || inv.rawProject?.isStandalone;
+                               setEditingInvoiceData({
+                                 id: inv.id,
+                                 invoiceNo: inv.invoiceNo,
+                                 name: inv.rawProject?.name || inv.clientName || "",
+                                 address: inv.rawProject?.address || getClientAddress(inv.clientName) || "",
+                                 phone: inv.rawProject?.phone || clients.find(c => c.name.toLowerCase() === (inv.rawProject?.name || inv.clientName || "").toLowerCase())?.phone || "",
+                                 email: inv.rawProject?.email || clients.find(c => c.name.toLowerCase() === (inv.rawProject?.name || inv.clientName || "").toLowerCase())?.email || "",
+                                 gst: inv.rawProject?.gst || clients.find(c => c.name.toLowerCase() === (inv.rawProject?.name || inv.clientName || "").toLowerCase())?.gst || "",
+                                 service: inv.projectService || inv.rawProject?.service || "",
+                                 quote: inv.rawProject?.quote || inv.grandTotal || 0,
+                                 discount: inv.rawProject?.discount || 0,
+                                 advanceAmount: inv.rawProject?.advanceAmount || 0,
+                                 qty: inv.rawProject?.qty || 1,
+                                 rate: inv.rawProject?.rate || (inv.rawProject?.quote / (inv.rawProject?.qty || 1)) || inv.grandTotal || 0,
+                                 items: inv.rawProject?.items || [],
+                                 isStandalone: isStandalone,
+                                 projectId: inv.projectId
+                               });
+                             }}
+                             prefilledEditData={editingInvoiceData}
+                             onClearEditData={() => setEditingInvoiceData(null)}
+                           />
                         )}
 
                         {activeAdminModule === "FINANCIALS" && (
@@ -4351,6 +4426,7 @@ function App() {
                             setFinancialTab={setFinancialTab}
                             financialMetrics={financialMetrics}
                             cashbookMetrics={cashbookMetrics}
+                            highlightedCashbookId={highlightedCashbookId}
                             setCustomPaymentPrompt={setCustomPaymentPrompt}
                             setIsCashbookEditModalOpen={setIsCashbookEditModalOpen}
                             setSelectedCashbookEntry={setSelectedCashbookEntry}
@@ -4545,27 +4621,19 @@ function App() {
                                     <label>Special Discount (₹)</label>
                                     <input type="number" name="discount" placeholder="0" />
                                   </div>
-                                  <div className="input-group">
-                                    <label>Advance Payment (₹)</label>
-                                    <input type="number" name="advanceAmount" placeholder="0" />
-                                  </div>
                                 </div>
 
                                 <div className="form-row">
-                                  <div className="input-group" style={{ opacity: 0, pointerEvents: 'none' }}>
-                                    <label>Spacer</label>
-                                    <input type="text" disabled />
-                                  </div>
-                                  <div className="input-group" style={{ opacity: 0, pointerEvents: 'none' }}>
-                                    <label>Spacer</label>
-                                    <input type="text" disabled />
+                                  <div className="input-group">
+                                    <label>Advance Payment (₹)</label>
+                                    <input type="number" name="advanceAmount" placeholder="0" />
                                   </div>
                                   <div className="input-group">
                                     <label>Advance Payment Method</label>
                                     <select
                                       name="advancePaymentMethod"
                                       className="ignition-input"
-                                      style={{ width: '100%', padding: '0.8rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '4px', outline: 'none', height: '42px' }}
+                                      style={{ width: '100%', padding: '0 0.8rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '4px', outline: 'none', height: '42px' }}
                                     >
                                       <option value="UPI">UPI / Online</option>
                                       <option value="CASH">Cash</option>
@@ -5378,8 +5446,9 @@ function App() {
                         }
 
                         if (amt > 0) {
+                          const entryId = Date.now();
                           setCashbookEntries(prev => [...prev, {
-                            id: Date.now(),
+                            id: entryId,
                             projectId: customPaymentPrompt.p.id,
                             date: new Date().toISOString().split('T')[0],
                             desc: `Payment: ${customPaymentPrompt.p.service} - ${customPaymentPrompt.p.name}`,
@@ -5389,7 +5458,16 @@ function App() {
                             category: "Project",
                             isFinal: true
                           }]);
+                          setHighlightedCashbookId(entryId);
+                          setActiveAdminModule("FINANCIALS");
+                          setFinancialTab("CASHBOOK");
+                          setTimeout(() => {
+                            setHighlightedCashbookId(null);
+                          }, 4000);
                           alert(`Payment of ₹${amt} logged to Cashbook!`);
+                        } else {
+                          setActiveAdminModule("FINANCIALS");
+                          setFinancialTab("CASHBOOK");
                         }
 
                         // Auto-generate and save invoice to vault when project completes
@@ -5639,18 +5717,28 @@ function App() {
                               {/* Payment Instructions */}
                               <div style={{ background: '#f8f9fa', padding: '12px', borderRadius: '8px', display: 'flex', gap: '10px', width: '58%', border: '1px solid #eee' }}>
                                 <div style={{ width: '80px', height: '80px', background: '#fff', padding: '4px', borderRadius: '4px', border: '1px solid #ddd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=${encodeURIComponent(bankingDetails.upiId)}&pn=${encodeURIComponent(bankingDetails.accountName)}&am=${
-                                    isLastPage 
-                                      ? (() => {
-                                          const isCompleted = (invoiceProject.status || '').toLowerCase() === 'completed';
-                                          const subtotal = parseFloat(invoiceProject.quote) || 0;
-                                          const discount = parseFloat(invoiceProject.discount) || 0;
-                                          const advance = parseFloat(invoiceProject.advanceAmount) || 0;
-                                          const grandTotal = subtotal - discount;
-                                          return isCompleted ? grandTotal : (advance > 0 ? grandTotal - advance : grandTotal);
-                                        })()
-                                      : pageTotal
-                                  }&cu=INR`} alt="UPI QR" style={{ width: '100%', height: '100%' }} />
+                                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
+                                    `upi://pay?pa=${bankingDetails.upiId}&pn=${bankingDetails.accountName}&am=${
+                                      (() => {
+                                        const isStandalone = invoiceProject.isStandalone || 
+                                                             (invoiceProject.invoiceNo && invoiceProject.invoiceNo.includes('/C')) ||
+                                                             (invoiceProject.id && typeof invoiceProject.id === 'string' && (invoiceProject.id.startsWith('custom-') || invoiceProject.id.startsWith('local-')));
+                                        const subtotal = parseFloat(invoiceProject.quote) || 0;
+                                        const discount = parseFloat(invoiceProject.discount) || 0;
+                                        const grandTotal = subtotal - discount;
+                                        if (isStandalone) {
+                                          return grandTotal;
+                                        }
+                                        return isLastPage 
+                                          ? (() => {
+                                              const isCompleted = (invoiceProject.status || '').toLowerCase() === 'completed';
+                                              const advance = parseFloat(invoiceProject.advanceAmount) || 0;
+                                              return isCompleted ? grandTotal : (advance > 0 ? grandTotal - advance : grandTotal);
+                                            })()
+                                          : pageTotal;
+                                      })()
+                                    }&cu=INR`
+                                  )}`} alt="UPI QR" style={{ width: '100%', height: '100%' }} />
                                 </div>
                                 <div style={{ flex: 1 }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#546e7a', fontSize: '0.65rem', fontWeight: 'bold', marginBottom: '6px' }}>
@@ -5846,29 +5934,36 @@ function App() {
                           >
                             Send via WhatsApp
                           </button>
-                          <button
-                            className="action-btn btn-edit"
-                            onClick={() => {
-                              setEditingInvoiceData({
-                                id: existingInvoice?.id || invoiceProject.id,
-                                invoiceNo: stableInvoiceNo,
-                                name: invoiceProject.name,
-                                address: getClientAddress(invoiceProject.name),
-                                phone: invoiceProject.phone || clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase())?.phone || "",
-                                email: invoiceProject.email || clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase())?.email || "",
-                                gst: invoiceProject.gst || clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase())?.gst || "",
-                                service: invoiceProject.service,
-                                quote: invoiceProject.quote,
-                                discount: invoiceProject.discount || 0,
-                                advanceAmount: invoiceProject.advanceAmount || 0,
-                                qty: invoiceProject.qty || 1,
-                                rate: invoiceProject.rate || (invoiceProject.quote / (invoiceProject.qty || 1)),
-                                items: invoiceProject.items || []
-                              });
-                            }}
-                          >
-                            Edit Details
-                          </button>
+                           <button
+                             className="action-btn btn-edit"
+                             onClick={() => {
+                               const isStandalone = !invoiceProject.projectId || invoiceProject.isStandalone || stableInvoiceNo?.includes('/C');
+                               setEditingInvoiceData({
+                                 id: existingInvoice?.id || invoiceProject.id,
+                                 invoiceNo: stableInvoiceNo,
+                                 name: invoiceProject.name,
+                                 address: getClientAddress(invoiceProject.name),
+                                 phone: invoiceProject.phone || clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase())?.phone || "",
+                                 email: invoiceProject.email || clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase())?.email || "",
+                                 gst: invoiceProject.gst || clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase())?.gst || "",
+                                 service: invoiceProject.service,
+                                 quote: invoiceProject.quote,
+                                 discount: invoiceProject.discount || 0,
+                                 advanceAmount: invoiceProject.advanceAmount || 0,
+                                 qty: invoiceProject.qty || 1,
+                                 rate: invoiceProject.rate || (invoiceProject.quote / (invoiceProject.qty || 1)),
+                                 items: invoiceProject.items || [],
+                                 isStandalone: isStandalone,
+                                 projectId: invoiceProject.projectId
+                               });
+                               if (isStandalone) {
+                                 setActiveAdminModule("INVOICES");
+                                 setIsInvoicePreviewOpen(false);
+                               }
+                             }}
+                           >
+                             Edit Details
+                           </button>
                           <button
                             className="action-btn btn-close"
                             onClick={() => {
@@ -6315,7 +6410,7 @@ function App() {
 
           {/* Edit Invoice Details Modal */}
           <AnimatePresence>
-            {editingInvoiceData && (
+            {editingInvoiceData && !editingInvoiceData.isStandalone && (
               <div className="modal-overlay z-[10010]" style={{ zIndex: 10050 }}>
                 <motion.div
                   initial={{ scale: 0.9, opacity: 0 }}

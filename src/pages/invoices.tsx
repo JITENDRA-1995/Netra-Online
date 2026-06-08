@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { saveInvoice } from "@/supabase/database";
+import { saveInvoice, deleteInvoice, updateInvoice } from "@/supabase/database";
 
 interface InvoicesPageProps {
   invoices: any[];
@@ -40,6 +40,8 @@ interface InvoicesPageProps {
   projects?: any[];
   services?: any[];
   onEditInvoice?: (invoice: any) => void;
+  prefilledEditData?: any;
+  onClearEditData?: () => void;
 }
 
 const containerVariants = {
@@ -65,14 +67,81 @@ export default function InvoicesPage({
   bankingDetails,
   projects = [],
   services = [],
-  onEditInvoice
+  onEditInvoice,
+  prefilledEditData,
+  onClearEditData
 }: InvoicesPageProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
-  const [invoiceTab, setInvoiceTab] = useState<"SAVED" | "DRAFT">("SAVED");
+  const [invoiceTab, setInvoiceTab] = useState<"SAVED" | "DRAFT" | "CUSTOM">("SAVED");
+
+  // Edit mode tracking state
+  const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
+  const [editingInvoiceNo, setEditingInvoiceNo] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (prefilledEditData && prefilledEditData.isStandalone) {
+      setEditingInvoiceId(prefilledEditData.id);
+      setEditingInvoiceNo(prefilledEditData.invoiceNo);
+      setBillingName(prefilledEditData.name || "");
+      setBillingAddress(prefilledEditData.address || "");
+      setBillingEmail(prefilledEditData.email || "");
+      setBillingPhone(prefilledEditData.phone || "");
+      setBillingGst(prefilledEditData.gst || "");
+
+      setService(prefilledEditData.service || "");
+      setQty(prefilledEditData.qty || 1);
+      
+      const rateVal = parseFloat(prefilledEditData.rate) || 0;
+      setRate(rateVal > 0 ? rateVal.toString() : "");
+      
+      const discVal = parseFloat(prefilledEditData.discount) || 0;
+      setDiscount(discVal > 0 ? discVal.toString() : "");
+      setDiscountType("rs");
+
+      const totalVal = parseFloat(prefilledEditData.quote) - discVal;
+      setTotalAmount(totalVal > 0 ? totalVal.toFixed(2) : (prefilledEditData.quote || 0).toString());
+
+      setPaymentMode("UPI");
+      setSaveOption("save_preview");
+      setFormStep(1);
+      setIsWorkspaceOpen(true);
+    }
+  }, [prefilledEditData]);
+
+  const handleCloseWorkspace = () => {
+    setIsWorkspaceOpen(false);
+    setEditingInvoiceId(null);
+    setEditingInvoiceNo(null);
+    if (onClearEditData) {
+      onClearEditData();
+    }
+    setFormStep(1);
+    setBillingName("");
+    setBillingAddress("");
+    setBillingEmail("");
+    setBillingPhone("");
+    setBillingGst("");
+    setService("");
+    setQty(1);
+    setRate("");
+    setDiscount("");
+    setDiscountType("rs");
+    setTotalAmount("");
+    setLogToCashbook(true);
+    setPaymentMode("UPI");
+    setSaveOption("save_preview");
+  };
+  const [paymentMode, setPaymentMode] = useState<"UPI" | "CASH">("UPI");
+  const [saveOption, setSaveOption] = useState<"save_preview" | "save_only">("save_preview");
   const [showServiceSuggestions, setShowServiceSuggestions] = useState(false);
   const [formStep, setFormStep] = useState(1); // 1 = Client details, 2 = Service Details, 3 = Gateway Review
+
+  // Deletion States
+  const [invoiceToDelete, setInvoiceToDelete] = useState<any>(null);
+  const [batchInvoicesToDelete, setBatchInvoicesToDelete] = useState<any[] | null>(null);
+  const [deleteStrategy, setDeleteStrategy] = useState<"keep" | "purge">("keep");
 
   // Form States
   const [billingName, setBillingName] = useState("");
@@ -184,9 +253,18 @@ export default function InvoicesPage({
 
     if (!matchesSearch) return false;
 
-    // 2. Tab filter (Saved vs Draft)
+    // 2. Tab filter (Saved vs Draft vs Custom)
     const isDraft = inv.rawProject && inv.rawProject.id && inv.rawProject.status && inv.rawProject.status !== 'Completed';
-    const matchesTab = invoiceTab === "DRAFT" ? isDraft : !isDraft;
+    const isCustom = !inv.projectId || (inv.rawProject && inv.rawProject.isStandalone) || inv.invoiceNo.includes('/C');
+    
+    let matchesTab = false;
+    if (invoiceTab === "DRAFT") {
+      matchesTab = isDraft && !isCustom;
+    } else if (invoiceTab === "CUSTOM") {
+      matchesTab = isCustom;
+    } else {
+      matchesTab = !isDraft && !isCustom;
+    }
     if (!matchesTab) return false;
 
     // 3. Client name filter
@@ -231,6 +309,72 @@ export default function InvoicesPage({
     return true;
   });
 
+  const executeSingleDelete = async () => {
+    if (!invoiceToDelete) return;
+    const inv = invoiceToDelete;
+    try {
+      try {
+        await deleteInvoice(inv.id);
+      } catch (dbErr) {
+        console.warn("Supabase delete failed, falling back to local memory:", dbErr);
+      }
+
+      setInvoices(prev => prev.filter(i => i.id !== inv.id));
+      setSelectedVaultInvoices(prev => prev.filter(id => id !== inv.id));
+
+      if (deleteStrategy === "purge") {
+        setCashbookEntries(prev => prev.filter(entry => 
+          entry.invoiceId !== inv.id && 
+          entry.invoiceNo !== inv.invoiceNo &&
+          !(entry.desc && entry.desc.includes(inv.invoiceNo))
+        ));
+        toast({ title: "Invoice & Log Entry Purged", description: "Successfully removed invoice and reverted cashbook logs." });
+      } else {
+        toast({ title: "Invoice Deleted", description: "Invoice removed from vault. Cashbook entries preserved." });
+      }
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Failed to delete", description: "An error occurred during deletion.", variant: "destructive" });
+    } finally {
+      setInvoiceToDelete(null);
+    }
+  };
+
+  const executeBatchDelete = async () => {
+    if (!batchInvoicesToDelete || batchInvoicesToDelete.length === 0) return;
+    const invs = batchInvoicesToDelete;
+    const ids = invs.map(i => i.id);
+    const nos = invs.map(i => i.invoiceNo);
+    try {
+      for (const inv of invs) {
+        try {
+          await deleteInvoice(inv.id);
+        } catch (dbErr) {
+          console.warn(`Supabase delete failed for invoice ${inv.id}:`, dbErr);
+        }
+      }
+
+      setInvoices(prev => prev.filter(i => !ids.includes(i.id)));
+      setSelectedVaultInvoices([]);
+
+      if (deleteStrategy === "purge") {
+        setCashbookEntries(prev => prev.filter(entry => 
+          !ids.includes(entry.invoiceId) && 
+          !nos.includes(entry.invoiceNo) &&
+          !nos.some(no => entry.desc && entry.desc.includes(no))
+        ));
+        toast({ title: "Batch Invoices & Logs Purged", description: `Successfully removed ${invs.length} invoices and reverted cashbook logs.` });
+      } else {
+        toast({ title: "Batch Invoices Deleted", description: `${invs.length} invoices removed. Cashbook entries preserved.` });
+      }
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Failed to delete batch", description: "An error occurred during batch deletion.", variant: "destructive" });
+    } finally {
+      setBatchInvoicesToDelete(null);
+    }
+  };
+
   const getInvoiceNumber = (date: Date, serial = 1) => {
     const d = new Date(date);
     const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '');
@@ -238,8 +382,18 @@ export default function InvoicesPage({
     return `NG/${dateStr}/${serialStr}`;
   };
 
-  const handleCreateInvoice = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const getCustomInvoiceNumber = (date: Date, serial = 1) => {
+    const d = new Date(date);
+    const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '');
+    const serialStr = serial.toString().padStart(4, '0');
+    return `NG/${dateStr}/C${serialStr}`;
+  };
+
+  const handleCreateInvoice = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (formStep < 3) {
+      return;
+    }
     if (!billingName || !billingAddress || !service || !totalAmount) {
       toast({ title: "Incomplete details", description: "Please fill all required fields.", variant: "destructive" });
       return;
@@ -251,7 +405,10 @@ export default function InvoicesPage({
     const discVal = parseFloat(discount) || 0;
 
     const customInvoiceId = `custom-${Date.now()}`;
-    const stableInvoiceNo = getInvoiceNumber(new Date(), invoices.length + 1);
+    const stableInvoiceNo = editingInvoiceNo || (() => {
+      const customInvoices = invoices.filter(inv => !inv.projectId || inv.invoiceNo.includes('/C'));
+      return getCustomInvoiceNumber(new Date(), customInvoices.length + 1);
+    })();
 
     // Mock client data inside clientName using JSON_MOCK prefix
     const mockClientPayload = {
@@ -279,12 +436,16 @@ export default function InvoicesPage({
 
     let savedInvoice;
     try {
-      savedInvoice = await saveInvoice(newInvoice);
+      if (editingInvoiceId) {
+        savedInvoice = await updateInvoice(editingInvoiceId, newInvoice);
+      } else {
+        savedInvoice = await saveInvoice(newInvoice);
+      }
     } catch (err) {
-      console.warn("Supabase insert failed. Falling back to local model creation:", err);
+      console.warn("Supabase save/update failed. Falling back to local model:", err);
       // Construct a valid local fallback object
       savedInvoice = {
-        id: `local-${Date.now()}`,
+        id: editingInvoiceId || `local-${Date.now()}`,
         invoice_no: stableInvoiceNo,
         client_name: newInvoice.clientName,
         project_service: newInvoice.projectService,
@@ -295,14 +456,14 @@ export default function InvoicesPage({
 
     try {
       const formattedInvoice = {
-        id: savedInvoice.id || `local-${Date.now()}`,
+        id: savedInvoice.id || editingInvoiceId || `local-${Date.now()}`,
         invoiceNo: savedInvoice.invoice_no || stableInvoiceNo,
         clientName: billingName,
         projectService: service,
         issueDate: new Date(savedInvoice.issue_date || new Date()).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
         grandTotal: totalVal,
         rawProject: {
-          id: savedInvoice.id || `local-${Date.now()}`,
+          id: savedInvoice.id || editingInvoiceId || `local-${Date.now()}`,
           name: billingName,
           service: service,
           quote: rateVal * qtyVal,
@@ -312,6 +473,8 @@ export default function InvoicesPage({
           email: billingEmail,
           address: billingAddress,
           gst: billingGst,
+          status: 'Completed',
+          isStandalone: true,
           items: [{
             service: service,
             quote: rateVal * qtyVal,
@@ -322,43 +485,61 @@ export default function InvoicesPage({
         }
       };
 
-      setInvoices(prev => [formattedInvoice, ...prev]);
-
-      // Log payment to Cashbook if checked
-      if (logToCashbook) {
-        const cashbookEntry = {
-          id: Date.now(),
-          date: new Date().toISOString().split('T')[0],
-          desc: `Custom Invoice: ${service} - ${billingName}`,
-          amount: totalVal,
-          type: "INCOME" as const,
-          mode: "UPI" as const,
-          category: "Service"
-        };
-        setCashbookEntries(prev => [cashbookEntry, ...prev]);
+      if (editingInvoiceId) {
+        setInvoices(prev => prev.map(inv => inv.id === editingInvoiceId ? formattedInvoice : inv));
+      } else {
+        setInvoices(prev => [formattedInvoice, ...prev]);
       }
 
-      toast({ title: "Invoice Ignited Successfully", description: `Saved and logged to vault as ${stableInvoiceNo}` });
+      // Log/Update payment to Cashbook if checked
+      if (logToCashbook) {
+        setCashbookEntries(prev => {
+          const exists = prev.some(entry => 
+            entry.invoiceId === (savedInvoice.id || editingInvoiceId) || 
+            (entry.invoiceNo && entry.invoiceNo === stableInvoiceNo)
+          );
+          if (exists) {
+            return prev.map(entry => {
+              if (entry.invoiceId === (savedInvoice.id || editingInvoiceId) || (entry.invoiceNo && entry.invoiceNo === stableInvoiceNo)) {
+                return {
+                  ...entry,
+                  invoiceNo: stableInvoiceNo,
+                  desc: `Custom Invoice: ${service} - ${billingName} [${stableInvoiceNo}]`,
+                  amount: totalVal,
+                  mode: paymentMode
+                };
+              }
+              return entry;
+            });
+          } else {
+            return [
+              {
+                id: Date.now(),
+                invoiceId: savedInvoice.id || editingInvoiceId || `local-${Date.now()}`,
+                invoiceNo: stableInvoiceNo,
+                date: new Date().toISOString().split('T')[0],
+                desc: `Custom Invoice: ${service} - ${billingName} [${stableInvoiceNo}]`,
+                amount: totalVal,
+                type: "INCOME" as const,
+                mode: paymentMode,
+                category: "Service"
+              },
+              ...prev
+            ];
+          }
+        });
+      }
 
-      // Trigger preview modal immediately
-      setInvoiceProject(formattedInvoice.rawProject);
-      setIsInvoicePreviewOpen(true);
+      toast({ title: editingInvoiceId ? "Invoice Updated Successfully" : "Invoice Ignited Successfully", description: `Saved and logged to vault as ${stableInvoiceNo}` });
+
+      // Trigger preview modal if selected
+      if (saveOption === "save_preview") {
+        setInvoiceProject(formattedInvoice.rawProject);
+        setIsInvoicePreviewOpen(true);
+      }
       
       // Reset form
-      setIsWorkspaceOpen(false);
-      setFormStep(1);
-      setBillingName("");
-      setBillingAddress("");
-      setBillingEmail("");
-      setBillingPhone("");
-      setBillingGst("");
-      setService("");
-      setQty(1);
-      setRate("");
-      setDiscount("");
-      setDiscountType("rs");
-      setTotalAmount("");
-      setLogToCashbook(true);
+      handleCloseWorkspace();
     } catch (err) {
       console.error(err);
       toast({ title: "Failed to generate invoice", description: "Internal runtime rendering error.", variant: "destructive" });
@@ -397,7 +578,7 @@ export default function InvoicesPage({
               <button
                 type="button"
                 className="close-modal"
-                onClick={() => setIsWorkspaceOpen(false)}
+                onClick={handleCloseWorkspace}
               >
                 ×
               </button>
@@ -405,9 +586,9 @@ export default function InvoicesPage({
               <div className="modal-header border-b border-white/5 pb-4 mb-5">
                 <h2 className="font-extrabold text-foreground text-lg flex items-center gap-2">
                   <FileText className="w-5 h-5 text-cyan-400" />
-                  Standalone Invoicing Workspace
+                  {editingInvoiceId ? `Edit Standalone Invoice: ${editingInvoiceNo}` : "Standalone Invoicing Workspace"}
                 </h2>
-                <p className="text-xs text-muted-foreground">Generate complete tax invoices on-the-fly without registering clients or projects beforehand</p>
+                <p className="text-xs text-muted-foreground">{editingInvoiceId ? "Modify details, service catalog, and pricing for this custom invoice" : "Generate complete tax invoices on-the-fly without registering clients or projects beforehand"}</p>
               </div>
 
               {/* Glowing Wizard Stepper Progress Bar */}
@@ -471,7 +652,7 @@ export default function InvoicesPage({
                 </div>
               </div>
 
-              <form onSubmit={handleCreateInvoice} className="space-y-5">
+              <div className="space-y-5">
                 {/* Step 1: Client Credentials */}
                 {formStep === 1 && (
                   <motion.div
@@ -721,8 +902,34 @@ export default function InvoicesPage({
                           <span>₹{parseFloat(totalAmount).toFixed(2)}</span>
                         </div>
 
+                        {/* Payment Method Selector */}
+                        <div className="flex flex-col gap-1 mt-3 pt-3 border-t border-white/5">
+                          <label className="text-[9px] uppercase tracking-widest text-white/40 font-semibold font-sans">Payment Method</label>
+                          <select
+                            value={paymentMode}
+                            onChange={e => setPaymentMode(e.target.value as "UPI" | "CASH")}
+                            className="bg-[#050508] border border-white/10 text-xs rounded-xl h-8 outline-none text-white px-2.5 font-sans"
+                          >
+                            <option value="UPI">UPI / Online</option>
+                            <option value="CASH">Cash</option>
+                          </select>
+                        </div>
+
+                        {/* Save Action Type Selector */}
+                        <div className="flex flex-col gap-1 mt-3">
+                          <label className="text-[9px] uppercase tracking-widest text-white/40 font-semibold font-sans">Save Action Type</label>
+                          <select
+                            value={saveOption}
+                            onChange={e => setSaveOption(e.target.value as "save_preview" | "save_only")}
+                            className="bg-[#050508] border border-white/10 text-xs rounded-xl h-8 outline-none text-white px-2.5 font-sans"
+                          >
+                            <option value="save_preview">Save & Open Invoice Preview</option>
+                            <option value="save_only">Save Only (No Preview)</option>
+                          </select>
+                        </div>
+
                         {/* Log to Cashbook checkbox */}
-                        <div className="flex items-center gap-2.5 pt-4 select-none border-t border-white/5 mt-4">
+                        <div className="flex items-center gap-2.5 pt-4 select-none border-t border-white/5 mt-3">
                           <input
                             type="checkbox"
                             id="logToCashbook"
@@ -731,37 +938,56 @@ export default function InvoicesPage({
                             className="rounded accent-cyan-400 w-4 h-4 cursor-pointer"
                           />
                           <label htmlFor="logToCashbook" className="text-[9px] text-muted-foreground cursor-pointer text-left leading-normal">
-                            Log ₹{parseFloat(totalAmount).toFixed(2)} as UPI income in global Cashbook?
+                            Log ₹{parseFloat(totalAmount).toFixed(2)} as {paymentMode} income in global Cashbook?
                           </label>
                         </div>
                       </div>
 
-                      {/* Right: UPI QR Simulation Card */}
-                      <div className="rounded-xl border border-white/5 bg-white/[0.01] p-5 flex flex-col items-center justify-center gap-4 relative">
-                        <div className="absolute top-3 right-3 flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[8px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
-                          <span>DOCK QR</span>
-                        </div>
-
-                        <div className="w-32 h-32 bg-white p-2 rounded-xl flex items-center justify-center shadow-inner relative group overflow-hidden">
-                          {bankingDetails?.upiId ? (
-                            <img 
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=${bankingDetails.upiId}&pn=${bankingDetails.accountName}&am=${parseFloat(totalAmount)}&cu=INR`)}`}
-                              alt="Settlement UPI QR Checkout" 
-                              className="w-full h-full object-contain"
-                            />
-                          ) : (
-                            <div className="text-center p-2 text-muted-foreground/30">
-                              🌐
-                              <span className="text-[8px] uppercase font-mono block mt-1">Awaiting VPA...</span>
+                      {/* Right: UPI QR or Cash Simulation Card */}
+                      <div className="rounded-xl border border-white/5 bg-white/[0.01] p-5 flex flex-col items-center justify-center gap-4 relative min-h-[250px]">
+                        {paymentMode === "UPI" ? (
+                          <>
+                            <div className="absolute top-3 right-3 flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[8px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                              <span>DOCK QR</span>
                             </div>
-                          )}
-                        </div>
 
-                        <div className="text-center space-y-1 w-full">
-                          <div className="text-[9px] uppercase tracking-widest text-muted-foreground/60 font-semibold font-mono">Invoice Settlement Target</div>
-                          <div className="text-xs font-bold text-white truncate max-w-[220px] mx-auto font-sans">{bankingDetails?.accountName || "AWAITING CONFIG"}</div>
-                          <div className="text-[9px] font-mono text-cyan-400 truncate max-w-[220px] mx-auto">{bankingDetails?.upiId || "VPA uncalibrated"}</div>
-                        </div>
+                            <div className="w-32 h-32 bg-white p-2 rounded-xl flex items-center justify-center shadow-inner relative group overflow-hidden">
+                              {bankingDetails?.upiId ? (
+                                <img 
+                                  src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=${bankingDetails.upiId}&pn=${bankingDetails.accountName}&am=${parseFloat(totalAmount)}&cu=INR`)}`}
+                                  alt="Settlement UPI QR Checkout" 
+                                  className="w-full h-full object-contain"
+                                />
+                              ) : (
+                                <div className="text-center p-2 text-muted-foreground/30">
+                                  🌐
+                                  <span className="text-[8px] uppercase font-mono block mt-1">Awaiting VPA...</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="text-center space-y-1 w-full">
+                              <div className="text-[9px] uppercase tracking-widest text-muted-foreground/60 font-semibold font-mono">Invoice Settlement Target</div>
+                              <div className="text-xs font-bold text-white truncate max-w-[220px] mx-auto font-sans">{bankingDetails?.accountName || "AWAITING CONFIG"}</div>
+                              <div className="text-[9px] font-mono text-cyan-400 truncate max-w-[220px] mx-auto">{bankingDetails?.upiId || "VPA uncalibrated"}</div>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="absolute top-3 right-3 flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              <span>CASH PAY</span>
+                            </div>
+
+                            <div className="w-24 h-24 rounded-full border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+                              <Coins className="w-12 h-12" />
+                            </div>
+
+                            <div className="text-center space-y-1 w-full">
+                              <div className="text-xs font-bold text-emerald-400 font-sans uppercase">Cash Settlement Selected</div>
+                              <div className="text-[9px] text-muted-foreground font-mono max-w-[200px] mx-auto uppercase">Amount will be recorded directly into local vault cash registers upon ignition.</div>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   </motion.div>
@@ -783,7 +1009,7 @@ export default function InvoicesPage({
                       <Button
                         type="button"
                         variant="ghost"
-                        onClick={() => setIsWorkspaceOpen(false)}
+                        onClick={handleCloseWorkspace}
                         className="border border-white/5 text-muted-foreground hover:bg-white/5 text-xs rounded-xl px-5"
                       >
                         CANCEL
@@ -793,39 +1019,167 @@ export default function InvoicesPage({
 
                   {/* Right Action Button */}
                   <div>
-                    {formStep < 3 ? (
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          if (formStep === 1) {
-                            if (!billingName || !billingAddress) {
-                              toast({ title: "Missing parameters", description: "Name and physical address are required.", variant: "destructive" });
-                              return;
-                            }
-                            setFormStep(2);
-                          } else if (formStep === 2) {
-                            if (!service || !totalAmount) {
-                              toast({ title: "Missing parameters", description: "Service catalog description and amount are required.", variant: "destructive" });
-                              return;
-                            }
-                            setFormStep(3);
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (formStep === 1) {
+                          if (!billingName || !billingAddress) {
+                            toast({ title: "Missing parameters", description: "Name and physical address are required.", variant: "destructive" });
+                            return;
                           }
-                        }}
-                        className="bg-cyan-500 hover:bg-cyan-600 text-black font-extrabold text-xs rounded-xl px-6 py-2 shadow-lg shadow-cyan-500/10"
-                      >
-                        NEXT STEP
-                      </Button>
-                    ) : (
-                      <Button
-                        type="submit"
-                        className="bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-600 hover:to-indigo-600 text-black font-extrabold text-xs rounded-xl px-8 py-5 shadow-lg shadow-cyan-500/15"
-                      >
-                        IGNITE TAX INVOICE ⚡
-                      </Button>
-                    )}
+                          setFormStep(2);
+                        } else if (formStep === 2) {
+                          if (!service || !totalAmount) {
+                            toast({ title: "Missing parameters", description: "Service catalog description and amount are required.", variant: "destructive" });
+                            return;
+                          }
+                          setFormStep(3);
+                        } else if (formStep === 3) {
+                          handleCreateInvoice();
+                        }
+                      }}
+                      className={
+                        formStep === 3
+                          ? "bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-600 hover:to-indigo-600 text-black font-extrabold text-xs rounded-xl px-8 py-5 shadow-lg shadow-cyan-500/15"
+                          : "bg-cyan-500 hover:bg-cyan-600 text-black font-extrabold text-xs rounded-xl px-6 py-2 shadow-lg shadow-cyan-500/10"
+                      }
+                    >
+                      {formStep === 3 ? (editingInvoiceId ? "UPDATE TAX INVOICE ⚡" : "IGNITE TAX INVOICE ⚡") : "NEXT STEP"}
+                    </Button>
                   </div>
                 </div>
-              </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Invoice Delete Confirmation Modal */}
+      <AnimatePresence>
+        {(invoiceToDelete || (batchInvoicesToDelete && batchInvoicesToDelete.length > 0)) && (
+          <div className="modal-overlay z-[10005]" style={{ zIndex: 10050 }}>
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="ignition-modal max-w-lg w-[90vw] border border-red-500/30 bg-[#0e0a0b]/98"
+            >
+              <button
+                type="button"
+                className="close-modal text-red-400 hover:text-red-300"
+                onClick={() => {
+                  setInvoiceToDelete(null);
+                  setBatchInvoicesToDelete(null);
+                }}
+              >
+                ×
+              </button>
+
+              <div className="modal-header border-b border-red-500/10 pb-4 mb-5">
+                <h2 className="font-extrabold text-red-500 text-lg flex items-center gap-2">
+                  ⚠️ EXTINGUISH INVOICE & REVERT LOGS
+                </h2>
+                <p className="text-xs text-muted-foreground">Permanent deletion of document and financial cashbook reconciliation</p>
+              </div>
+
+              <div className="space-y-4 text-left text-xs text-white/80">
+                <div className="p-4 rounded-xl border border-red-500/10 bg-red-500/[0.02] space-y-1">
+                  <div className="text-[10px] font-bold text-red-400 uppercase tracking-widest">Target Invoice Parameters</div>
+                  {invoiceToDelete ? (
+                    <>
+                      <div className="text-sm font-black text-white">{invoiceToDelete.invoiceNo}</div>
+                      <div className="text-[10px] text-muted-foreground uppercase font-mono">
+                        Client: {invoiceToDelete.clientName} | Service: {invoiceToDelete.projectService}
+                      </div>
+                      <div className="text-[10px] text-emerald-400 font-bold font-mono">
+                        Amount: ₹{invoiceToDelete.grandTotal.toLocaleString()}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-sm font-black text-white">BATCH DELETION ({batchInvoicesToDelete?.length} Invoices)</div>
+                      <p className="text-3xs text-muted-foreground">Selected: {batchInvoicesToDelete?.map(i => i.invoiceNo).join(', ')}</p>
+                    </>
+                  )}
+                </div>
+
+                {/* Cashbook warning */}
+                {(() => {
+                  const targetIds = invoiceToDelete ? [invoiceToDelete.id] : (batchInvoicesToDelete?.map(i => i.id) || []);
+                  const targetNos = invoiceToDelete ? [invoiceToDelete.invoiceNo] : (batchInvoicesToDelete?.map(i => i.invoiceNo) || []);
+                  const relatedEntries = cashbookEntries.filter(entry => 
+                    targetIds.includes(entry.invoiceId) || 
+                    targetNos.includes(entry.invoiceNo) ||
+                    targetNos.some(no => entry.desc && entry.desc.includes(no))
+                  );
+                  if (relatedEntries.length === 0) return null;
+                  return (
+                    <div className="p-4 rounded-xl border border-cyan-500/10 bg-cyan-500/[0.01] space-y-1.5">
+                      <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest">💰 Linked Cashbook Entries ({relatedEntries.length})</div>
+                      <p className="text-3xs text-muted-foreground">The following financial logs will be affected:</p>
+                      <div className="space-y-1 divide-y divide-white/5 max-h-32 overflow-y-auto pr-1">
+                        {relatedEntries.map(entry => (
+                          <div key={entry.id} className="flex justify-between items-center text-[10px] py-1">
+                            <span className="text-white/60 truncate max-w-[180px]">{entry.desc}</span>
+                            <span className={`font-mono font-bold ${entry.type === 'EXPENSE' ? 'text-red-400' : 'text-emerald-400'}`}>
+                              {entry.type === 'EXPENSE' ? '-' : '+'}₹{parseFloat(entry.amount).toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Keep / Purge strategy choice */}
+                <div className="p-4 rounded-xl border border-cyan-500/10 bg-cyan-500/[0.01] space-y-3">
+                  <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest">Deletion Strategy</div>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-center gap-2 cursor-pointer text-[11px] text-white/80 select-none">
+                      <input
+                        type="radio"
+                        name="deleteInvoiceStrategy"
+                        value="keep"
+                        checked={deleteStrategy === 'keep'}
+                        onChange={() => setDeleteStrategy('keep')}
+                        className="accent-cyan-500"
+                      />
+                      <span>Keep/Preserve associated Cashbook entry</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-[11px] text-white/80 select-none">
+                      <input
+                        type="radio"
+                        name="deleteInvoiceStrategy"
+                        value="purge"
+                        checked={deleteStrategy === 'purge'}
+                        onChange={() => setDeleteStrategy('purge')}
+                        className="accent-red-500"
+                      />
+                      <span className="text-red-400 font-semibold">Purge associated Cashbook entry (Revert Cashflow)</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center pt-5 border-t border-white/5 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInvoiceToDelete(null);
+                    setBatchInvoicesToDelete(null);
+                  }}
+                  className="border border-white/10 text-white hover:bg-white/5 text-xs rounded-xl px-5 h-9 bg-transparent cursor-pointer font-bold transition-all"
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="button"
+                  onClick={invoiceToDelete ? executeSingleDelete : executeBatchDelete}
+                  className={deleteStrategy === 'keep' ? "bg-cyan-500 hover:bg-cyan-600 text-black font-extrabold text-xs rounded-xl px-6 h-9 shadow-lg shadow-cyan-500/10 cursor-pointer border-none transition-all" : "bg-red-500 hover:bg-red-600 text-white font-extrabold text-xs rounded-xl px-6 h-9 shadow-lg shadow-red-500/10 cursor-pointer border-none transition-all"}
+                >
+                  {deleteStrategy === 'keep' ? "CONFIRM DELETION" : "CONFIRM PURGE & REVERT"}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
@@ -864,6 +1218,18 @@ export default function InvoicesPage({
                 onClick={() => setInvoiceTab("DRAFT")}
               >
                 DRAFT INVOICES
+              </Button>
+              <Button
+                variant={invoiceTab === "CUSTOM" ? "secondary" : "ghost"}
+                size="sm"
+                className={`h-7 rounded-md text-[10px] font-bold tracking-wider px-3 ${
+                  invoiceTab === "CUSTOM" 
+                    ? "bg-white/10 text-teal-400" 
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => setInvoiceTab("CUSTOM")}
+              >
+                CUSTOM INVOICES
               </Button>
             </div>
             <div className="relative w-64">
@@ -950,11 +1316,9 @@ export default function InvoicesPage({
                   size="sm"
                   className="bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 font-bold text-xs"
                   onClick={() => {
-                    if (window.confirm(`Delete ${selectedVaultInvoices.length} selected invoices? This action cannot be undone.`)) {
-                      setInvoices(prev => prev.filter(inv => !selectedVaultInvoices.includes(inv.id)));
-                      setSelectedVaultInvoices([]);
-                      toast({ title: "Invoices deleted" });
-                    }
+                    const selectedInvs = upToDateInvoices.filter(inv => selectedVaultInvoices.includes(inv.id));
+                    setBatchInvoicesToDelete(selectedInvs);
+                    setDeleteStrategy("keep");
                   }}
                 >
                   DELETE SELECTED ({selectedVaultInvoices.length})
@@ -1120,11 +1484,8 @@ export default function InvoicesPage({
                           className="w-7 h-7 hover:bg-red-500/10 hover:text-red-400"
                           title="Delete Record"
                           onClick={() => {
-                            if (window.confirm("Remove this invoice record from vault?")) {
-                              setInvoices(prev => prev.filter(i => i.id !== inv.id));
-                              setSelectedVaultInvoices(prev => prev.filter(id => id !== inv.id));
-                              toast({ title: "Invoice deleted" });
-                            }
+                            setInvoiceToDelete(inv);
+                            setDeleteStrategy("keep");
                           }}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1136,7 +1497,7 @@ export default function InvoicesPage({
               ) : (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-muted-foreground uppercase tracking-widest text-3xs font-semibold">
-                    {invoiceTab === "DRAFT" ? "NO TEMPORARY DRAFT INVOICES IN VAULT" : "LEDGER IS VOID OF SAVED INVOICES"}
+                    {invoiceTab === "DRAFT" ? "NO TEMPORARY DRAFT INVOICES IN VAULT" : invoiceTab === "CUSTOM" ? "NO CUSTOM INVOICES IN VAULT" : "LEDGER IS VOID OF SAVED INVOICES"}
                   </td>
                 </tr>
               )}

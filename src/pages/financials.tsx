@@ -59,6 +59,7 @@ interface FinancialsProps {
   handleAddCashbookEntry: (e: any) => void;
   handleMarkMilestonePaid?: (p: any, type: 'deposit' | 'retainer') => void;
   handleUpdateProjectStatusHandy?: (projectId: number, newProjectStatus: string) => void;
+  highlightedCashbookId?: number | null;
 }
 
 const containerVariants = {
@@ -95,7 +96,8 @@ export default function Financials({
   setSelectedVaultInvoices,
   handleAddCashbookEntry,
   handleMarkMilestonePaid,
-  handleUpdateProjectStatusHandy
+  handleUpdateProjectStatusHandy,
+  highlightedCashbookId
 }: FinancialsProps) {
   const { toast } = useToast();
   const [ledgerSearch, setLedgerSearch] = useState("");
@@ -117,6 +119,13 @@ export default function Financials({
       animate="visible"
       className="space-y-6"
     >
+      <style>{`
+        @keyframes glowingPulse {
+          0% { background-color: rgba(16, 185, 129, 0.05); box-shadow: inset 0 0 10px rgba(16, 185, 129, 0.1); }
+          50% { background-color: rgba(16, 185, 129, 0.25); box-shadow: inset 0 0 20px rgba(16, 185, 129, 0.4); }
+          100% { background-color: rgba(16, 185, 129, 0.05); box-shadow: inset 0 0 10px rgba(16, 185, 129, 0.1); }
+        }
+      `}</style>
       {/* Header */}
       <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -667,8 +676,18 @@ export default function Financials({
                   </thead>
                   <tbody className="divide-y divide-white/5 text-xs">
                     {cashbookEntries.length > 0 ? (
-                      cashbookEntries.map(entry => (
-                        <tr key={entry.id} className="hover:bg-white/[0.01] transition-colors">
+                      cashbookEntries.map(entry => {
+                        const isHighlighted = highlightedCashbookId === entry.id;
+                        return (
+                          <tr
+                            key={entry.id}
+                            className={`hover:bg-white/[0.01] transition-colors ${isHighlighted ? 'cashbook-row-highlight' : ''}`}
+                            style={isHighlighted ? {
+                              animation: 'glowingPulse 2s ease-in-out infinite',
+                              background: 'rgba(16, 185, 129, 0.15)',
+                              borderLeft: '4px solid #10b981'
+                            } : {}}
+                          >
                           <td className="p-4 text-muted-foreground">{entry.date}</td>
                           <td className="p-4">
                             <div className="flex flex-col">
@@ -712,8 +731,9 @@ export default function Financials({
                               </Button>
                             </div>
                           </td>
-                        </tr>
-                      ))
+                          </tr>
+                        );
+                      })
                     ) : (
                       <tr>
                         <td colSpan={5} className="p-8 text-center text-muted-foreground uppercase tracking-widest text-3xs font-semibold">

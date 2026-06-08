@@ -21,5 +21,9 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  },
+  build: {
+    outDir: 'production-site',
+    emptyOutDir: true
   }
 })
