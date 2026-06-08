@@ -1171,7 +1171,8 @@ export default function SettingsPage({
 
   // States for interactive slideshow slide calibration preview modal
   const [activePreviewSlide, setActivePreviewSlide] = useState<{
-    slotIdx: number;
+    slotIdx?: number;
+    serviceId?: number;
     url: string;
     title: string;
     durationStr: string;
