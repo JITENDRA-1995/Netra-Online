@@ -357,9 +357,10 @@ const defaultBankingDetails = {
 const defaultAdminProfile = {
   businessName: "Netra Graphics & Designing",
   address: "Shreeji Complex, Opp. AaramGruh, Mendarda-Sasan Road, Mendarda-362260",
-  phone: "+91 90161 60152",
-  email: "info@netragraphics.com",
-  gst: "24AAAAA0000A1Z5"
+  phone: "73590 93035",
+  email: "savanhirapra@netragraphics.com",
+  gst: "24AAAAA0000A1Z5",
+  instagram: "hiraparasavanphotographer"
 };
 
 function ServiceSlideshowContent({ service, onClose }) {
@@ -531,6 +532,7 @@ function ServiceSlideshowContent({ service, onClose }) {
 }
 
 function App() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [servicesList, setServicesList] = useState(() => {
     const saved = localStorage.getItem('netra_services');
     if (saved) {
@@ -3551,7 +3553,7 @@ function App() {
                   </motion.div>
                   <motion.span layout className="branding-text word-graphics">GRAPHICS</motion.span>
                 </div>
-                <div className="menu-container">
+                <div className="menu-container desktop-menu">
                   <a href="#" className="menu-link" title="HOME" onClick={(e) => { e.preventDefault(); goHome(); }}>
                     <Home className="menu-icon" />
                     <span className="menu-text">HOME</span>
@@ -3597,7 +3599,79 @@ function App() {
                     )}
                   </button>
                 </div>
+                
+                {/* Mobile Menu Toggle Button */}
+                <button
+                  className="mobile-menu-toggle"
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  aria-label="Toggle navigation menu"
+                >
+                  {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                </button>
               </nav>
+
+              {/* Mobile Drawer Overlay */}
+              <AnimatePresence>
+                {mobileMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -15 }}
+                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                    className="mobile-menu-drawer"
+                  >
+                    <div className="mobile-menu-links">
+                      <a href="#" className="mobile-menu-link" onClick={(e) => { e.preventDefault(); goHome(); setMobileMenuOpen(false); }}>
+                        <Home className="w-4 h-4" />
+                        <span className="mobile-link-text">HOME</span>
+                      </a>
+                      <a href="#" className="mobile-menu-link" onClick={(e) => { e.preventDefault(); goToServices(); setMobileMenuOpen(false); }}>
+                        <Briefcase className="w-4 h-4" />
+                        <span className="mobile-link-text">SERVICES</span>
+                      </a>
+                      <a href="#" className="mobile-menu-link" onClick={(e) => { e.preventDefault(); goToVision(); setMobileMenuOpen(false); }}>
+                        <Eye className="w-4 h-4" />
+                        <span className="mobile-link-text">VISION</span>
+                      </a>
+                      <a href="#" className="mobile-menu-link" onClick={(e) => { e.preventDefault(); goToContact(); setMobileMenuOpen(false); }}>
+                        <Mail className="w-4 h-4" />
+                        <span className="mobile-link-text">CONTACT US</span>
+                      </a>
+                      <a href="#" className="mobile-menu-link" onClick={(e) => { e.preventDefault(); goToLogin(); setMobileMenuOpen(false); }}>
+                        <LogIn className="w-4 h-4" />
+                        <span className="mobile-link-text">LOGIN</span>
+                      </a>
+
+                      <div className="mobile-menu-controls">
+                        <div className="mobile-control-row">
+                          <span className="control-label">Ambient Audio</span>
+                          <button className="sound-toggle-btn" onClick={toggleSound} title={isPlaying ? "Mute Ambient Track" : "Play Ambient Track"}>
+                            <div className={`sound-waves ${isPlaying ? 'playing' : ''}`}>
+                              <span></span>
+                              <span></span>
+                              <span></span>
+                              <span></span>
+                            </div>
+                          </button>
+                        </div>
+                        <div className="mobile-control-row">
+                          <span className="control-label">Click Sounds</span>
+                          <button
+                            className={`click-sound-toggle-btn ${clickSoundEnabled ? 'active' : ''} ${!isPlaying ? 'disabled' : ''}`}
+                            onClick={toggleClickSound}
+                          >
+                            {clickSoundEnabled ? (
+                              <Volume2 className="w-4 h-4" />
+                            ) : (
+                              <VolumeX className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </header>
           )}
 
@@ -3827,9 +3901,9 @@ function App() {
                             visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: "easeOut" } }
                           }}
                         >
-                          <p className="detail-item email">hiraparasavan989@gmail.com</p>
-                          <p className="detail-item phone">+91 73590 93035</p>
-                          <p className="detail-item address">Shreeji Complex, Opp. AaramGruh, Mendarda-Sasan Road, Mendarda-362260</p>
+                          <p className="detail-item email">{adminProfile?.email || "savanhirapra@netragraphics.com"}</p>
+                          <p className="detail-item phone">{adminProfile?.phone || "73590 93035"}</p>
+                          <p className="detail-item address">{adminProfile?.address || "Shreeji Complex, Opp. AaramGruh, Mendarda-Sasan Road, Mendarda-362260"}</p>
                         </motion.div>
                         <motion.div
                           className="social-links"
@@ -3838,11 +3912,11 @@ function App() {
                             visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: "easeOut" } }
                           }}
                         >
-                          <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" className="social-icon">
+                          <a href={adminProfile?.instagram ? `https://www.instagram.com/${adminProfile.instagram}` : "https://www.instagram.com/"} target="_blank" rel="noopener noreferrer" className="social-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
                           </a>
-                          <a href="https://wa.me/917359093035?text=I am interested in starting a visual revolution with Netra Graphics." target="_blank" rel="noopener noreferrer" className="social-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 1 1-7.6-7.6 8.38 8.38 0 0 1 3.8.9L21 4.5l-4.1 4.1" /><path d="M11 11a1 1 0 1 0 2 0 1 1 0 1 0-2 0" /><path d="M17 11a1 1 0 1 0 2 0 1 1 0 1 0-2 0" /><path d="M7 11a1 1 0 1 0 2 0 1 1 0 1 0-2 0" /></svg>
+                          <a href={`https://wa.me/${(adminProfile?.phone || "917359093035").replace(/[^0-9]/g, "")}?text=I am interested in starting a visual revolution with Netra Graphics.`} target="_blank" rel="noopener noreferrer" className="social-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.455 5.703 1.458h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
                           </a>
                         </motion.div>
                       </motion.div>
@@ -5875,10 +5949,10 @@ function App() {
                                 <h4 style={{ margin: '0 0 4px 0', fontSize: '0.7rem', fontWeight: '900' }}>Follow Us on Instagram</h4>
                                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                   <div style={{ width: '35px', height: '35px' }}>
-                                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://instagram.com/HIRAPARASAVANPHOTOGRAPHER" alt="IG QR" style={{ width: '100%' }} />
+                                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://instagram.com/${adminProfile?.instagram || 'HIRAPARASAVANPHOTOGRAPHER'}`} alt="IG QR" style={{ width: '100%' }} />
                                   </div>
                                   <div style={{ fontSize: '0.5rem', color: '#777' }}>
-                                    <strong style={{ color: '#333' }}>@HIRAPARASAVANPHOTOGRAPHER</strong>
+                                    <strong style={{ color: '#333' }}>@{adminProfile?.instagram ? adminProfile.instagram.toUpperCase() : 'HIRAPARASAVANPHOTOGRAPHER'}</strong>
                                   </div>
                                 </div>
                               </div>

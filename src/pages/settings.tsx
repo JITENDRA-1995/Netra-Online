@@ -831,6 +831,7 @@ export default function SettingsPage({
   const [profilePhone, setProfilePhone] = useState(adminProfile?.phone || "");
   const [profileEmail, setProfileEmail] = useState(adminProfile?.email || "");
   const [profileGst, setProfileGst] = useState(adminProfile?.gst || "");
+  const [profileInstagram, setProfileInstagram] = useState(adminProfile?.instagram || "");
   const [isProfileSaving, setIsProfileSaving] = useState(false);
 
   useEffect(() => {
@@ -850,6 +851,7 @@ export default function SettingsPage({
       setProfilePhone(adminProfile.phone || "");
       setProfileEmail(adminProfile.email || "");
       setProfileGst(adminProfile.gst || "");
+      setProfileInstagram(adminProfile.instagram || "");
     }
   }, [adminProfile]);
 
@@ -929,7 +931,8 @@ export default function SettingsPage({
         address: profileAddress,
         phone: profilePhone,
         email: profileEmail,
-        gst: profileGst
+        gst: profileGst,
+        instagram: profileInstagram
       });
     } catch (err) {
       console.error("Save profile error:", err);
@@ -2090,6 +2093,16 @@ export default function SettingsPage({
                   />
                 </div>
 
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Instagram Username (Optional)</label>
+                  <Input 
+                    value={profileInstagram}
+                    onChange={e => setProfileInstagram(e.target.value)}
+                    placeholder="e.g. hiraparasavanphotographer"
+                    className="bg-white/5 border-white/10 text-xs rounded-xl h-10 font-mono text-foreground"
+                  />
+                </div>
+
                 <Button
                   type="submit"
                   disabled={isProfileSaving}
@@ -2150,6 +2163,12 @@ export default function SettingsPage({
                       <span className="text-indigo-400">🏠</span>
                       <span className="truncate max-w-[260px]">{profileAddress || "Office address, City"}</span>
                     </div>
+                    {profileInstagram && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-indigo-400">📸</span>
+                        <span className="truncate max-w-[260px]">@{profileInstagram}</span>
+                      </div>
+                    )}
                     {profileGst && (
                       <div className="flex items-center gap-2 border-t border-white/5 pt-2 mt-2">
                         <span className="text-cyan-400 font-bold uppercase">GSTIN:</span>

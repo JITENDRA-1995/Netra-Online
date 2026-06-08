@@ -392,9 +392,10 @@ input[type="number"] {
   }
 }
 
-/* Base menu-icon hides in horizontal layout */
-.main-header .menu-icon {
-  display: none;
+/* Base menu-icon and mobile toggle hides in desktop layout */
+.main-header .menu-icon,
+.mobile-menu-toggle {
+  display: none !important;
 }
 
 /* ── Hero page blank space fix ───────────────────────────────────────────── */
@@ -1678,12 +1679,8 @@ input[type="number"] {
   }
 
   .branding-text {
-    font-size: 1.05rem !important; /* Scale down brand text size */
+    font-size: 0.95rem !important; /* Scale down brand text size slightly to fit full text */
     letter-spacing: 2px !important;
-  }
-
-  .word-graphics {
-    display: none !important; /* Hide "GRAPHICS" text to save horizontal space on mobile */
   }
 
   .branding-logo {
@@ -1699,31 +1696,154 @@ input[type="number"] {
     margin-right: 0.4rem !important;
   }
 
-  .menu-container {
-    gap: 0.5rem !important; /* Tighter navigation spacing on mobile */
+  .desktop-menu {
+    display: none !important;
   }
 
-  .menu-text {
-    display: none !important; /* Hide long text labels on mobile */
-  }
-
-  .main-header .menu-icon {
-    display: block !important; /* Show crisp Lucide icons */
-    width: 20px !important;
-    height: 20px !important;
-    color: rgba(255, 255, 255, 0.7) !important;
-    transition: all 0.3s ease !important;
-  }
-
-  .menu-link {
-    padding: 0.2rem !important; /* Make link hits more compact */
+  .mobile-menu-toggle {
     display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    cursor: pointer;
+    padding: 0.5rem;
+    z-index: 2005;
+    transition: color 0.3s ease;
   }
 
-  .menu-divider {
-    display: none !important; /* Hide dividers to fit navigation icons */
+  .mobile-menu-toggle:hover {
+    color: #00E5FF;
+  }
+
+  .mobile-menu-drawer {
+    position: absolute;
+    top: 60px;
+    left: 0;
+    right: 0;
+    width: 100%;
+    background: rgba(5, 5, 8, 0.98);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 1.5rem;
+    box-sizing: border-box;
+    z-index: 1999;
+  }
+
+  .mobile-menu-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    width: 100%;
+  }
+
+  .mobile-menu-link {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #B0B0B0;
+    text-decoration: none;
+    letter-spacing: 2px;
+    padding: 0.7rem 1rem;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .mobile-menu-link:hover, .mobile-menu-link:active {
+    color: #ffffff;
+    background: rgba(0, 229, 255, 0.08);
+    border-color: rgba(0, 229, 255, 0.3);
+    box-shadow: 0 0 15px rgba(0, 229, 255, 0.1);
+  }
+
+  .mobile-menu-link svg {
+    color: #00E5FF;
+    width: 16px;
+    height: 16px;
+  }
+
+  .mobile-link-text {
+    line-height: 1;
+  }
+
+  .mobile-menu-controls {
+    margin-top: 0.8rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    width: 100%;
+  }
+
+  .mobile-control-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    padding: 0.6rem 1rem;
+    border-radius: 12px;
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  .control-label {
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.75rem;
+    color: #B0B0B0;
+    font-weight: 500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .mobile-control-row .sound-toggle-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 0;
+  }
+
+  .mobile-control-row .sound-toggle-btn .sound-waves {
+    width: 18px;
+    height: 14px;
+    margin: auto;
+  }
+
+  .mobile-control-row .click-sound-toggle-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #B0B0B0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-left: 0;
+    padding: 0;
+  }
+
+  .mobile-control-row .click-sound-toggle-btn.active {
+    background: rgba(0, 229, 255, 0.1);
+    border-color: #00E5FF;
+    color: #ffffff;
   }
 
   /* ── Hero Page Overrides ── */
