@@ -1358,11 +1358,11 @@ export default function SettingsPage({
       {/* Tabs */}
       <motion.div 
         variants={itemVariants} 
-        className="flex p-1 bg-white/[0.02] border border-white/5 rounded-2xl gap-2 w-fit mb-8 shadow-inner"
+        className="flex p-1 bg-white/[0.02] border border-white/5 rounded-2xl gap-2 w-full overflow-x-auto scrollbar-none mb-8 shadow-inner shrink-0 flex-nowrap"
       >
         <button
           onClick={() => setActiveTab("CATALOG")}
-          className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-all duration-300 outline-none select-none cursor-pointer flex items-center gap-2 ${
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-all duration-300 outline-none select-none cursor-pointer flex items-center gap-2 shrink-0 ${
             activeTab === "CATALOG" 
               ? "bg-indigo-500 text-white font-black shadow-[0_0_15px_rgba(99,102,241,0.35)] border border-indigo-400/20 scale-[0.98]" 
               : "border border-transparent text-muted-foreground hover:text-foreground hover:bg-white/[0.03] hover:scale-[1.02]"
@@ -1373,7 +1373,7 @@ export default function SettingsPage({
         </button>
         <button
           onClick={() => setActiveTab("VISION")}
-          className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-all duration-300 outline-none select-none cursor-pointer flex items-center gap-2 ${
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-all duration-300 outline-none select-none cursor-pointer flex items-center gap-2 shrink-0 ${
             activeTab === "VISION" 
               ? "bg-indigo-500 text-white font-black shadow-[0_0_15px_rgba(99,102,241,0.35)] border border-indigo-400/20 scale-[0.98]" 
               : "border border-transparent text-muted-foreground hover:text-foreground hover:bg-white/[0.03] hover:scale-[1.02]"
@@ -1384,7 +1384,7 @@ export default function SettingsPage({
         </button>
         <button
           onClick={() => setActiveTab("BANKING")}
-          className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-all duration-300 outline-none select-none cursor-pointer flex items-center gap-2 ${
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-all duration-300 outline-none select-none cursor-pointer flex items-center gap-2 shrink-0 ${
             activeTab === "BANKING" 
               ? "bg-indigo-500 text-white font-black shadow-[0_0_15px_rgba(99,102,241,0.35)] border border-indigo-400/20 scale-[0.98]" 
               : "border border-transparent text-muted-foreground hover:text-foreground hover:bg-white/[0.03] hover:scale-[1.02]"
@@ -1395,7 +1395,7 @@ export default function SettingsPage({
         </button>
         <button
           onClick={() => setActiveTab("PROFILE")}
-          className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-all duration-300 outline-none select-none cursor-pointer flex items-center gap-2 ${
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-all duration-300 outline-none select-none cursor-pointer flex items-center gap-2 shrink-0 ${
             activeTab === "PROFILE" 
               ? "bg-indigo-500 text-white font-black shadow-[0_0_15px_rgba(99,102,241,0.35)] border border-indigo-400/20 scale-[0.98]" 
               : "border border-transparent text-muted-foreground hover:text-foreground hover:bg-white/[0.03] hover:scale-[1.02]"
@@ -1406,7 +1406,7 @@ export default function SettingsPage({
         </button>
         <button
           onClick={() => setActiveTab("BACKUP")}
-          className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-all duration-300 outline-none select-none cursor-pointer flex items-center gap-2 ${
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-all duration-300 outline-none select-none cursor-pointer flex items-center gap-2 shrink-0 ${
             activeTab === "BACKUP" 
               ? "bg-indigo-500 text-white font-black shadow-[0_0_15px_rgba(99,102,241,0.35)] border border-indigo-400/20 scale-[0.98]" 
               : "border border-transparent text-muted-foreground hover:text-foreground hover:bg-white/[0.03] hover:scale-[1.02]"
