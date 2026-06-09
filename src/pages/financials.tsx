@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   TrendingUp,
@@ -115,6 +115,74 @@ export default function Financials({
 }: FinancialsProps) {
   const { toast } = useToast();
   const [localSearch, setLocalSearch] = useState("");
+
+  // Scroll-pin refs: metricsRef = the stats cards row, ledgerRef = the cashbook table wrapper
+  const metricsRef = useRef<HTMLDivElement>(null);
+  const ledgerRef = useRef<HTMLDivElement>(null);
+  const isPinnedRef = useRef(false);
+
+  // Scroll-pinning: freeze outer scroll when metrics cards are above viewport, let ledger scroll
+  useEffect(() => {
+    if (financialTab !== 'CASHBOOK') return;
+
+    // The admin vault page is the outer scrollable container
+    const scrollContainer = document.querySelector('.admin-vault-page') as HTMLElement | null;
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      const metrics = metricsRef.current;
+      const ledger = ledgerRef.current;
+      if (!metrics || !ledger) return;
+
+      const metricsRect = metrics.getBoundingClientRect();
+
+      if (!isPinnedRef.current) {
+        // The card row's BOTTOM edge has gone above 0 (top of viewport) — pin it
+        if (metricsRect.bottom <= 8) {
+          isPinnedRef.current = true;
+          // Freeze the outer container at current scroll position
+          scrollContainer.style.overflowY = 'hidden';
+          // Give focus to ledger so mouse-wheel works on it
+          ledger.style.overflowY = 'auto';
+          ledger.style.maxHeight = `calc(100vh - 64px)`; // 64px = admin header height
+          ledger.focus();
+        }
+      } else {
+        // Already pinned — check if ledger has been scrolled back to top
+        if (ledger.scrollTop === 0 && metricsRect.bottom <= 8) {
+          // User tried to scroll up in ledger past top — unpin
+          isPinnedRef.current = false;
+          scrollContainer.style.overflowY = 'auto';
+          ledger.style.overflowY = 'auto';
+        }
+      }
+    };
+
+    // Also handle wheel event for the ledger to propagate up when at top
+    const handleLedgerWheel = (e: WheelEvent) => {
+      const ledger = ledgerRef.current;
+      if (!ledger || !isPinnedRef.current) return;
+
+      // If scrolling up and already at top of ledger, unpin outer scroll
+      if (e.deltaY < 0 && ledger.scrollTop === 0) {
+        isPinnedRef.current = false;
+        scrollContainer.style.overflowY = 'auto';
+        ledger.style.overflowY = 'auto';
+      }
+    };
+
+    const ledger = ledgerRef.current;
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    if (ledger) ledger.addEventListener('wheel', handleLedgerWheel, { passive: true });
+
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
+      if (ledger) ledger.removeEventListener('wheel', handleLedgerWheel);
+      // Reset scroll container on unmount
+      scrollContainer.style.overflowY = 'auto';
+      isPinnedRef.current = false;
+    };
+  }, [financialTab]);
 
   const currentSearch = ledgerSearch !== undefined ? ledgerSearch : localSearch;
   const changeSearch = setLedgerSearch ? setLedgerSearch : setLocalSearch;
@@ -748,8 +816,8 @@ export default function Financials({
 
       {financialTab === "CASHBOOK" && (
         <motion.div variants={containerVariants} className="space-y-6">
-          {/* Stats row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Stats row - tracked for scroll-pinning: when this exits top, ledger gets pinned scroll */}
+          <div ref={metricsRef} className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <motion.div
               variants={itemVariants}
               className="relative overflow-hidden rounded-2xl p-5 border border-white/5 bg-card/40 backdrop-blur-sm group cursor-default"
@@ -851,7 +919,7 @@ export default function Financials({
               </form>
             </motion.div>
 
-            {/* List */}
+            {/* List - scroll-pinned: receives focus and internal scroll when metrics are above viewport */}
             <motion.div variants={itemVariants} className="xl:col-span-2 rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 space-y-4">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
@@ -922,7 +990,12 @@ export default function Financials({
                 </Button>
               </div>
 
-              <div className="overflow-x-auto border border-white/5 rounded-xl">
+              <div
+                ref={ledgerRef}
+                tabIndex={-1}
+                className="overflow-x-auto border border-white/5 rounded-xl outline-none"
+                style={{ overflowY: 'auto', maxHeight: '100%' }}
+              >
                 <table className="w-full text-sm text-left border-collapse">
                   <thead>
                     <tr className="border-b border-white/5 bg-white/[0.01] text-xs text-muted-foreground uppercase tracking-wider font-semibold">
