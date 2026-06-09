@@ -546,6 +546,25 @@ function ServiceSlideshowContent({ service, onClose }) {
 function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
+  const [trashItems, setTrashItems] = useState(() => {
+    const saved = localStorage.getItem('netra_trash');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const now = Date.now();
+          return parsed.filter(item => {
+            if (!item || !item.deletedAt) return false;
+            const expiry = new Date(item.deletedAt).getTime() + 24 * 60 * 60 * 1000;
+            return expiry > now;
+          });
+        }
+      } catch (e) {
+        console.error("Failed to parse saved trash items:", e);
+      }
+    }
+    return [];
+  });
   const [cashbookEntries, setCashbookEntries] = useState(() => {
     const saved = localStorage.getItem('netra_cashbook');
     if (saved) {
@@ -925,6 +944,16 @@ function App() {
               setCashbookEntries(parsed.cashbook);
               safeSetLocalStorage('netra_cashbook', JSON.stringify(parsed.cashbook));
             }
+            if (parsed.trash && Array.isArray(parsed.trash)) {
+              const now = Date.now();
+              const validTrash = parsed.trash.filter(item => {
+                if (!item || !item.deletedAt) return false;
+                const expiry = new Date(item.deletedAt).getTime() + 24 * 60 * 60 * 1000;
+                return expiry > now;
+              });
+              setTrashItems(validTrash);
+              safeSetLocalStorage('netra_trash', JSON.stringify(validTrash));
+            }
           } catch (parseErr) {
             console.error("Failed to parse global settings from database:", parseErr);
           }
@@ -933,7 +962,7 @@ function App() {
             name: 'System Settings',
             email: 'settings@netra.graphics',
             phone: 'SYSTEM',
-            address: JSON.stringify({ services: servicesList, vision: visionSettings, banking: bankingDetails, profile: adminProfile, cashbook: cashbookEntries }),
+            address: JSON.stringify({ services: servicesList, vision: visionSettings, banking: bankingDetails, profile: adminProfile, cashbook: cashbookEntries, trash: [] }),
             status: 'Active',
             access_key: 'SYSTEM'
           };
@@ -957,6 +986,7 @@ function App() {
     localStorage.setItem('netra_banking_details', JSON.stringify(bankingDetails));
     localStorage.setItem('netra_admin_profile', JSON.stringify(adminProfile));
     localStorage.setItem('netra_cashbook', JSON.stringify(cashbookEntries));
+    localStorage.setItem('netra_trash', JSON.stringify(trashItems));
 
     const syncToDb = async () => {
       try {
@@ -966,7 +996,8 @@ function App() {
             vision: visionSettings,
             banking: bankingDetails,
             profile: adminProfile,
-            cashbook: cashbookEntries
+            cashbook: cashbookEntries,
+            trash: trashItems
           })
         };
         const { error } = await supabase
@@ -982,7 +1013,7 @@ function App() {
 
     const timer = setTimeout(syncToDb, 1000); // 1-second debounce to avoid database spam
     return () => clearTimeout(timer);
-  }, [servicesList, visionSettings, bankingDetails, adminProfile, cashbookEntries, isSettingsLoaded]);
+  }, [servicesList, visionSettings, bankingDetails, adminProfile, cashbookEntries, trashItems, isSettingsLoaded]);
 
   const toggleSound = () => {
     if (!audioRef.current) return;
@@ -1912,7 +1943,7 @@ function App() {
   }, [ignitionQueue, cashbookEntries, monthlyTarget]);
 
   // --- CASHBOOK SYSTEM ---
-  const [financialTab, setFinancialTab] = useState("PROJECTS"); // PROJECTS, CASHBOOK, INVOICES
+  const [financialTab, setFinancialTab] = useState("OVERVIEW"); // OVERVIEW, PROJECTS, CASHBOOK, INVOICES
   const [isCashbookEditModalOpen, setIsCashbookEditModalOpen] = useState(false);
   const [selectedCashbookEntry, setSelectedCashbookEntry] = useState(null);
   const [customPaymentPrompt, setCustomPaymentPrompt] = useState(null);
@@ -1965,7 +1996,8 @@ function App() {
 
       // A. Advance payment verification
       if (advance > 0 && !isCancelled) {
-        const hasAdvance = newEntries.some(entry => entry.projectId === p.id && (entry.isAdvance || entry.desc.toLowerCase().startsWith('advance:') || entry.desc.toLowerCase().startsWith('advance payment:')));
+        const hasAdvance = newEntries.some(entry => entry.projectId === p.id && (entry.isAdvance || entry.desc.toLowerCase().startsWith('advance:') || entry.desc.toLowerCase().startsWith('advance payment:'))) ||
+                           (trashItems || []).some(item => item.type === 'cashbook' && item.data && item.data.projectId === p.id && (item.data.isAdvance || (item.data.desc && (item.data.desc.toLowerCase().startsWith('advance:') || item.data.desc.toLowerCase().startsWith('advance payment:')))));
         if (!hasAdvance) {
           newEntries.push({
             id: Date.now() + Math.random(),
@@ -1999,7 +2031,9 @@ function App() {
       // B. Final payment verification
       if (isCompleted) {
         const isPromptOpenForProject = customPaymentPrompt && customPaymentPrompt.p.id === p.id;
-        const hasFinal = newEntries.some(entry => entry.projectId === p.id && (entry.isFinal || entry.desc.toLowerCase().startsWith('payment:') || entry.desc.toLowerCase().startsWith('final payment:'))) || isPromptOpenForProject;
+        const hasFinal = newEntries.some(entry => entry.projectId === p.id && (entry.isFinal || entry.desc.toLowerCase().startsWith('payment:') || entry.desc.toLowerCase().startsWith('final payment:'))) ||
+                         isPromptOpenForProject ||
+                         (trashItems || []).some(item => item.type === 'cashbook' && item.data && item.data.projectId === p.id && (item.data.isFinal || (item.data.desc && (item.data.desc.toLowerCase().startsWith('payment:') || item.data.desc.toLowerCase().startsWith('final payment:')))));
         if (!hasFinal && remainingDue > 0) {
           newEntries.push({
             id: Date.now() + Math.random(),
@@ -2052,7 +2086,7 @@ function App() {
     if (updated) {
       setCashbookEntries(newEntries);
     }
-  }, [ignitionQueue, cashbookEntries, customPaymentPrompt]);
+  }, [ignitionQueue, cashbookEntries, trashItems, customPaymentPrompt]);
 
   // Reconcile cashbook entries with standalone invoices to ensure alignment
   useEffect(() => {
@@ -2070,6 +2104,12 @@ function App() {
         entry.invoiceId === inv.id || 
         (entry.invoiceNo && entry.invoiceNo === inv.invoiceNo) ||
         (entry.desc && entry.desc.includes(inv.invoiceNo))
+      ) || (trashItems || []).some(item => 
+        item.type === 'cashbook' && item.data && (
+          item.data.invoiceId === inv.id ||
+          (item.data.invoiceNo && item.data.invoiceNo === inv.invoiceNo) ||
+          (item.data.desc && item.data.desc.includes(inv.invoiceNo))
+        )
       );
 
       if (!hasEntry && inv.grandTotal > 0) {
@@ -2096,7 +2136,7 @@ function App() {
     if (updated) {
       setCashbookEntries(newEntries);
     }
-  }, [invoices, cashbookEntries]);
+  }, [invoices, cashbookEntries, trashItems]);
 
   const kanbanColumns = [
     { id: 1, title: "SPARK", desc: "Discovery" },
@@ -3308,6 +3348,18 @@ function App() {
   const deleteClient = async (id) => {
     if (window.confirm("ARE YOU SURE YOU WANT TO EXTINGUISH THIS CLIENT RECORD?")) {
       try {
+        const clientToDelete = clients.find(c => c.id === id);
+        if (clientToDelete) {
+          setTrashItems(prev => [
+            ...prev,
+            {
+              id: `trash-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              type: "client",
+              deletedAt: new Date().toISOString(),
+              data: clientToDelete
+            }
+          ]);
+        }
         try {
           const { error } = await supabase.from('clients').delete().eq('id', id);
           if (error) throw error;
@@ -3324,6 +3376,204 @@ function App() {
         console.error("Failed to delete client:", err);
         alert("Failed to delete client record: " + (err.message || err.details || JSON.stringify(err)));
       }
+    }
+  };
+
+  const restoreItem = async (trashId) => {
+    const item = trashItems.find(it => it.id === trashId);
+    if (!item) return;
+
+    try {
+      if (item.type === 'client') {
+        const clientData = item.data;
+        const { error } = await supabase.from('clients').insert([{
+          id: clientData.id,
+          name: clientData.name,
+          email: clientData.email,
+          phone: clientData.phone,
+          address: clientData.address,
+          access_key: clientData.accessKey || clientData.access_key,
+          status: clientData.status || 'Active',
+          gst: clientData.gst || null,
+          joined_date: clientData.joinedDate || clientData.joined_date || new Date().toISOString()
+        }]);
+        if (error) throw error;
+
+        setClients(prev => {
+          const next = [...prev, {
+            ...clientData,
+            joinedDate: clientData.joinedDate || clientData.joined_date || new Date().toISOString(),
+            accessKey: clientData.accessKey || clientData.access_key
+          }];
+          localStorage.setItem("netra_clients", JSON.stringify(next));
+          return next;
+        });
+        toast({ title: "Client Restored", description: `${clientData.name} has been recovered.` });
+
+      } else if (item.type === 'project') {
+        const { project: p, strategy, purgedInvoices, purgedEntries } = item.data;
+        
+        const desc = p.description || '';
+        const serializedDesc = desc.startsWith("JSON_METADATA:") 
+          ? desc 
+          : `JSON_METADATA:${JSON.stringify({
+              qty: p.qty || 1,
+              rate: p.rate || (p.quote / (p.qty || 1)),
+              description: desc
+            })}`;
+
+        const { error: pError } = await supabase.from('projects').insert([{
+          id: p.id,
+          name: p.name,
+          service: p.service,
+          stage: p.stage || 1,
+          status: p.status || 'Ongoing',
+          quote: p.quote,
+          discount: p.discount || 0,
+          discount_value: p.discountValue || p.discount_value,
+          discount_type: p.discountType || p.discount_type || 'rs',
+          advance_amount: p.advanceAmount || p.advance_amount || 0,
+          payment_status: p.paymentStatus || p.payment_status || 'part',
+          deadline: p.deadline,
+          client_id: p.client?.id || p.client_id,
+          description: serializedDesc,
+          category: p.category || 'branding',
+          progress: p.progress || 0,
+          created_at: p.createdAt ? new Date(p.createdAt).toISOString() : new Date().toISOString()
+        }]);
+        if (pError) throw pError;
+
+        if (p.milestones && p.milestones.length > 0) {
+          const milestonesToInsert = p.milestones.map((m, idx) => ({
+            project_id: p.id,
+            name: m.name,
+            completed: m.completed || false,
+            position: idx
+          }));
+          await supabase.from('project_milestones').insert(milestonesToInsert);
+        }
+
+        if (p.activityLog && p.activityLog.length > 0) {
+          const logsToInsert = p.activityLog.map(l => ({
+            project_id: p.id,
+            action: l.action,
+            created_at: l.time ? new Date().toISOString() : undefined
+          }));
+          await supabase.from('project_activity_logs').insert(logsToInsert);
+        }
+
+        if (p.collaborationStream && p.collaborationStream.length > 0) {
+          const chatsToInsert = p.collaborationStream.map(c => ({
+            id: c.id,
+            project_id: p.id,
+            sender: c.sender,
+            message: c.text
+          }));
+          await supabase.from('project_chats').insert(chatsToInsert);
+        }
+
+        if (p.mediaVault && p.mediaVault.length > 0) {
+          const mediaToInsert = p.mediaVault.map(m => ({
+            id: m.id,
+            project_id: p.id,
+            file_name: m.name,
+            file_url: m.url,
+            file_type: m.type
+          }));
+          await supabase.from('project_media').insert(mediaToInsert);
+        }
+
+        if (strategy === 'purge') {
+          if (purgedInvoices && purgedInvoices.length > 0) {
+            for (const inv of purgedInvoices) {
+              await supabase.from('invoices').insert({
+                id: inv.id,
+                invoice_no: inv.invoiceNo || inv.invoice_no,
+                project_id: inv.projectId || inv.project_id || p.id,
+                client_name: inv.clientName || inv.client_name,
+                project_service: inv.projectService || inv.project_service,
+                issue_date: (inv.issueDate && !isNaN(new Date(inv.issueDate).getTime()))
+                  ? new Date(inv.issueDate).toISOString().split('T')[0]
+                  : new Date().toISOString().split('T')[0],
+                grand_total: inv.grandTotal || inv.grand_total,
+                created_at: inv.createdAt ? new Date(inv.createdAt).toISOString() : undefined
+              });
+            }
+            setInvoices(prev => [...purgedInvoices, ...prev]);
+          }
+
+          if (purgedEntries && purgedEntries.length > 0) {
+            setCashbookEntries(prev => [...purgedEntries, ...prev]);
+          }
+        }
+
+        setIgnitionQueue(prev => [p, ...prev]);
+        toast({ title: "Project Restored", description: `${p.name} workspace fully restored.` });
+
+      } else if (item.type === 'invoice') {
+        const { invoice: inv, strategy, purgedEntries } = item.data;
+        const { error } = await supabase.from('invoices').insert({
+          id: inv.id,
+          invoice_no: inv.invoiceNo || inv.invoice_no,
+          project_id: inv.projectId || inv.project_id,
+          client_name: inv.clientName || inv.client_name,
+          project_service: inv.projectService || inv.project_service,
+          issue_date: (inv.issueDate && !isNaN(new Date(inv.issueDate).getTime()))
+            ? new Date(inv.issueDate).toISOString().split('T')[0]
+            : new Date().toISOString().split('T')[0],
+          grand_total: inv.grandTotal || inv.grand_total,
+          created_at: inv.createdAt ? new Date(inv.createdAt).toISOString() : undefined
+        });
+        if (error) throw error;
+
+        setInvoices(prev => [inv, ...prev]);
+
+        if (strategy === 'purge' && purgedEntries && purgedEntries.length > 0) {
+          setCashbookEntries(prev => [...purgedEntries, ...prev]);
+        }
+
+        toast({ title: "Invoice Restored", description: `Invoice NG/${inv.invoiceNo} restored.` });
+
+      } else if (item.type === 'invoice_batch') {
+        const { invoices: invs, strategy, purgedEntries } = item.data;
+        for (const inv of invs) {
+          await supabase.from('invoices').insert({
+            id: inv.id,
+            invoice_no: inv.invoiceNo || inv.invoice_no,
+            project_id: inv.projectId || inv.project_id,
+            client_name: inv.clientName || inv.client_name,
+            project_service: inv.projectService || inv.project_service,
+            issue_date: (inv.issueDate && !isNaN(new Date(inv.issueDate).getTime()))
+              ? new Date(inv.issueDate).toISOString().split('T')[0]
+              : new Date().toISOString().split('T')[0],
+            grand_total: inv.grandTotal || inv.grand_total,
+            created_at: inv.createdAt ? new Date(inv.createdAt).toISOString() : undefined
+          });
+        }
+
+        setInvoices(prev => [...invs, ...prev]);
+
+        if (strategy === 'purge' && purgedEntries && purgedEntries.length > 0) {
+          setCashbookEntries(prev => [...purgedEntries, ...prev]);
+        }
+
+        toast({ title: "Batch Invoices Restored", description: `${invs.length} invoices restored.` });
+
+      } else if (item.type === 'cashbook') {
+        const entry = item.data;
+        setCashbookEntries(prev => [entry, ...prev]);
+        toast({ title: "Cashbook Record Restored", description: `${entry.desc} added back to ledger.` });
+      }
+
+      setTrashItems(prev => prev.filter(it => it.id !== trashId));
+
+    } catch (err) {
+      console.error("Failed to restore item:", err);
+      toast({
+        title: "Restoration Failed",
+        description: err.message || "An error occurred while writing back to database.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -4455,6 +4705,8 @@ function App() {
                              }}
                              prefilledEditData={editingInvoiceData}
                              onClearEditData={() => setEditingInvoiceData(null)}
+                             trashItems={trashItems}
+                             setTrashItems={setTrashItems}
                            />
                         )}
 
@@ -4492,6 +4744,8 @@ function App() {
                             handleAddCashbookEntry={handleAddCashbookEntry}
                             handleMarkMilestonePaid={handleMarkMilestonePaid}
                             handleUpdateProjectStatusHandy={handleUpdateProjectStatusHandy}
+                            trashItems={trashItems}
+                            setTrashItems={setTrashItems}
                           />
                         )}
 
@@ -4521,6 +4775,8 @@ function App() {
                             setVisionSettings={setVisionSettings}
                             setBankingDetails={setBankingDetails}
                             setAdminProfile={setAdminProfile}
+                            trashItems={trashItems}
+                            onRestoreItem={restoreItem}
                           />
                         )}
                         </Suspense>
@@ -6363,6 +6619,25 @@ function App() {
                         const targetId = projectToDelete.id;
                         try {
                           const relatedInvs = invoices.filter(inv => inv.rawProject?.id === targetId || inv.projectId === targetId);
+                          const relatedEntries = cashbookEntries.filter(entry => entry.projectId === targetId);
+
+                          const purgedInvoices = deleteStrategy === 'purge' ? relatedInvs : [];
+                          const purgedEntries = deleteStrategy === 'purge' ? relatedEntries : [];
+
+                          setTrashItems(prev => [
+                            ...prev,
+                            {
+                              id: `trash-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                              type: "project",
+                              deletedAt: new Date().toISOString(),
+                              data: {
+                                project: projectToDelete,
+                                strategy: deleteStrategy,
+                                purgedInvoices,
+                                purgedEntries
+                              }
+                            }
+                          ]);
                           
                           if (deleteStrategy === 'keep' && projectToDelete.status === 'Completed') {
                             // Keep strategy: unlink invoice and serialize metadata to JSON_MOCK

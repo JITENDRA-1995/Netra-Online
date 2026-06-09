@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -24,7 +24,11 @@ import {
   AlertCircle,
   RefreshCw,
   FileText,
-  Settings
+  Settings,
+  Lock,
+  Key,
+  Undo,
+  ShieldAlert
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +75,8 @@ interface SettingsProps {
   setVisionSettings: React.Dispatch<React.SetStateAction<any[]>>;
   setBankingDetails: React.Dispatch<React.SetStateAction<any>>;
   setAdminProfile: React.Dispatch<React.SetStateAction<any>>;
+  trashItems?: any[];
+  onRestoreItem?: (id: string) => void;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -92,459 +98,42 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 };
 
+export function SecurityPanel({
+  trashItems = [],
+  onRestoreItem
+}: {
+  trashItems: any[];
+  onRestoreItem?: (id: string) => void;
+}) {
+  const [now, setNow] = useState(Date.now());
 
-export function BackupRestorePanel({
-  servicesList,
-  visionSettings,
-  bankingDetails,
-  adminProfile,
-  projectsList,
-  invoicesList,
-  cashbookEntries,
-  clients,
-  setClients,
-  setIgnitionQueue,
-  setInvoices,
-  setCashbookEntries,
-  setServicesList,
-  setVisionSettings,
-  setBankingDetails,
-  setAdminProfile
-}: SettingsProps) {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
-  const [restoreSuccessOpen, setRestoreSuccessOpen] = useState(false);
-  
-  const [uploadedData, setUploadedData] = useState<any>(null);
-  const [analysisResult, setAnalysisResult] = useState<{
-    overrides: string[];
-    mismatches: string[];
-    info: string[];
-  }>({ overrides: [], mismatches: [], info: [] });
-  
-  const activeRestoreCategory = useRef<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 15000); // update every 15 seconds
+    return () => clearInterval(interval);
+  }, []);
 
-  // Safe Fallback Arrays to prevent render crash if props are not loaded
-  const safeProjects = projectsList || [];
-  const safeInvoices = invoicesList || [];
-  const safeCashbook = cashbookEntries || [];
-  const safeServices = servicesList || [];
-  const safeVision = visionSettings || [];
-  const safeClients = clients || [];
-
-  const downloadJSON = (data: any, filename: string) => {
-    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', jsonString);
-    downloadAnchor.setAttribute('download', filename);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-  };
-
-  const handleBackup = async (categoryId: string) => {
-    setIsProcessing(true);
-    try {
-      if (categoryId === "projects") {
-        const data = await getProjects();
-        downloadJSON({
-          type: "netra_backup_projects",
-          timestamp: Date.now(),
-          version: "1.0",
-          data
-        }, `netra_projects_backup_${Date.now()}.json`);
-      } else if (categoryId === "invoices") {
-        const data = await getInvoices();
-        downloadJSON({
-          type: "netra_backup_invoices",
-          timestamp: Date.now(),
-          version: "1.0",
-          data
-        }, `netra_invoices_backup_${Date.now()}.json`);
-      } else if (categoryId === "cashbook") {
-        downloadJSON({
-          type: "netra_backup_cashbook",
-          timestamp: Date.now(),
-          version: "1.0",
-          data: safeCashbook
-        }, `netra_cashbook_backup_${Date.now()}.json`);
-      } else if (categoryId === "services") {
-        downloadJSON({
-          type: "netra_backup_services",
-          timestamp: Date.now(),
-          version: "1.0",
-          data: safeServices
-        }, `netra_services_backup_${Date.now()}.json`);
-      } else if (categoryId === "vision") {
-        downloadJSON({
-          type: "netra_backup_vision",
-          timestamp: Date.now(),
-          version: "1.0",
-          data: safeVision
-        }, `netra_vision_backup_${Date.now()}.json`);
-      } else if (categoryId === "profile") {
-        downloadJSON({
-          type: "netra_backup_profile",
-          timestamp: Date.now(),
-          version: "1.0",
-          data: adminProfile
-        }, `netra_profile_backup_${Date.now()}.json`);
-      } else if (categoryId === "banking") {
-        downloadJSON({
-          type: "netra_backup_banking",
-          timestamp: Date.now(),
-          version: "1.0",
-          data: bankingDetails
-        }, `netra_banking_backup_${Date.now()}.json`);
-      }
-    } catch (err) {
-      console.error(err);
-      alert(`Backup failed for ${categoryId}.`);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const triggerRestore = (categoryId: string) => {
-    activeRestoreCategory.current = categoryId;
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const text = event.target?.result as string;
-        const parsed = JSON.parse(text);
-        const category = activeRestoreCategory.current;
-        if (!category) return;
-
-        const expectedType = categories.find(c => c.id === category)?.backupType;
-        if (parsed.type !== expectedType) {
-          alert(`Type Mismatch: Expected backup file of type "${expectedType}", but found "${parsed.type}".`);
-          return;
-        }
-
-        if (!parsed.data) {
-          alert("Invalid backup file: Missing 'data' field.");
-          return;
-        }
-
-        const overrides: string[] = [];
-        const mismatches: string[] = [];
-        const info: string[] = [];
-
-        if (category === "projects") {
-          if (!Array.isArray(parsed.data)) {
-            alert("Invalid projects backup: data is not an array.");
-            return;
-          }
-          parsed.data.forEach((proj: any) => {
-            const exists = safeProjects.find(p => p.id === proj.id);
-            if (exists) {
-              overrides.push(`Project "${proj.name}" (ID: ${proj.id}) already exists and will be overwritten.`);
-            }
-            if (proj.client) {
-              const clientExists = safeClients.some(c => c.id === proj.client.id || c.email === proj.client.email);
-              if (!clientExists) {
-                mismatches.push(`Client "${proj.client.name}" is missing in the system and will be automatically re-created.`);
-              }
-            }
-          });
-        } else if (category === "invoices") {
-          if (!Array.isArray(parsed.data)) {
-            alert("Invalid invoices backup: data is not an array.");
-            return;
-          }
-          parsed.data.forEach((inv: any) => {
-            const exists = safeInvoices.find(i => i.id === inv.id || i.invoiceNo === inv.invoiceNo);
-            if (exists) {
-              overrides.push(`Invoice #${inv.invoiceNo} (ID: ${inv.id}) already exists and will be overwritten.`);
-            }
-            const projId = inv.projectId || inv.project_id || inv.rawProject?.id;
-            const projExists = safeProjects.some(p => p.id === projId);
-            if (projId && !projExists) {
-              mismatches.push(`Invoice #${inv.invoiceNo} references missing Project ID ${projId}. Restoring will create an orphaned invoice.`);
-            }
-          });
-        } else if (category === "cashbook") {
-          if (!Array.isArray(parsed.data)) {
-            alert("Invalid cashbook backup: data is not an array.");
-            return;
-          }
-          parsed.data.forEach((entry: any) => {
-            const exists = safeCashbook.find(e => e.id === entry.id);
-            if (exists) {
-              overrides.push(`Cashbook entry "${entry.description || 'Entry'}" (Amount: ${entry.amount}) will overwrite an existing record.`);
-            }
-            if (entry.projectId) {
-              const projExists = safeProjects.some(p => p.id === entry.projectId);
-              if (!projExists) {
-                mismatches.push(`Cashbook record "${entry.description}" references missing Project ID ${entry.projectId}.`);
-              }
-            }
-          });
-        } else if (category === "services") {
-          if (!Array.isArray(parsed.data)) {
-            alert("Invalid services backup: data is not an array.");
-            return;
-          }
-          info.push(`This will completely replace your current service catalog (${safeServices.length} services) with ${parsed.data.length} services from the backup.`);
-        } else if (category === "vision") {
-          if (!Array.isArray(parsed.data)) {
-            alert("Invalid vision backup: data is not an array.");
-            return;
-          }
-          info.push("This will completely overwrite your Vision slideshow and slot settings.");
-          parsed.data.forEach((slot: any, idx: number) => {
-            if (slot.serviceId && slot.serviceId !== 0) {
-              const serviceExists = safeServices.some(s => s.id === slot.serviceId);
-              if (!serviceExists) {
-                mismatches.push(`Vision Slot ${idx + 1} references service ID ${slot.serviceId} which does not exist in the active catalog.`);
-              }
-            }
-          });
-        } else if (category === "profile") {
-          info.push(`This will overwrite your profile with: "${parsed.data.businessName || parsed.data.business_name || 'N/A'}"`);
-        } else if (category === "banking") {
-          info.push(`This will overwrite your banking settings with: "${parsed.data.bankName || parsed.data.bank_name || 'N/A'}"`);
-        }
-
-        setUploadedData(parsed);
-        setAnalysisResult({ overrides, mismatches, info });
-        setRestoreConfirmOpen(true);
-      } catch (err) {
-        alert("Failed to parse JSON backup file.");
-      }
+  const getRemainingTime = (deletedAt: string) => {
+    const expiry = new Date(deletedAt).getTime() + 24 * 60 * 60 * 1000;
+    const diff = expiry - now;
+    if (diff <= 0) return { text: "Purged", isExpiring: true };
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return {
+      text: `${hours}h ${minutes}m left`,
+      isExpiring: hours < 2
     };
-    reader.readAsText(file);
   };
 
-  const executeRestore = async () => {
-    if (!uploadedData || !activeRestoreCategory.current) return;
-    setIsProcessing(true);
-    try {
-      const category = activeRestoreCategory.current;
-      if (category === "projects") {
-        for (const proj of uploadedData.data) {
-          if (proj.client) {
-            const clientExists = safeClients.some(c => c.id === proj.client.id || c.email === proj.client.email);
-            if (!clientExists) {
-              await supabase.from('clients').upsert({
-                id: proj.client.id,
-                name: proj.client.name,
-                email: proj.client.email || 'recovered@netra.graphics',
-                phone: proj.client.phone || 'N/A',
-                address: proj.client.address || '',
-                status: 'Active'
-              });
-            }
-          }
-
-          const serializedDesc = `JSON_METADATA:${JSON.stringify({
-            qty: proj.qty || 1,
-            rate: proj.rate || (proj.quote / (proj.qty || 1)),
-            description: proj.description || ''
-          })}`;
-
-          const { error: pErr } = await supabase.from('projects').upsert({
-            id: proj.id,
-            name: proj.name,
-            service: proj.service,
-            stage: proj.stage,
-            status: proj.status,
-            quote: proj.quote,
-            discount: proj.discount,
-            discount_value: proj.discountValue || proj.discount_value,
-            discount_type: proj.discountType || proj.discount_type,
-            advance_amount: proj.advanceAmount || proj.advance_amount,
-            payment_status: proj.paymentStatus || proj.payment_status,
-            deadline: proj.deadline,
-            client_id: proj.client?.id || proj.client_id,
-            description: serializedDesc,
-            category: proj.category || 'branding',
-            progress: proj.progress || 0,
-            created_at: proj.createdAt ? new Date(proj.createdAt).toISOString() : new Date().toISOString()
-          });
-          if (pErr) throw pErr;
-
-          await supabase.from('project_milestones').delete().eq('project_id', proj.id);
-          await supabase.from('project_activity_logs').delete().eq('project_id', proj.id);
-          await supabase.from('project_chats').delete().eq('project_id', proj.id);
-          await supabase.from('project_media').delete().eq('project_id', proj.id);
-
-          if (proj.milestones && proj.milestones.length > 0) {
-            await supabase.from('project_milestones').insert(proj.milestones.map((m: any, idx: number) => ({
-              project_id: proj.id,
-              name: m.name,
-              completed: m.completed || false,
-              position: idx
-            })));
-          }
-          if (proj.activityLog && proj.activityLog.length > 0) {
-            await supabase.from('project_activity_logs').insert(proj.activityLog.map((l: any) => ({
-              project_id: proj.id,
-              action: l.action,
-              created_at: l.time ? new Date().toISOString() : undefined
-            })));
-          }
-          if (proj.collaborationStream && proj.collaborationStream.length > 0) {
-            await supabase.from('project_chats').insert(proj.collaborationStream.map((c: any) => ({
-              project_id: proj.id,
-              sender: c.sender,
-              message: c.text,
-              created_at: c.time ? new Date().toISOString() : undefined
-            })));
-          }
-          if (proj.mediaVault && proj.mediaVault.length > 0) {
-            await supabase.from('project_media').insert(proj.mediaVault.map((m: any) => ({
-              id: m.id,
-              project_id: proj.id,
-              file_name: m.name,
-              file_url: m.url,
-              file_type: m.type
-            })));
-          }
-        }
-
-        const refreshedP = await getProjects();
-        setIgnitionQueue(refreshedP);
-        const refreshedC = await getClients();
-        setClients(refreshedC.map(c => ({
-          ...c,
-          joinedDate: c.joined_date || c.joinedDate,
-          accessKey: c.access_key || c.accessKey
-        })));
-
-      } else if (category === "invoices") {
-        for (const inv of uploadedData.data) {
-          const { error: iErr } = await supabase.from('invoices').upsert({
-            id: inv.id,
-            invoice_no: inv.invoiceNo || inv.invoice_no,
-            project_id: inv.projectId || inv.project_id || inv.rawProject?.id,
-            client_name: inv.clientName || inv.client_name,
-            project_service: inv.projectService || inv.project_service,
-            issue_date: inv.issueDate ? new Date(inv.issueDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-            grand_total: inv.grandTotal || inv.grand_total,
-            created_at: inv.createdAt || undefined
-          });
-          if (iErr) throw iErr;
-        }
-        const refreshedI = await getInvoices();
-        setInvoices(refreshedI);
-
-      } else if (category === "cashbook") {
-        setCashbookEntries(uploadedData.data);
-        localStorage.setItem('netra_cashbook', JSON.stringify(uploadedData.data));
-
-      } else if (category === "services") {
-        setServicesList(uploadedData.data);
-        localStorage.setItem('netra_services', JSON.stringify(uploadedData.data));
-        const payload = {
-          address: JSON.stringify({ services: uploadedData.data, vision: safeVision, banking: bankingDetails, profile: adminProfile })
-        };
-        await supabase.from('clients').update(payload).eq('email', 'settings@netra.graphics');
-
-      } else if (category === "vision") {
-        setVisionSettings(uploadedData.data);
-        localStorage.setItem('netra_vision_settings', JSON.stringify(uploadedData.data));
-        const payload = {
-          address: JSON.stringify({ services: safeServices, vision: uploadedData.data, banking: bankingDetails, profile: adminProfile })
-        };
-        await supabase.from('clients').update(payload).eq('email', 'settings@netra.graphics');
-
-      } else if (category === "profile") {
-        setAdminProfile(uploadedData.data);
-        localStorage.setItem('netra_admin_profile', JSON.stringify(uploadedData.data));
-        const payload = {
-          address: JSON.stringify({ services: safeServices, vision: safeVision, banking: bankingDetails, profile: uploadedData.data })
-        };
-        await supabase.from('clients').update(payload).eq('email', 'settings@netra.graphics');
-
-      } else if (category === "banking") {
-        setBankingDetails(uploadedData.data);
-        localStorage.setItem('netra_banking_details', JSON.stringify(uploadedData.data));
-        const payload = {
-          address: JSON.stringify({ services: safeServices, vision: safeVision, banking: uploadedData.data, profile: adminProfile })
-        };
-        await supabase.from('clients').update(payload).eq('email', 'settings@netra.graphics');
-      }
-
-      setRestoreConfirmOpen(false);
-      setRestoreSuccessOpen(true);
-    } catch (err: any) {
-      console.error(err);
-      alert(`Restore failed: ${err.message || 'Unknown database error'}`);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const categories = [
-    {
-      id: "projects",
-      name: "Projects Database",
-      desc: "Backup all project details, milestones, activity logs, collaboration stream chats, and registered media files.",
-      countLabel: () => `${safeProjects.length} Projects`,
-      backupType: "netra_backup_projects",
-      icon: <Database className="w-5 h-5 text-indigo-400" />
-    },
-    {
-      id: "invoices",
-      name: "Invoices Ledger",
-      desc: "Backup all saved invoices and billing statements from the database vault.",
-      countLabel: () => `${safeInvoices.length} Invoices`,
-      backupType: "netra_backup_invoices",
-      icon: <FileText className="w-5 h-5 text-cyan-400" />
-    },
-    {
-      id: "cashbook",
-      name: "Financial State (Cashbook)",
-      desc: "Backup local cashbook ledger records, payments, and financial targets.",
-      countLabel: () => `${safeCashbook.length} Records`,
-      backupType: "netra_backup_cashbook",
-      icon: <Coins className="w-5 h-5 text-emerald-400" />
-    },
-    {
-      id: "services",
-      name: "Service Pricing Catalog",
-      desc: "Backup all active service catalog listings, tags, descriptions, and feature lists.",
-      countLabel: () => `${safeServices.length} Services`,
-      backupType: "netra_backup_services",
-      icon: <Tag className="w-5 h-5 text-purple-400" />
-    },
-    {
-      id: "vision",
-      name: "Vision Tab Calibration",
-      desc: "Backup the slideshow, slot bindings, and visual coordinates for the public studio vision showcase.",
-      countLabel: () => `${safeVision.filter((v: any) => v.photos && v.photos.length > 0).length} Active Slots`,
-      backupType: "netra_backup_vision",
-      icon: <Eye className="w-5 h-5 text-pink-400" />
-    },
-    {
-      id: "profile",
-      name: "Admin Profile Settings",
-      desc: "Backup official studio credentials, GST codes, email addresses, and contact details.",
-      countLabel: () => adminProfile?.businessName ? "Configured" : "Default Settings",
-      backupType: "netra_backup_profile",
-      icon: <User className="w-5 h-5 text-blue-400" />
-    },
-    {
-      id: "banking",
-      name: "Banking & Payments",
-      desc: "Backup official banking details, account numbers, IFSC codes, and custom UPI ID bindings.",
-      countLabel: () => bankingDetails?.bankName ? "Configured" : "Default Settings",
-      backupType: "netra_backup_banking",
-      icon: <Sliders className="w-5 h-5 text-teal-400" />
-    }
-  ];
+  const activeTrash = useMemo(() => {
+    return [...trashItems]
+      .filter(item => {
+        const expiry = new Date(item.deletedAt).getTime() + 24 * 60 * 60 * 1000;
+        return expiry > now;
+      })
+      .sort((a, b) => new Date(b.deletedAt).getTime() - new Date(a.deletedAt).getTime());
+  }, [trashItems, now]);
 
   return (
     <motion.div
@@ -553,223 +142,184 @@ export function BackupRestorePanel({
       animate="visible"
       className="space-y-6"
     >
-      {/* Intro Panel */}
-      <motion.div
-        variants={itemVariants}
-        className="p-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.02] backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
-      >
+      {/* Title */}
+      <motion.div variants={itemVariants} className="flex justify-between items-center">
         <div>
-          <h2 className="text-lg font-bold text-indigo-400 flex items-center gap-2 text-left">
-            <Database className="w-5 h-5" />
-            Standalone Backup & Restore Hub
+          <h2 className="text-3xl font-black tracking-tight bg-gradient-to-r from-red-400 via-amber-400 to-indigo-400 bg-clip-text text-transparent">
+            Security & Recovery Hub
           </h2>
-          <p className="text-xs text-muted-foreground leading-relaxed mt-2 max-w-2xl text-left">
-            Manage off-site backups and restore parameters for individual application layers. Each backup is generated as a secure, structured JSON file. Restores are verified by a diagnostics system before execution.
+          <p className="text-muted-foreground text-xs mt-1 tracking-widest uppercase">
+            Manage data preservation policies, restore deleted items, and monitor access credentials
           </p>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-red-500/20 bg-red-500/5">
+          <ShieldCheck className="w-4 h-4 text-red-400" />
+          <span className="text-xs text-red-400 font-bold tracking-wider">SYSTEM SECURE</span>
         </div>
       </motion.div>
 
-      {/* Grid of categories */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch text-left">
-        {categories.map((cat) => (
-          <motion.div
-            key={cat.id}
-            variants={itemVariants}
-            className="rounded-2xl border border-white/5 bg-[#08080f]/80 backdrop-blur-sm p-6 flex flex-col justify-between hover:border-white/10 transition-all duration-300"
-          >
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  {cat.icon}
-                  <h3 className="font-bold text-sm text-white">{cat.name}</h3>
-                </div>
-                <Badge className="bg-white/5 border-white/10 text-white font-mono text-[9px] px-2 py-0.5 select-none">
-                  {cat.countLabel()}
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed min-h-[50px]">
-                {cat.desc}
+      {/* Security Policies Grid */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="p-5 rounded-2xl border border-indigo-500/10 bg-indigo-500/[0.01] backdrop-blur-sm relative overflow-hidden group">
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-indigo-500/5 to-transparent" />
+          <div className="relative z-10 flex gap-4">
+            <Lock className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Access Lock Protocols</h4>
+              <p className="text-3xs text-muted-foreground mt-1 leading-relaxed">
+                Client Vault access requires private GST or customized authorization keys. Brute-force protection blocks repeated invalid passphrases.
               </p>
             </div>
+          </div>
+        </div>
 
-            <div className="flex gap-2 mt-6">
-              <Button
-                onClick={() => handleBackup(cat.id)}
-                disabled={isProcessing}
-                className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-2xs rounded-xl py-2 flex items-center justify-center gap-1.5 cursor-pointer select-none"
-              >
-                <Download className="w-3 h-3" />
-                BACKUP
-              </Button>
-              <Button
-                onClick={() => triggerRestore(cat.id)}
-                disabled={isProcessing}
-                className="flex-1 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 font-bold text-2xs rounded-xl py-2 flex items-center justify-center gap-1.5 cursor-pointer select-none"
-              >
-                <Upload className="w-3 h-3" />
-                RESTORE
-              </Button>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        accept=".json"
-        className="absolute opacity-0 pointer-events-none w-0 h-0"
-      />
-
-      {/* Validation Modal */}
-      <AnimatePresence>
-        {restoreConfirmOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="cyber-modal-overlay"
-            style={{ zIndex: 100006 }}
-          >
-            <motion.div
-              initial={{ scale: 0.85, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.85, opacity: 0 }}
-              className="cyber-modal-card max-w-lg w-full bg-[#060a12]/95 border border-white/10 text-left p-6 space-y-6"
-            >
-              <div className="cyber-scanner-line" />
-              
-              <div className="flex items-center gap-3 border-b border-white/5 pb-4">
-                <AlertTriangle className="w-6 h-6 text-amber-500" />
-                <div>
-                  <h3 className="font-mono font-black text-base text-white uppercase tracking-wider">
-                    RESTORE DIAGNOSTIC REPORT
-                  </h3>
-                  <p className="text-[10px] text-muted-foreground font-mono uppercase">
-                    Analyzing import payload integrity
-                  </p>
-                </div>
-              </div>
-
-              {/* Status Report Section */}
-              <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                {/* Info Block */}
-                {analysisResult.info.map((info, i) => (
-                  <div key={i} className="p-3.5 rounded-xl bg-blue-500/5 border border-blue-500/20 text-xs text-blue-300 leading-relaxed font-sans">
-                    ℹ️ {info}
-                  </div>
-                ))}
-
-                {/* Overrides Block */}
-                {analysisResult.overrides.length > 0 && (
-                  <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-2">
-                    <div className="text-2xs font-mono font-bold text-amber-500 uppercase tracking-widest flex items-center gap-1.5">
-                      <AlertCircle className="w-3.5 h-3.5" />
-                      RECORD OVERRIDES DETECTED ({analysisResult.overrides.length})
-                    </div>
-                    <ul className="list-disc pl-4 text-3xs text-amber-300/80 space-y-1 font-mono leading-relaxed">
-                      {analysisResult.overrides.map((ov, i) => <li key={i}>{ov}</li>)}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Mismatches Block */}
-                {analysisResult.mismatches.length > 0 && (
-                  <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/20 space-y-2">
-                    <div className="text-2xs font-mono font-bold text-red-500 uppercase tracking-widest flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      INTEGRITY WARNINGS DETECTED ({analysisResult.mismatches.length})
-                    </div>
-                    <ul className="list-disc pl-4 text-3xs text-red-300/80 space-y-1 font-mono leading-relaxed">
-                      {analysisResult.mismatches.map((m, i) => <li key={i}>{m}</li>)}
-                    </ul>
-                  </div>
-                )}
-
-                {analysisResult.overrides.length === 0 && analysisResult.mismatches.length === 0 && analysisResult.info.length === 0 && (
-                  <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-xs text-emerald-400 font-bold text-center">
-                    ✓ Clean Import: No conflicts or data integrity warnings detected.
-                  </div>
-                )}
-              </div>
-
-              {/* Warnings and confirmation prompt */}
-              <div className="border-t border-white/5 pt-4 text-left space-y-2 font-mono text-[9px] text-white/40">
-                <p className="text-[10px] text-red-400/90 font-extrabold uppercase animate-pulse">
-                  ⚠️ WARNING: Restoring will overwrite target active configurations. This action cannot be undone.
-                </p>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-3 justify-end pt-2 border-t border-white/5">
-                <Button
-                  onClick={() => setRestoreConfirmOpen(false)}
-                  disabled={isProcessing}
-                  className="bg-white/5 hover:bg-white/10 text-white font-bold text-xs rounded-xl px-4 py-2 select-none cursor-pointer"
-                >
-                  CANCEL
-                </Button>
-                <Button
-                  onClick={executeRestore}
-                  disabled={isProcessing}
-                  className="bg-amber-500 text-black hover:bg-amber-600 font-extrabold text-xs rounded-xl px-5 py-2 flex items-center gap-2 select-none cursor-pointer"
-                >
-                  {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                  {isProcessing ? "RESTORING..." : "CONFIRM RESTORE"}
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Success Modal */}
-      <AnimatePresence>
-        {restoreSuccessOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="cyber-modal-overlay"
-            style={{ zIndex: 100006 }}
-          >
-            <motion.div
-              initial={{ scale: 0.85, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.85, opacity: 0 }}
-              className="cyber-modal-card max-w-sm text-center p-6 success-card"
-            >
-              <div className="cyber-scanner-line" />
-              <div className="flex justify-center mb-6">
-                <div className="relative">
-                  <div className="absolute inset-0 rounded-full bg-cyan-400/20 blur-xl animate-pulse" />
-                  <div className="w-16 h-16 rounded-full border border-cyan-500 bg-[#00d4ff]/10 flex items-center justify-center text-cyan-400 relative z-10 shadow-[0_0_20px_rgba(0,212,255,0.4)]">
-                    <ShieldCheck className="w-10 h-10 text-cyan-400" />
-                  </div>
-                </div>
-              </div>
-
-              <h3 className="text-center font-black text-lg text-cyan-400 tracking-[3px] uppercase font-mono mb-2">
-                RESTORE COMPLETE
-              </h3>
-              <p className="text-center text-2xs text-muted-foreground font-mono leading-relaxed max-w-sm mb-6 uppercase tracking-wider">
-                System details successfully restored and global caches synced across all network nodes.
+        <div className="p-5 rounded-2xl border border-red-500/10 bg-red-500/[0.01] backdrop-blur-sm relative overflow-hidden group">
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-red-500/5 to-transparent" />
+          <div className="relative z-10 flex gap-4">
+            <Clock className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">24-Hour Recovery Window</h4>
+              <p className="text-3xs text-muted-foreground mt-1 leading-relaxed">
+                Deleted projects, invoices, clients, and cashbook records are temporarily held for 24 hours. Permanent database purges occur after 1 day.
               </p>
-              
-              <Button
-                onClick={() => setRestoreSuccessOpen(false)}
-                className="w-full bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 text-cyan-400 font-bold text-xs rounded-xl py-3 cursor-pointer select-none"
-              >
-                DISMISS
-              </Button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-5 rounded-2xl border border-amber-500/10 bg-amber-500/[0.01] backdrop-blur-sm relative overflow-hidden group">
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-amber-500/5 to-transparent" />
+          <div className="relative z-10 flex gap-4">
+            <Key className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">State Reconciliation</h4>
+              <p className="text-3xs text-muted-foreground mt-1 leading-relaxed">
+                Restoring a project or invoice fully re-logs cashbook entries and updates total revenue, net cashflow, and target progress automatically.
+              </p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Trash Vault List */}
+      <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 bg-card/25 backdrop-blur-sm p-6 space-y-4">
+        <div>
+          <h3 className="font-extrabold text-sm text-foreground uppercase tracking-widest flex items-center gap-2">
+            <Trash2 className="w-4 h-4 text-red-400 animate-pulse" />
+            Data Preservation Trash Vault
+          </h3>
+          <p className="text-3xs text-muted-foreground mt-1">
+            Currently holding {activeTrash.length} deleted records. Click &quot;Restore&quot; to push them back to active database state.
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-white/5 text-muted-foreground uppercase text-3xs font-mono tracking-widest h-10">
+                <th className="pb-2">Type</th>
+                <th className="pb-2">Item Details</th>
+                <th className="pb-2">Time Remaining</th>
+                <th className="pb-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {activeTrash.length > 0 ? (
+                activeTrash.map((item) => {
+                  const remaining = getRemainingTime(item.deletedAt);
+                  
+                  let badgeClass = "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
+                  let typeLabel = "ITEM";
+                  let summary = "";
+                  let subtext = "";
+
+                  if (item.type === 'client') {
+                    badgeClass = "bg-orange-500/10 text-orange-400 border-orange-500/20";
+                    typeLabel = "CLIENT";
+                    summary = item.data.name;
+                    subtext = `Email: ${item.data.email} | Phone: ${item.data.phone || 'No phone'}`;
+                  } else if (item.type === 'project') {
+                    badgeClass = "bg-blue-500/10 text-blue-400 border-blue-500/20";
+                    typeLabel = "PROJECT";
+                    const p = item.data.project;
+                    summary = `${p.name} - ${p.service}`;
+                    subtext = `Quote: ₹${parseFloat(p.quote || 0).toLocaleString()} | Strategy: ${item.data.strategy.toUpperCase()}`;
+                    if (item.data.strategy === 'purge') {
+                      subtext += ` (Purged: ${item.data.purgedInvoices?.length || 0} invoices, ${item.data.purgedEntries?.length || 0} entries)`;
+                    }
+                  } else if (item.type === 'invoice') {
+                    badgeClass = "bg-purple-500/10 text-purple-400 border-purple-500/20";
+                    typeLabel = "INVOICE";
+                    const inv = item.data.invoice;
+                    summary = `Invoice: ${inv.invoiceNo}`;
+                    subtext = `Client: ${inv.clientName} | Total: ₹${parseFloat(inv.grandTotal || 0).toLocaleString()}`;
+                    if (item.data.strategy === 'purge') {
+                      subtext += ` (Purged: ${item.data.purgedEntries?.length || 0} cashbook entries)`;
+                    }
+                  } else if (item.type === 'invoice_batch') {
+                    badgeClass = "bg-purple-500/10 text-purple-400 border-purple-500/20";
+                    typeLabel = "INVOICES (BATCH)";
+                    summary = `Batch: ${item.data.invoices?.length || 0} invoices`;
+                    subtext = `Strategy: ${item.data.strategy.toUpperCase()}`;
+                    if (item.data.strategy === 'purge') {
+                      subtext += ` (Purged: ${item.data.purgedEntries?.length || 0} cashbook entries)`;
+                    }
+                  } else if (item.type === 'cashbook') {
+                    const isIncome = item.data.type === "INCOME";
+                    badgeClass = isIncome 
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                      : "bg-rose-500/10 text-rose-400 border-rose-500/20";
+                    typeLabel = isIncome ? "CASHBOOK: INCOME" : "CASHBOOK: EXPENSE";
+                    summary = item.data.desc;
+                    subtext = `Amount: ₹${parseFloat(item.data.amount || 0).toLocaleString()} | Mode: ${item.data.mode} | Category: ${item.data.category}`;
+                  }
+
+                  return (
+                    <tr key={item.id} className="h-14 hover:bg-white/[0.01] transition-colors">
+                      <td className="align-middle">
+                        <Badge className={`text-[9px] tracking-wider border font-bold capitalize px-2 py-0.5 ${badgeClass}`}>
+                          {typeLabel}
+                        </Badge>
+                      </td>
+                      <td className="align-middle">
+                        <div className="font-bold text-foreground">{summary}</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">{subtext}</div>
+                      </td>
+                      <td className="align-middle font-mono text-[10px]">
+                        <span className={`flex items-center gap-1.5 font-bold ${remaining.isExpiring ? "text-red-400 animate-pulse" : "text-amber-400"}`}>
+                          <Clock className="w-3.5 h-3.5" />
+                          {remaining.text}
+                        </span>
+                      </td>
+                      <td className="align-middle text-right">
+                        {onRestoreItem && (
+                          <Button
+                            onClick={() => onRestoreItem(item.id)}
+                            className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold text-[9px] px-3 py-1 rounded-lg h-7 gap-1"
+                          >
+                            <Undo className="w-3 h-3" />
+                            RESTORE
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={4} className="text-center py-12 text-muted-foreground font-mono text-[10px] uppercase tracking-widest">
+                    <ShieldAlert className="w-8 h-8 mx-auto mb-2 text-muted-foreground/30" />
+                    Trash Vault is empty. No deleted records in the last 24 hours.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </motion.div>
     </motion.div>
   );
 }
+
 
 export default function SettingsPage({
   servicesList,
@@ -795,7 +345,9 @@ export default function SettingsPage({
   setServicesList,
   setVisionSettings,
   setBankingDetails,
-  setAdminProfile
+  setAdminProfile,
+  trashItems = [],
+  onRestoreItem
 }: SettingsProps) {
   const [activeTab, setActiveTab] = useState("CATALOG"); // CATALOG, VISION, BANKING, PROFILE
   const [search, setSearch] = useState("");
@@ -1338,22 +890,6 @@ export default function SettingsPage({
             Pricing, Service calibration and VISION page settings
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={() => {
-              if (window.confirm("🔴 CRITICAL SECURITY DISPATCH 🔴\n\nAre you absolutely certain you want to purge all demo data?\n\nThis will permanently delete all projects, inquiries, custom invoices, clients (except System Settings), and cashbook entries from Supabase and local storage.\n\nTHIS ACTION CANNOT BE UNDONE!")) {
-                onClearAllDemoData();
-              }
-            }}
-            className="bg-red-500/10 hover:bg-red-500/25 border border-red-500/30 text-red-400 font-extrabold text-xs rounded-xl px-4 py-2 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] transition-all duration-300 select-none cursor-pointer"
-          >
-            Clear System Demo Data
-          </Button>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-indigo-500/20 bg-indigo-500/5">
-            <Sliders className="w-4 h-4 text-indigo-400" />
-            <span className="text-xs text-indigo-400 font-bold tracking-wider">SYSTEM CONFIGURATION</span>
-          </div>
-        </div>
       </motion.div>
 
       {/* Tabs */}
@@ -1406,15 +942,15 @@ export default function SettingsPage({
           Admin Profile Settings
         </button>
         <button
-          onClick={() => setActiveTab("BACKUP")}
+          onClick={() => setActiveTab("SECURITY")}
           className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-all duration-300 outline-none select-none cursor-pointer flex items-center gap-2 shrink-0 ${
-            activeTab === "BACKUP" 
+            activeTab === "SECURITY" 
               ? "bg-indigo-500 text-white font-black shadow-[0_0_15px_rgba(99,102,241,0.35)] border border-indigo-400/20 scale-[0.98]" 
               : "border border-transparent text-muted-foreground hover:text-foreground hover:bg-white/[0.03] hover:scale-[1.02]"
           }`}
         >
-          <Database className="w-3.5 h-3.5" />
-          Backup & Restore
+          <ShieldCheck className="w-3.5 h-3.5" />
+          Security Settings
         </button>
       </motion.div>
 
@@ -2205,32 +1741,10 @@ export default function SettingsPage({
         </motion.div>
       )}
 
-      {activeTab === "BACKUP" && (
-        <BackupRestorePanel
-          servicesList={servicesList}
-          visionSettings={visionSettings}
-          bankingDetails={bankingDetails}
-          adminProfile={adminProfile}
-          projectsList={projectsList}
-          invoicesList={invoicesList}
-          cashbookEntries={cashbookEntries}
-          clients={clients}
-          setClients={setClients}
-          setIgnitionQueue={setIgnitionQueue}
-          setInvoices={setInvoices}
-          setCashbookEntries={setCashbookEntries}
-          setServicesList={setServicesList}
-          setVisionSettings={setVisionSettings}
-          setBankingDetails={setBankingDetails}
-          setAdminProfile={setAdminProfile}
-          onOpenCalibrate={onOpenCalibrate}
-          onSaveVisionSettings={onSaveVisionSettings}
-          onClearAllDemoData={onClearAllDemoData}
-          onSaveBankingDetails={onSaveBankingDetails}
-          onSaveAdminProfile={onSaveAdminProfile}
-          onAddService={onAddService}
-          onDeleteService={onDeleteService}
-          onUpdateService={onUpdateService}
+      {activeTab === "SECURITY" && (
+        <SecurityPanel
+          trashItems={trashItems}
+          onRestoreItem={onRestoreItem}
         />
       )}
 

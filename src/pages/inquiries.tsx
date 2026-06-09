@@ -326,61 +326,65 @@ export default function Inquiries({
                 <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
                   <span className="text-2xs text-muted-foreground font-mono">{inq.phone}</span>
                   <div className="flex items-center gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="w-7 h-7 hover:bg-emerald-500/10 hover:text-emerald-400 rounded-lg border border-white/5"
-                      title="Accept Spark"
-                      onClick={() => {
-                        // 1. Auto-Ignite project and open Ignition Modal
-                        handleIgniteFromInquiry(inq);
-                        
-                        // 2. Update local and backend inquiry status to "Ignited"
-                        updateInquiry(inq.id, { status: "Ignited" }).catch(err => {
-                          console.error("Failed to update status in Supabase:", err);
-                        });
-                        setInquiries(prev => prev.map(i => i.id === inq.id ? { ...i, status: "Ignited" } : i));
-                        
-                        // 3. Send positive WhatsApp greeting confirmation
-                        const msg = `Namaste ${inq.name}! We have received and accepted your spark for "${inq.service}" at Netra Graphics. Our team is super excited to work with you and start the ignition process! Let's build something exceptional.`;
-                        const cleanedPhone = inq.phone.replace(/\D/g, "");
-                        const finalPhone = cleanedPhone.length === 10 ? "91" + cleanedPhone : cleanedPhone;
-                        window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, '_blank');
-                        
-                        toast({
-                          title: "Spark Accepted!",
-                          description: "Launching WhatsApp confirmation and opening Ignition parameters."
-                        });
-                      }}
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="w-7 h-7 hover:bg-rose-500/10 hover:text-rose-400 rounded-lg border border-white/5"
-                      title="Reject Spark"
-                      onClick={() => {
-                        // 1. Send sad/apologetic WhatsApp refusal greeting
-                        const sadMsg = `Namaste ${inq.name}. We regret to inform you that we are currently unable to take on new projects for "${inq.service}" at this time due to scheduling conflicts. We hope to collaborate in the future under better alignments. Thank you for reaching out to Netra Graphics.`;
-                        const cleanedPhone = inq.phone.replace(/\D/g, "");
-                        const finalPhone = cleanedPhone.length === 10 ? "91" + cleanedPhone : cleanedPhone;
-                        window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(sadMsg)}`, '_blank');
-                        
-                        // 2. Dismiss/remove the spark from local state list and delete from backend DB
-                        deleteInquiry(inq.id).catch(err => {
-                          console.error("Failed to delete inquiry from Supabase:", err);
-                        });
-                        setInquiries(prev => prev.filter(i => i.id !== inq.id));
-                        
-                        toast({
-                          title: "Spark Dismissed",
-                          description: "Sent polite WhatsApp refusion and removed spark from vault."
-                        });
-                      }}
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </Button>
+                    {inq.status.toLowerCase() === "new spark" && (
+                      <>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="w-7 h-7 hover:bg-emerald-500/10 hover:text-emerald-400 rounded-lg border border-white/5"
+                          title="Accept Spark"
+                          onClick={() => {
+                            // 1. Auto-Ignite project and open Ignition Modal
+                            handleIgniteFromInquiry(inq);
+                            
+                            // 2. Update local and backend inquiry status to "Ignited"
+                            updateInquiry(inq.id, { status: "Ignited" }).catch(err => {
+                              console.error("Failed to update status in Supabase:", err);
+                            });
+                            setInquiries(prev => prev.map(i => i.id === inq.id ? { ...i, status: "Ignited" } : i));
+                            
+                            // 3. Send positive WhatsApp greeting confirmation
+                            const msg = `Namaste ${inq.name}! We have received and accepted your spark for "${inq.service}" at Netra Graphics. Our team is super excited to work with you and start the ignition process! Let's build something exceptional.`;
+                            const cleanedPhone = inq.phone.replace(/\D/g, "");
+                            const finalPhone = cleanedPhone.length === 10 ? "91" + cleanedPhone : cleanedPhone;
+                            window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+                            
+                            toast({
+                              title: "Spark Accepted!",
+                              description: "Launching WhatsApp confirmation and opening Ignition parameters."
+                            });
+                          }}
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="w-7 h-7 hover:bg-rose-500/10 hover:text-rose-400 rounded-lg border border-white/5"
+                          title="Reject Spark"
+                          onClick={() => {
+                            // 1. Send sad/apologetic WhatsApp refusal greeting
+                            const sadMsg = `Namaste ${inq.name}. We regret to inform you that we are currently unable to take on new projects for "${inq.service}" at this time due to scheduling conflicts. We hope to collaborate in the future under better alignments. Thank you for reaching out to Netra Graphics.`;
+                            const cleanedPhone = inq.phone.replace(/\D/g, "");
+                            const finalPhone = cleanedPhone.length === 10 ? "91" + cleanedPhone : cleanedPhone;
+                            window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(sadMsg)}`, '_blank');
+                            
+                            // 2. Dismiss/remove the spark from local state list and delete from backend DB
+                            deleteInquiry(inq.id).catch(err => {
+                              console.error("Failed to delete inquiry from Supabase:", err);
+                            });
+                            setInquiries(prev => prev.filter(i => i.id !== inq.id));
+                            
+                            toast({
+                              title: "Spark Dismissed",
+                              description: "Sent polite WhatsApp refusion and removed spark from vault."
+                            });
+                          }}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      </>
+                    )}
                     <Button
                       size="icon"
                       variant="ghost"
@@ -491,15 +495,23 @@ export default function Inquiries({
               </div>
 
               <div className="pt-2">
-                <Button
-                  onClick={() => {
-                    setIsReviewOpen(false);
-                    handleIgniteFromInquiry(selectedInquiry);
-                  }}
-                  className="w-full py-6 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(6,182,212,0.15)] focus:shadow-[0_0_20px_rgba(6,182,212,0.25)] rounded-xl"
-                >
-                  🚀 AUTO-IGNITE PROJECT
-                </Button>
+                {selectedInquiry.status.toLowerCase() === "ignited" || selectedInquiry.status.toLowerCase() === "accepted" ? (
+                  <div className="w-full py-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 rounded-xl select-none">
+                    ✓ Project Status: Ignited
+                  </div>
+                ) : ["extinguished", "rejected", "canceled", "expired"].includes(selectedInquiry.status.toLowerCase()) || selectedInquiry.status.toLowerCase().includes("extinguish") ? (
+                  null
+                ) : (
+                  <Button
+                    onClick={() => {
+                      setIsReviewOpen(false);
+                      handleIgniteFromInquiry(selectedInquiry);
+                    }}
+                    className="w-full py-6 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-400 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(6,182,212,0.15)] focus:shadow-[0_0_20px_rgba(6,182,212,0.25)] rounded-xl"
+                  >
+                    🚀 AUTO-IGNITE PROJECT
+                  </Button>
+                )}
               </div>
             </div>
           )}

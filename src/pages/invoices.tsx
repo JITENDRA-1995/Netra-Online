@@ -42,6 +42,8 @@ interface InvoicesPageProps {
   onEditInvoice?: (invoice: any) => void;
   prefilledEditData?: any;
   onClearEditData?: () => void;
+  trashItems?: any[];
+  setTrashItems?: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 const containerVariants = {
@@ -69,7 +71,9 @@ export default function InvoicesPage({
   services = [],
   onEditInvoice,
   prefilledEditData,
-  onClearEditData
+  onClearEditData,
+  trashItems = [],
+  setTrashItems
 }: InvoicesPageProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -323,6 +327,30 @@ export default function InvoicesPage({
         console.warn("Supabase delete failed, falling back to local memory:", dbErr);
       }
 
+      const purgedEntries = deleteStrategy === "purge"
+        ? cashbookEntries.filter(entry => 
+            entry.invoiceId === inv.id || 
+            entry.invoiceNo === inv.invoiceNo ||
+            (entry.desc && entry.desc.includes(inv.invoiceNo))
+          )
+        : [];
+
+      if (setTrashItems) {
+        setTrashItems(prev => [
+          ...prev,
+          {
+            id: `trash-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            type: "invoice",
+            deletedAt: new Date().toISOString(),
+            data: {
+              invoice: inv,
+              strategy: deleteStrategy,
+              purgedEntries
+            }
+          }
+        ]);
+      }
+
       setInvoices(prev => prev.filter(i => i.id !== inv.id));
       setSelectedVaultInvoices(prev => prev.filter(id => id !== inv.id));
 
@@ -356,6 +384,30 @@ export default function InvoicesPage({
         } catch (dbErr) {
           console.warn(`Supabase delete failed for invoice ${inv.id}:`, dbErr);
         }
+      }
+
+      const purgedEntries = deleteStrategy === "purge"
+        ? cashbookEntries.filter(entry => 
+            ids.includes(entry.invoiceId) || 
+            nos.includes(entry.invoiceNo) ||
+            nos.some(no => entry.desc && entry.desc.includes(no))
+          )
+        : [];
+
+      if (setTrashItems) {
+        setTrashItems(prev => [
+          ...prev,
+          {
+            id: `trash-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            type: "invoice_batch",
+            deletedAt: new Date().toISOString(),
+            data: {
+              invoices: invs,
+              strategy: deleteStrategy,
+              purgedEntries
+            }
+          }
+        ]);
       }
 
       setInvoices(prev => prev.filter(i => !ids.includes(i.id)));

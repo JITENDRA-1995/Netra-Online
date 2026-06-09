@@ -22,6 +22,15 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 interface FinancialsProps {
   ignitionQueue: any[];
@@ -67,6 +76,8 @@ interface FinancialsProps {
   setRedirectFilterClient?: (s: string) => void;
   redirectFilterService?: string;
   setRedirectFilterService?: (s: string) => void;
+  trashItems?: any[];
+  setTrashItems?: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 const containerVariants = {
@@ -112,6 +123,8 @@ export default function Financials({
   setRedirectFilterClient,
   redirectFilterService,
   setRedirectFilterService,
+  trashItems = [],
+  setTrashItems
 }: FinancialsProps) {
   const { toast } = useToast();
   const [localSearch, setLocalSearch] = useState("");
@@ -122,7 +135,6 @@ export default function Financials({
   // Filter states
   const [projClient, setProjClient] = useState<string>("all");
   const [projService, setProjService] = useState<string>("all");
-  const [projManualService, setProjManualService] = useState<string>("");
 
   // Apply redirect filter from dashboard when props change
   useEffect(() => {
@@ -139,9 +151,15 @@ export default function Financials({
     }
   }, [redirectFilterService]);
 
-  const [cashClient, setCashClient] = useState<string>("all");
-  const [cashCategory, setCashCategory] = useState<string>("all");
-  const [cashManualService, setCashManualService] = useState<string>("");
+  // Income Ledger Filters
+  const [incSearch, setIncSearch] = useState("");
+  const [incClient, setIncClient] = useState("all");
+  const [incCategory, setIncCategory] = useState("all");
+
+  // Expense Ledger Filters
+  const [expSearch, setExpSearch] = useState("");
+  const [expClient, setExpClient] = useState("all");
+  const [expCategory, setExpCategory] = useState("all");
 
   // Derived lists for dropdowns
   const availableClients = useMemo(() => {
@@ -171,11 +189,25 @@ export default function Financials({
     return Array.from(services).sort();
   }, [ignitionQueue]);
 
-  const availableCategories = useMemo(() => {
+  const availableIncomeCategories = useMemo(() => {
     const categories = new Set<string>();
     if (cashbookEntries && Array.isArray(cashbookEntries)) {
       cashbookEntries.forEach(entry => {
-        if (entry && entry.category) categories.add(entry.category);
+        if (entry && entry.type === "INCOME" && entry.category) {
+          categories.add(entry.category);
+        }
+      });
+    }
+    return Array.from(categories).sort();
+  }, [cashbookEntries]);
+
+  const availableExpenseCategories = useMemo(() => {
+    const categories = new Set<string>();
+    if (cashbookEntries && Array.isArray(cashbookEntries)) {
+      cashbookEntries.forEach(entry => {
+        if (entry && entry.type === "EXPENSE" && entry.category) {
+          categories.add(entry.category);
+        }
       });
     }
     return Array.from(categories).sort();
@@ -203,21 +235,17 @@ export default function Financials({
         if (p.service.toLowerCase() !== projService.toLowerCase()) return false;
       }
 
-      // 4. Service manual filter
-      if (projManualService) {
-        const manualQuery = projManualService.toLowerCase();
-        if (!p.service.toLowerCase().includes(manualQuery)) return false;
-      }
-
       return true;
     });
-  }, [ignitionQueue, currentSearch, projClient, projService, projManualService]);
+  }, [ignitionQueue, currentSearch, projClient, projService]);
 
-  const filteredCashbookEntries = useMemo(() => {
+  const filteredIncomeEntries = useMemo(() => {
     return cashbookEntries.filter(entry => {
-      // 1. Global text search
-      if (currentSearch) {
-        const query = currentSearch.toLowerCase();
+      if (entry.type !== "INCOME") return false;
+
+      // 1. Search text
+      if (incSearch) {
+        const query = incSearch.toLowerCase();
         const matchesQuery =
           entry.desc.toLowerCase().includes(query) ||
           entry.category.toLowerCase().includes(query) ||
@@ -226,33 +254,117 @@ export default function Financials({
       }
 
       // 2. Client dropdown filter (client name in entry.desc)
-      if (cashClient !== "all") {
-        const clientQuery = cashClient.toLowerCase();
+      if (incClient !== "all") {
+        const clientQuery = incClient.toLowerCase();
         if (!entry.desc.toLowerCase().includes(clientQuery)) return false;
       }
 
       // 3. Category dropdown filter
-      if (cashCategory !== "all") {
-        if (entry.category.toLowerCase() !== cashCategory.toLowerCase()) return false;
-      }
-
-      // 4. Manual service/category/desc filter
-      if (cashManualService) {
-        const manualQuery = cashManualService.toLowerCase();
-        const matchesManual =
-          entry.desc.toLowerCase().includes(manualQuery) ||
-          entry.category.toLowerCase().includes(manualQuery);
-        if (!matchesManual) return false;
+      if (incCategory !== "all") {
+        if (entry.category.toLowerCase() !== incCategory.toLowerCase()) return false;
       }
 
       return true;
     });
-  }, [cashbookEntries, currentSearch, cashClient, cashCategory, cashManualService]);
+  }, [cashbookEntries, incSearch, incClient, incCategory]);
 
-  const filteredInvoices = invoices.filter(inv =>
-    inv.clientName.toLowerCase().includes(currentSearch.toLowerCase()) ||
-    (inv.projectService && inv.projectService.toLowerCase().includes(currentSearch.toLowerCase()))
-  );
+  const filteredExpenseEntries = useMemo(() => {
+    return cashbookEntries.filter(entry => {
+      if (entry.type !== "EXPENSE") return false;
+
+      // 1. Search text
+      if (expSearch) {
+        const query = expSearch.toLowerCase();
+        const matchesQuery =
+          entry.desc.toLowerCase().includes(query) ||
+          entry.category.toLowerCase().includes(query) ||
+          (entry.mode && entry.mode.toLowerCase().includes(query));
+        if (!matchesQuery) return false;
+      }
+
+      // 2. Client dropdown filter (client name in entry.desc)
+      if (expClient !== "all") {
+        const clientQuery = expClient.toLowerCase();
+        if (!entry.desc.toLowerCase().includes(clientQuery)) return false;
+      }
+
+      // 3. Category dropdown filter
+      if (expCategory !== "all") {
+        if (entry.category.toLowerCase() !== expCategory.toLowerCase()) return false;
+      }
+
+      return true;
+    });
+  }, [cashbookEntries, expSearch, expClient, expCategory]);
+
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [modalEntryType, setModalEntryType] = useState<"INCOME" | "EXPENSE">("INCOME");
+
+  const monthlyFlowData = useMemo(() => {
+    const monthsList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const now = new Date();
+    const last6Months = [];
+    
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      last6Months.push({
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        monthName: `${monthsList[d.getMonth()]} ${d.getFullYear().toString().slice(-2)}`,
+        Income: 0,
+        Expense: 0
+      });
+    }
+
+    if (cashbookEntries && Array.isArray(cashbookEntries)) {
+      cashbookEntries.forEach(entry => {
+        if (!entry || !entry.date) return;
+        const entryDate = new Date(entry.date);
+        if (isNaN(entryDate.getTime())) return;
+        const key = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}`;
+        const bucket = last6Months.find(m => m.key === key);
+        if (bucket) {
+          const amt = parseFloat(entry.amount) || 0;
+          if (entry.type === "INCOME") {
+            bucket.Income += amt;
+          } else if (entry.type === "EXPENSE") {
+            bucket.Expense += amt;
+          }
+        }
+      });
+    }
+
+    return last6Months;
+  }, [cashbookEntries]);
+
+  const expenseCategoryData = useMemo(() => {
+    const breakdown: Record<string, number> = {};
+    if (cashbookEntries && Array.isArray(cashbookEntries)) {
+      cashbookEntries.forEach(entry => {
+        if (entry && entry.type === "EXPENSE") {
+          const cat = entry.category || "Other";
+          breakdown[cat] = (breakdown[cat] || 0) + (parseFloat(entry.amount) || 0);
+        }
+      });
+    }
+    const total = Object.values(breakdown).reduce((sum, val) => sum + val, 0);
+    return Object.entries(breakdown)
+      .map(([name, value]) => ({
+        name,
+        value,
+        percent: total > 0 ? (value / total) * 100 : 0
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [cashbookEntries]);
+
+  const categoryColors: Record<string, string> = {
+    Software: "from-cyan-500 to-blue-500",
+    Hardware: "from-violet-500 to-fuchsia-500",
+    Marketing: "from-amber-500 to-orange-500",
+    Salary: "from-emerald-500 to-teal-500",
+    Rent: "from-rose-500 to-pink-500",
+    Service: "from-cyan-400 to-emerald-400",
+    Other: "from-slate-500 to-zinc-500"
+  };
 
   return (
     <motion.div
@@ -281,6 +393,14 @@ export default function Financials({
         <div className="flex w-full sm:w-auto overflow-x-auto scrollbar-none gap-1.5 p-1 rounded-xl bg-white/5 border border-white/10 max-w-full shrink-0">
           <Button
             size="sm"
+            variant={financialTab === "OVERVIEW" ? "secondary" : "ghost"}
+            className={`rounded-lg text-xs font-semibold tracking-wider shrink-0 ${financialTab === "OVERVIEW" ? "bg-white/10 text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
+            onClick={() => setFinancialTab("OVERVIEW")}
+          >
+            FINANCIAL OVERVIEW
+          </Button>
+          <Button
+            size="sm"
             variant={financialTab === "PROJECTS" ? "secondary" : "ghost"}
             className={`rounded-lg text-xs font-semibold tracking-wider shrink-0 ${financialTab === "PROJECTS" ? "bg-white/10 text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
             onClick={() => setFinancialTab("PROJECTS")}
@@ -300,10 +420,11 @@ export default function Financials({
       </motion.div>
 
       {/* Main Content Areas based on Tab */}
-      {financialTab === "PROJECTS" && (
+      {financialTab === "OVERVIEW" && (
         <motion.div variants={containerVariants} className="space-y-6">
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* 1. Total Revenue */}
             <motion.div
               variants={itemVariants}
               className="relative overflow-hidden rounded-2xl p-5 border border-emerald-500/20 bg-emerald-500/[0.02] backdrop-blur-sm group cursor-default"
@@ -324,6 +445,7 @@ export default function Financials({
               </div>
             </motion.div>
 
+            {/* 2. Pending Dues */}
             <motion.div
               variants={itemVariants}
               className="relative overflow-hidden rounded-2xl p-5 border border-cyan-500/20 bg-cyan-500/[0.02] backdrop-blur-sm group cursor-default"
@@ -344,6 +466,7 @@ export default function Financials({
               </div>
             </motion.div>
 
+            {/* 3. Monthly Target */}
             <motion.div
               variants={itemVariants}
               className="relative overflow-hidden rounded-2xl p-5 border border-violet-500/20 bg-violet-500/[0.02] backdrop-blur-sm group cursor-default"
@@ -355,7 +478,7 @@ export default function Financials({
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">MONTHLY TARGET</span>
                     <button
-                      className="text-xs text-violet-400 hover:text-violet-300 transition-colors font-bold"
+                      className="text-xs text-violet-400 hover:text-violet-300 transition-colors font-bold cursor-pointer"
                       onClick={() => {
                         const t = prompt("Set New Monthly Target (₹):", String(monthlyTarget));
                         if (t && !isNaN(Number(t))) setMonthlyTarget(parseInt(t));
@@ -385,10 +508,129 @@ export default function Financials({
                 </div>
               </div>
             </motion.div>
+
+            {/* 4. Net Cashflow */}
+            <motion.div
+              variants={itemVariants}
+              className="relative overflow-hidden rounded-2xl p-5 border border-white/5 bg-card/40 backdrop-blur-sm group cursor-default"
+            >
+              <div className="relative z-10">
+                <span className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">NET CASHFLOW</span>
+                <div className={`text-3xl font-black mt-2 ${cashbookMetrics.netFlow >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                  {cashbookMetrics.netFlow >= 0 ? "+" : "-"}₹{Math.abs(cashbookMetrics.netFlow).toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Difference between Income & Expenses</p>
+              </div>
+            </motion.div>
+
+            {/* 5. Total Expenses */}
+            <motion.div
+              variants={itemVariants}
+              className="relative overflow-hidden rounded-2xl p-5 border border-white/5 bg-card/40 backdrop-blur-sm group cursor-default"
+            >
+              <div className="relative z-10">
+                <span className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">TOTAL EXPENSES</span>
+                <div className="text-3xl font-black mt-2 text-rose-400">
+                  ₹{cashbookMetrics.totalExpense.toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Total recorded outgoing payments</p>
+              </div>
+            </motion.div>
+
+            {/* 6. Cash / UPI Breakdown */}
+            <motion.div
+              variants={itemVariants}
+              className="relative overflow-hidden rounded-2xl p-5 border border-white/5 bg-card/40 backdrop-blur-sm group cursor-default"
+            >
+              <div className="relative z-10 flex gap-4 justify-around h-full items-center">
+                <div>
+                  <span className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">CASH</span>
+                  <div className="text-xl font-bold mt-1 text-cyan-400">₹{cashbookMetrics.cashFlow.toLocaleString()}</div>
+                </div>
+                <div className="border-l border-white/5 h-10 self-center" />
+                <div>
+                  <span className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">UPI / ONLINE</span>
+                  <div className="text-xl font-bold mt-1 text-amber-400">₹{cashbookMetrics.upiFlow.toLocaleString()}</div>
+                </div>
+              </div>
+            </motion.div>
           </div>
 
+          {/* Visual Analytics Row */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* Chart */}
+            <motion.div
+              variants={itemVariants}
+              className="xl:col-span-2 rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-6"
+            >
+              <h3 className="font-bold text-foreground text-lg mb-1">Income & Expense Trend</h3>
+              <p className="text-xs text-muted-foreground mb-6">6-month overview of financials flow</p>
+              <div className="h-[260px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={monthlyFlowData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="#f43f5e" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                    <XAxis dataKey="monthName" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} />
+                    <YAxis tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10 }} tickFormatter={(val) => `₹${(val/1000).toFixed(0)}k`} />
+                    <Tooltip
+                      contentStyle={{ background: "rgba(10,15,30,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px" }}
+                      labelStyle={{ color: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: "bold" }}
+                    />
+                    <Area type="monotone" dataKey="Income" stroke="#10b981" strokeWidth={2} fill="url(#incomeGrad)" />
+                    <Area type="monotone" dataKey="Expense" stroke="#f43f5e" strokeWidth={2} fill="url(#expenseGrad)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </motion.div>
+
+            {/* Category Breakdown */}
+            <motion.div
+              variants={itemVariants}
+              className="xl:col-span-1 rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-6 flex flex-col justify-between"
+            >
+              <div>
+                <h3 className="font-bold text-foreground text-lg mb-1">Expense Categories</h3>
+                <p className="text-xs text-muted-foreground mb-6">Distribution of outgoing funds</p>
+                <div className="space-y-4 max-h-[260px] overflow-y-auto pr-1">
+                  {expenseCategoryData.map((item) => {
+                    const color = categoryColors[item.name] || "from-slate-500 to-zinc-500";
+                    return (
+                      <div key={item.name} className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="font-semibold text-foreground">{item.name}</span>
+                          <span className="text-muted-foreground">₹{item.value.toLocaleString()} ({Math.round(item.percent)}%)</span>
+                        </div>
+                        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full bg-gradient-to-r ${color}`} style={{ width: `${item.percent}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {expenseCategoryData.length === 0 && (
+                    <div className="text-center py-10 text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                      No expenses logged yet
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      )}
+
+      {financialTab === "PROJECTS" && (
+        <motion.div variants={containerVariants} className="space-y-6 flex flex-col h-[calc(100vh-180px)]">
           {/* Ledger Table Container */}
-          <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 space-y-4">
+          <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 flex flex-col flex-1 overflow-hidden space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h3 className="font-bold text-foreground text-lg">Ledger & Ignition Queue</h3>
@@ -436,7 +678,7 @@ export default function Financials({
             </div>
 
             {/* Multi-Level Filters Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
               {/* Global Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
@@ -452,7 +694,7 @@ export default function Financials({
               <select
                 value={projClient}
                 onChange={(e) => setProjClient(e.target.value)}
-                className="h-9 px-3 bg-[#0a0f1e] border border-white/10 text-xs rounded-xl text-foreground focus:border-emerald-500/50 cursor-pointer w-full"
+                className="h-9 px-3 bg-[#0a0f1e] border border-white/10 text-xs rounded-xl text-foreground focus:border-emerald-500/50 cursor-pointer w-full font-bold bg-[#0a0f1e]"
               >
                 <option value="all">All Clients</option>
                 {availableClients.map(client => (
@@ -464,7 +706,7 @@ export default function Financials({
               <select
                 value={projService}
                 onChange={(e) => setProjService(e.target.value)}
-                className="h-9 px-3 bg-[#0a0f1e] border border-white/10 text-xs rounded-xl text-foreground focus:border-emerald-500/50 cursor-pointer w-full"
+                className="h-9 px-3 bg-[#0a0f1e] border border-white/10 text-xs rounded-xl text-foreground focus:border-emerald-500/50 cursor-pointer w-full font-bold bg-[#0a0f1e]"
               >
                 <option value="all">All Services</option>
                 {availableServices.map(service => (
@@ -472,23 +714,14 @@ export default function Financials({
                 ))}
               </select>
 
-              {/* Service Manual Input */}
-              <Input
-                className="h-9 bg-white/5 border-white/10 text-xs rounded-xl text-foreground placeholder:text-muted-foreground focus:border-emerald-500/50"
-                placeholder="Manual service..."
-                value={projManualService}
-                onChange={(e) => setProjManualService(e.target.value)}
-              />
-
               {/* Reset Button */}
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={projClient === "all" && projService === "all" && projManualService === "" && currentSearch === ""}
+                disabled={projClient === "all" && projService === "all" && currentSearch === ""}
                 onClick={() => {
                   setProjClient("all");
                   setProjService("all");
-                  setProjManualService("");
                   changeSearch("");
                 }}
                 className="h-9 px-3 text-2xs font-extrabold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 border border-rose-500/20 rounded-xl disabled:opacity-40"
@@ -497,9 +730,9 @@ export default function Financials({
               </Button>
             </div>
 
-            <div className="overflow-x-auto border border-white/5 rounded-xl">
+            <div className="overflow-x-auto overflow-y-auto border border-white/5 rounded-xl flex-1 scrollbar-thin mt-2">
               <table className="w-full text-sm text-left border-collapse">
-                <thead>
+                <thead className="sticky top-0 bg-[#0a0f1e] z-10 border-b border-white/5">
                   <tr className="border-b border-white/5 bg-white/[0.01] text-xs text-muted-foreground uppercase tracking-wider font-semibold">
                     <th style={{ width: "40px" }} className="p-4 text-center">
                       <input
@@ -747,195 +980,90 @@ export default function Financials({
       )}
 
       {financialTab === "CASHBOOK" && (
-        <motion.div variants={containerVariants} className="space-y-6">
-          {/* Stats row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <motion.div
-              variants={itemVariants}
-              className="relative overflow-hidden rounded-2xl p-5 border border-white/5 bg-card/40 backdrop-blur-sm group cursor-default"
-            >
-              <div className="relative z-10">
-                <span className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">NET CASHFLOW</span>
-                <div className={`text-3xl font-black mt-2 ${cashbookMetrics.netFlow >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                  {cashbookMetrics.netFlow >= 0 ? "+" : "-"}₹{Math.abs(cashbookMetrics.netFlow).toLocaleString()}
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              variants={itemVariants}
-              className="relative overflow-hidden rounded-2xl p-5 border border-white/5 bg-card/40 backdrop-blur-sm group cursor-default"
-            >
-              <div className="relative z-10">
-                <span className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">TOTAL EXPENSES</span>
-                <div className="text-3xl font-black mt-2 text-rose-400">
-                  ₹{cashbookMetrics.totalExpense.toLocaleString()}
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              variants={itemVariants}
-              className="relative overflow-hidden rounded-2xl p-5 border border-white/5 bg-card/40 backdrop-blur-sm group cursor-default"
-            >
-              <div className="relative z-10 flex gap-4 justify-around">
-                <div>
-                  <span className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">CASH</span>
-                  <div className="text-xl font-bold mt-1 text-cyan-400">₹{cashbookMetrics.cashFlow.toLocaleString()}</div>
-                </div>
-                <div className="border-l border-white/5 h-10 self-center" />
-                <div>
-                  <span className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">UPI / ONLINE</span>
-                  <div className="text-xl font-bold mt-1 text-amber-400">₹{cashbookMetrics.upiFlow.toLocaleString()}</div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-
-          {/* Form & Table Row */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Record entry form */}
-            <motion.div variants={itemVariants} className="xl:col-span-1 rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 space-y-4">
-              <div>
-                <h3 className="font-bold text-foreground text-lg flex items-center gap-2">
-                  <Coins className="w-5 h-5 text-emerald-400" />
-                  Record cashbook entry
-                </h3>
-                <p className="text-xs text-muted-foreground">Add income or expense for financial model logging</p>
-              </div>
-
-              <form onSubmit={handleAddCashbookEntry} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Date</label>
-                  <Input type="date" name="date" defaultValue={new Date().toISOString().split('T')[0]} required className="bg-white/5 border-white/10 text-xs rounded-xl" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Description</label>
-                  <Input type="text" name="desc" placeholder="e.g. Adobe CC subscription" required className="bg-white/5 border-white/10 text-xs rounded-xl" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Amount (₹)</label>
-                  <Input type="number" name="amount" placeholder="0" required className="bg-white/5 border-white/10 text-xs rounded-xl" />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Type</label>
-                    <select name="type" className="w-full h-10 px-3 bg-white/5 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400">
-                      <option value="EXPENSE">Expense</option>
-                      <option value="INCOME">Income</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Mode</label>
-                    <select name="mode" className="w-full h-10 px-3 bg-white/5 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400">
-                      <option value="UPI">UPI / Online</option>
-                      <option value="CASH">Cash</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Category</label>
-                  <select name="category" className="w-full h-10 px-3 bg-white/5 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400">
-                    <option value="Software">Software</option>
-                    <option value="Hardware">Hardware</option>
-                    <option value="Marketing">Marketing</option>
-                    <option value="Salary">Salary/Wages</option>
-                    <option value="Rent">Rent</option>
-                    <option value="Service">Service Income</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-                <Button type="submit" className="w-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold text-xs rounded-xl py-5">
-                  RECORD ENTRY
-                </Button>
-              </form>
-            </motion.div>
-
-            {/* List */}
-            <motion.div variants={itemVariants} className="xl:col-span-2 rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 space-y-4">
+        <motion.div variants={containerVariants} className="space-y-6 flex flex-col h-[calc(100vh-180px)]">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 overflow-hidden">
+            {/* Income Ledger */}
+            <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 flex flex-col overflow-hidden space-y-4">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <h3 className="font-bold text-foreground text-lg">Cashbook Entries Ledger</h3>
-                  <p className="text-xs text-muted-foreground">Historical records of cash flow items</p>
+                  <h3 className="font-bold text-foreground text-base">Cashbook Entries Ledger (Income)</h3>
+                  <p className="text-xs text-muted-foreground">Historical records of incoming payments</p>
                 </div>
-              </div>
-
-              {/* Multi-Level Filters Grid for Cashbook */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2">
-                {/* Global Search */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                  <Input
-                    className="pl-9 h-9 bg-white/5 border-white/10 text-xs rounded-xl text-foreground placeholder:text-muted-foreground focus:border-emerald-500/50"
-                    placeholder="Global search..."
-                    value={currentSearch}
-                    onChange={(e) => changeSearch(e.target.value)}
-                  />
-                </div>
-
-                {/* Client Select */}
-                <select
-                  value={cashClient}
-                  onChange={(e) => setCashClient(e.target.value)}
-                  className="h-9 px-3 bg-[#0a0f1e] border border-white/10 text-xs rounded-xl text-foreground focus:border-emerald-500/50 cursor-pointer w-full"
-                >
-                  <option value="all">All Clients</option>
-                  {availableClients.map(client => (
-                    <option key={client} value={client}>{client}</option>
-                  ))}
-                </select>
-
-                {/* Category Select */}
-                <select
-                  value={cashCategory}
-                  onChange={(e) => setCashCategory(e.target.value)}
-                  className="h-9 px-3 bg-[#0a0f1e] border border-white/10 text-xs rounded-xl text-foreground focus:border-emerald-500/50 cursor-pointer w-full"
-                >
-                  <option value="all">All Categories</option>
-                  {availableCategories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-
-                {/* Service Manual Input */}
-                <Input
-                  className="h-9 bg-white/5 border-white/10 text-xs rounded-xl text-foreground placeholder:text-muted-foreground focus:border-emerald-500/50"
-                  placeholder="Manual category/desc..."
-                  value={cashManualService}
-                  onChange={(e) => setCashManualService(e.target.value)}
-                />
-
-                {/* Reset Button */}
                 <Button
                   size="sm"
-                  variant="ghost"
-                  disabled={cashClient === "all" && cashCategory === "all" && cashManualService === "" && currentSearch === ""}
+                  className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold text-2xs rounded-lg cursor-pointer"
                   onClick={() => {
-                    setCashClient("all");
-                    setCashCategory("all");
-                    setCashManualService("");
-                    changeSearch("");
+                    setModalEntryType("INCOME");
+                    setIsAddModalOpen(true);
                   }}
-                  className="h-9 px-3 text-2xs font-extrabold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 border border-rose-500/20 rounded-xl disabled:opacity-40"
                 >
-                  RESET FILTERS
+                  <Plus className="w-3 h-3 mr-1" /> NEW INCOME
                 </Button>
               </div>
 
-              <div className="overflow-x-auto border border-white/5 rounded-xl">
+              {/* Separate Filters for Income */}
+              <div className="flex items-center gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                    <Input
+                      className="pl-8 h-8 bg-white/5 border-white/10 text-2xs rounded-lg text-foreground placeholder:text-muted-foreground focus:border-emerald-500/50 focus:ring-0"
+                      placeholder="Search income..."
+                      value={incSearch}
+                      onChange={(e) => setIncSearch(e.target.value)}
+                    />
+                  </div>
+                  <select
+                    value={incClient}
+                    onChange={(e) => setIncClient(e.target.value)}
+                    className="h-8 px-2 bg-[#0a0f1e] border border-white/10 text-2xs rounded-lg text-foreground focus:border-emerald-500/50 cursor-pointer w-full font-bold bg-[#0a0f1e]"
+                  >
+                    <option value="all">All Clients</option>
+                    {availableClients.map(client => (
+                      <option key={client} value={client}>{client}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={incCategory}
+                    onChange={(e) => setIncCategory(e.target.value)}
+                    className="h-8 px-2 bg-[#0a0f1e] border border-white/10 text-2xs rounded-lg text-foreground focus:border-emerald-500/50 cursor-pointer w-full font-bold bg-[#0a0f1e]"
+                  >
+                    <option value="all">All Categories</option>
+                    {availableIncomeCategories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+                {(incSearch !== "" || incClient !== "all" || incCategory !== "all") && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setIncSearch("");
+                      setIncClient("all");
+                      setIncCategory("all");
+                    }}
+                    className="h-8 px-2 text-3xs font-extrabold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 border border-rose-500/20 rounded-lg shrink-0"
+                  >
+                    RESET
+                  </Button>
+                )}
+              </div>
+
+              <div className="overflow-x-auto overflow-y-auto border border-white/5 rounded-xl flex-1 scrollbar-thin">
                 <table className="w-full text-sm text-left border-collapse">
-                  <thead>
+                  <thead className="sticky top-0 bg-[#0a0f1e] z-10 border-b border-white/5">
                     <tr className="border-b border-white/5 bg-white/[0.01] text-xs text-muted-foreground uppercase tracking-wider font-semibold">
-                      <th className="p-4">Date</th>
-                      <th className="p-4">Description / Category</th>
-                      <th className="p-4">Mode</th>
-                      <th className="p-4 text-right">Amount</th>
-                      <th className="p-4 text-right">Action</th>
+                      <th className="p-3">Date</th>
+                      <th className="p-3">Description / Category</th>
+                      <th className="p-3">Mode</th>
+                      <th className="p-3 text-right">Amount</th>
+                      <th className="p-3 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 text-xs">
-                    {filteredCashbookEntries.length > 0 ? (
-                      filteredCashbookEntries.map(entry => {
+                    {filteredIncomeEntries.length > 0 ? (
+                      filteredIncomeEntries.map(entry => {
                         const isHighlighted = highlightedCashbookId === entry.id;
                         return (
                           <tr
@@ -947,56 +1075,239 @@ export default function Financials({
                               borderLeft: '4px solid #10b981'
                             } : {}}
                           >
-                          <td className="p-4 text-muted-foreground">{entry.date}</td>
-                          <td className="p-4">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-foreground">{entry.desc}</span>
-                              <span className="text-3xs text-muted-foreground mt-0.5">{entry.category}</span>
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            <Badge variant="outline" className="border-white/10 text-muted-foreground text-3xs font-semibold px-2 py-0">
-                              {entry.mode}
-                            </Badge>
-                          </td>
-                          <td className={`p-4 text-right font-bold ${entry.type === 'INCOME' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {entry.type === 'INCOME' ? '+' : '-'}₹{entry.amount.toLocaleString()}
-                          </td>
-                          <td className="p-4">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="w-7 h-7 hover:bg-cyan-500/10 hover:text-cyan-400"
-                                onClick={() => {
-                                  setSelectedCashbookEntry(entry);
-                                  setIsCashbookEditModalOpen(true);
-                                }}
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="w-7 h-7 hover:bg-red-500/10 hover:text-red-400"
-                                onClick={() => {
-                                  if (window.confirm("Delete this entry?")) {
-                                    setCashbookEntries(prev => prev.filter(e => e.id !== entry.id));
-                                    toast({ title: "Cashbook entry deleted" });
-                                  }
-                                }}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                          </td>
+                            <td className="p-3 text-muted-foreground">{entry.date}</td>
+                            <td className="p-3">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-foreground">{entry.desc}</span>
+                                <span className="text-3xs text-muted-foreground mt-0.5">{entry.category}</span>
+                              </div>
+                            </td>
+                            <td className="p-3">
+                              <Badge variant="outline" className="border-white/10 text-muted-foreground text-3xs font-semibold px-2 py-0 font-bold">
+                                {entry.mode}
+                              </Badge>
+                            </td>
+                            <td className="p-3 text-right font-bold text-emerald-400">
+                              +₹{entry.amount.toLocaleString()}
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="w-7 h-7 hover:bg-cyan-500/10 hover:text-cyan-400"
+                                  onClick={() => {
+                                    setSelectedCashbookEntry(entry);
+                                    setIsCashbookEditModalOpen(true);
+                                  }}
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="w-7 h-7 hover:bg-red-500/10 hover:text-red-400"
+                                  onClick={() => {
+                                    console.log("Delete clicked (income) for ID:", entry.id);
+                                    if (window.confirm(`Delete this entry: ${entry.desc}?`)) {
+                                      if (setTrashItems) {
+                                        setTrashItems(prev => [
+                                          ...prev,
+                                          {
+                                            id: `trash-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                            type: "cashbook",
+                                            deletedAt: new Date().toISOString(),
+                                            data: entry
+                                          }
+                                        ]);
+                                      }
+                                      setCashbookEntries(prev => {
+                                        const filtered = prev.filter(e => String(e.id) !== String(entry.id));
+                                        console.log(`Filtered: before=${prev.length}, after=${filtered.length}`);
+                                        return filtered;
+                                      });
+                                      toast({ title: "Cashbook entry deleted" });
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            </td>
                           </tr>
                         );
                       })
                     ) : (
                       <tr>
                         <td colSpan={5} className="p-8 text-center text-muted-foreground uppercase tracking-widest text-3xs font-semibold">
-                          {currentSearch || cashClient !== "all" || cashCategory !== "all" || cashManualService ? "NO MATCHING ENTRIES FOUND" : "LEDGER IS VOID OF ENTRIES"}
+                          No Income Entries Found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+
+            {/* Expense Ledger */}
+            <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 flex flex-col overflow-hidden space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h3 className="font-bold text-foreground text-base">Cashbook Entries Ledger (Expense)</h3>
+                  <p className="text-xs text-muted-foreground">Historical records of outgoing payments</p>
+                </div>
+                <Button
+                  size="sm"
+                  className="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 font-bold text-2xs rounded-lg cursor-pointer"
+                  onClick={() => {
+                    setModalEntryType("EXPENSE");
+                    setIsAddModalOpen(true);
+                  }}
+                >
+                  <Plus className="w-3 h-3 mr-1" /> NEW EXPENSE
+                </Button>
+              </div>
+
+              {/* Separate Filters for Expense */}
+              <div className="flex items-center gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                    <Input
+                      className="pl-8 h-8 bg-white/5 border-white/10 text-2xs rounded-lg text-foreground placeholder:text-muted-foreground focus:border-rose-500/50 focus:ring-0"
+                      placeholder="Search expense..."
+                      value={expSearch}
+                      onChange={(e) => setExpSearch(e.target.value)}
+                    />
+                  </div>
+                  <select
+                    value={expClient}
+                    onChange={(e) => setExpClient(e.target.value)}
+                    className="h-8 px-2 bg-[#0a0f1e] border border-white/10 text-2xs rounded-lg text-foreground focus:border-rose-500/50 cursor-pointer w-full font-bold bg-[#0a0f1e]"
+                  >
+                    <option value="all">All Clients</option>
+                    {availableClients.map(client => (
+                      <option key={client} value={client}>{client}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={expCategory}
+                    onChange={(e) => setExpCategory(e.target.value)}
+                    className="h-8 px-2 bg-[#0a0f1e] border border-white/10 text-2xs rounded-lg text-foreground focus:border-rose-500/50 cursor-pointer w-full font-bold bg-[#0a0f1e]"
+                  >
+                    <option value="all">All Categories</option>
+                    {availableExpenseCategories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+                {(expSearch !== "" || expClient !== "all" || expCategory !== "all") && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setExpSearch("");
+                      setExpClient("all");
+                      setExpCategory("all");
+                    }}
+                    className="h-8 px-2 text-3xs font-extrabold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 border border-rose-500/20 rounded-lg shrink-0"
+                  >
+                    RESET
+                  </Button>
+                )}
+              </div>
+
+              <div className="overflow-x-auto overflow-y-auto border border-white/5 rounded-xl flex-1 scrollbar-thin">
+                <table className="w-full text-sm text-left border-collapse">
+                  <thead className="sticky top-0 bg-[#0a0f1e] z-10 border-b border-white/5">
+                    <tr className="border-b border-white/5 bg-white/[0.01] text-xs text-muted-foreground uppercase tracking-wider font-semibold">
+                      <th className="p-3">Date</th>
+                      <th className="p-3">Description / Category</th>
+                      <th className="p-3">Mode</th>
+                      <th className="p-3 text-right">Amount</th>
+                      <th className="p-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 text-xs">
+                    {filteredExpenseEntries.length > 0 ? (
+                      filteredExpenseEntries.map(entry => {
+                        const isHighlighted = highlightedCashbookId === entry.id;
+                        return (
+                          <tr
+                            key={entry.id}
+                            className={`hover:bg-white/[0.01] transition-colors ${isHighlighted ? 'cashbook-row-highlight' : ''}`}
+                            style={isHighlighted ? {
+                              animation: 'glowingPulse 2s ease-in-out infinite',
+                              background: 'rgba(16, 185, 129, 0.15)',
+                              borderLeft: '4px solid #10b981'
+                            } : {}}
+                          >
+                            <td className="p-3 text-muted-foreground">{entry.date}</td>
+                            <td className="p-3">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-foreground">{entry.desc}</span>
+                                <span className="text-3xs text-muted-foreground mt-0.5">{entry.category}</span>
+                              </div>
+                            </td>
+                            <td className="p-3">
+                              <Badge variant="outline" className="border-white/10 text-muted-foreground text-3xs font-semibold px-2 py-0 font-bold">
+                                {entry.mode}
+                              </Badge>
+                            </td>
+                            <td className="p-3 text-right font-bold text-rose-400">
+                              -₹{entry.amount.toLocaleString()}
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="w-7 h-7 hover:bg-cyan-500/10 hover:text-cyan-400"
+                                  onClick={() => {
+                                    setSelectedCashbookEntry(entry);
+                                    setIsCashbookEditModalOpen(true);
+                                  }}
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="w-7 h-7 hover:bg-red-500/10 hover:text-red-400"
+                                  onClick={() => {
+                                    console.log("Delete clicked (expense) for ID:", entry.id);
+                                    if (window.confirm(`Delete this entry: ${entry.desc}?`)) {
+                                      if (setTrashItems) {
+                                        setTrashItems(prev => [
+                                          ...prev,
+                                          {
+                                            id: `trash-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                            type: "cashbook",
+                                            deletedAt: new Date().toISOString(),
+                                            data: entry
+                                          }
+                                        ]);
+                                      }
+                                      setCashbookEntries(prev => {
+                                        const filtered = prev.filter(e => String(e.id) !== String(entry.id));
+                                        console.log(`Filtered: before=${prev.length}, after=${filtered.length}`);
+                                        return filtered;
+                                      });
+                                      toast({ title: "Cashbook entry deleted" });
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-muted-foreground uppercase tracking-widest text-3xs font-semibold">
+                          No Expense Entries Found
                         </td>
                       </tr>
                     )}
@@ -1007,6 +1318,94 @@ export default function Financials({
           </div>
         </motion.div>
       )}
+
+      {/* Record Entry Modal */}
+      <AnimatePresence>
+        {isAddModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-md bg-[#0a0f1e] border border-white/10 rounded-2xl p-6 space-y-4 shadow-2xl relative"
+            >
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground text-lg cursor-pointer bg-transparent border-none outline-none font-bold"
+              >
+                ×
+              </button>
+              
+              <div>
+                <h3 className="font-bold text-foreground text-lg flex items-center gap-2 uppercase tracking-wider">
+                  <Coins className="w-5 h-5 text-emerald-400" />
+                  Record {modalEntryType.toLowerCase()} entry
+                </h3>
+                <p className="text-xs text-muted-foreground">Add new {modalEntryType.toLowerCase()} transaction to the ledger</p>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  handleAddCashbookEntry(e);
+                  setIsAddModalOpen(false);
+                }}
+                className="space-y-4"
+              >
+                <input type="hidden" name="type" value={modalEntryType} />
+                
+                <div className="space-y-1.5">
+                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Date</label>
+                  <Input type="date" name="date" defaultValue={new Date().toISOString().split('T')[0]} required className="bg-white/5 border-white/10 text-xs rounded-xl" />
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Description</label>
+                  <Input type="text" name="desc" placeholder={modalEntryType === "EXPENSE" ? "e.g. Adobe CC subscription" : "e.g. Logo Design Advance"} required className="bg-white/5 border-white/10 text-xs rounded-xl" />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Amount (₹)</label>
+                    <Input type="number" name="amount" placeholder="0" required className="bg-white/5 border-white/10 text-xs rounded-xl" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Mode</label>
+                    <select name="mode" className="w-full h-10 px-3 bg-[#0a0f1e] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 font-bold">
+                      <option value="UPI">UPI / Online</option>
+                      <option value="CASH">Cash</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Category</label>
+                  <select name="category" className="w-full h-10 px-3 bg-[#0a0f1e] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 font-bold">
+                    {modalEntryType === "INCOME" ? (
+                      <>
+                        <option value="Service">Service Income</option>
+                        <option value="Other">Other</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="Software">Software</option>
+                        <option value="Hardware">Hardware</option>
+                        <option value="Marketing">Marketing</option>
+                        <option value="Salary">Salary/Wages</option>
+                        <option value="Rent">Rent</option>
+                        <option value="Other">Other</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                <Button type="submit" className="w-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold text-xs rounded-xl py-5 cursor-pointer">
+                  RECORD ENTRY
+                </Button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
 
     </motion.div>
