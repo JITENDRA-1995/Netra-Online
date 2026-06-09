@@ -13,11 +13,61 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "../supabase/client";
 
 const STATUS_COLORS: Record<string, string> = {
-  active: "#00d4ff",
-  ongoing: "#00d4ff",
-  completed: "#10b981",
-  on_hold: "#f59e0b",
-  cancelled: "#ef4444",
+  active: "#10b981",    // Green
+  ongoing: "#10b981",   // Green
+  completed: "#00d4ff",  // Cyan
+  on_hold: "#f59e0b",    // Amber
+  cancelled: "#ef4444",  // Red
+};
+
+const STATUS_THEMES: Record<string, {
+  color: string;
+  borderClass: string;
+  bgGradient: string;
+  glowColor: string;
+  textHighlight: string;
+  cardBg: string;
+}> = {
+  active: {
+    color: "#10b981",
+    borderClass: "border-emerald-500/10 group-hover:border-emerald-500/35",
+    bgGradient: "linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, transparent 100%)",
+    glowColor: "rgba(16, 185, 129, 0.03)",
+    textHighlight: "text-emerald-400",
+    cardBg: "bg-emerald-950/15"
+  },
+  ongoing: {
+    color: "#10b981",
+    borderClass: "border-emerald-500/10 group-hover:border-emerald-500/35",
+    bgGradient: "linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, transparent 100%)",
+    glowColor: "rgba(16, 185, 129, 0.03)",
+    textHighlight: "text-emerald-400",
+    cardBg: "bg-emerald-950/15"
+  },
+  completed: {
+    color: "#00d4ff",
+    borderClass: "border-cyan-500/10 group-hover:border-cyan-500/35",
+    bgGradient: "linear-gradient(135deg, rgba(0, 212, 255, 0.04) 0%, transparent 100%)",
+    glowColor: "rgba(0, 212, 255, 0.03)",
+    textHighlight: "text-cyan-400",
+    cardBg: "bg-cyan-950/15"
+  },
+  on_hold: {
+    color: "#f59e0b",
+    borderClass: "border-amber-500/10 group-hover:border-amber-500/35",
+    bgGradient: "linear-gradient(135deg, rgba(245, 158, 11, 0.04) 0%, transparent 100%)",
+    glowColor: "rgba(245, 158, 11, 0.03)",
+    textHighlight: "text-amber-400",
+    cardBg: "bg-amber-950/15"
+  },
+  cancelled: {
+    color: "#ef4444",
+    borderClass: "border-red-950/30 group-hover:border-red-500/20",
+    bgGradient: "linear-gradient(135deg, rgba(239, 68, 68, 0.02) 0%, transparent 100%)",
+    glowColor: "rgba(239, 68, 68, 0.01)",
+    textHighlight: "text-red-400/80",
+    cardBg: "bg-red-950/25 opacity-70"
+  }
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -415,6 +465,23 @@ export default function Projects({
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
+      <style>{`
+        @keyframes pulseGlow {
+          0%, 100% {
+            box-shadow: 0 0 6px rgba(16, 185, 129, 0.25), inset 0 0 2px rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.3);
+            background-color: rgba(16, 185, 129, 0.06);
+          }
+          50% {
+            box-shadow: 0 0 16px rgba(16, 185, 129, 0.6), inset 0 0 5px rgba(16, 185, 129, 0.35);
+            border-color: rgba(16, 185, 129, 0.75);
+            background-color: rgba(16, 185, 129, 0.16);
+          }
+        }
+        .animate-pulse-glow {
+          animation: pulseGlow 1.8s infinite ease-in-out;
+        }
+      `}</style>
       {/* Header */}
       <motion.div variants={itemVariants} className="flex items-center justify-between">
         <div>
@@ -578,19 +645,29 @@ export default function Projects({
           const serviceName = project.service || project.name || "Unnamed Project";
           const clientName = project.clientName || project.name || "Unknown Client";
           const budgetVal = project.budget !== undefined ? project.budget : (parseFloat(project.quote) || 0);
-          const progressVal = project.progress || 0;
           const statusVal = (project.status || "active").toLowerCase().replace(" ", "_");
+          const progressVal = statusVal === "completed" ? 100 : (project.progress || 0);
           const categoryVal = (project.category || "branding").toLowerCase().replace(" ", "_");
 
           const statusColor = STATUS_COLORS[statusVal] ?? "#666";
           const categoryColor = CATEGORY_COLORS[categoryVal] ?? "#666";
+          const theme = STATUS_THEMES[statusVal] ?? {
+            color: statusColor,
+            borderClass: "border-white/5 group-hover:border-white/10",
+            bgGradient: "linear-gradient(135deg, transparent 0%, transparent 100%)",
+            glowColor: "transparent",
+            textHighlight: "text-foreground",
+            cardBg: "bg-card/40"
+          };
+
+          const isProjectActive = statusVal === "active" || statusVal === "ongoing";
 
           return (
             <motion.div
               key={project.id}
               variants={itemVariants}
-              className="group relative rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 hover:border-white/10 transition-all flex flex-col justify-between"
-              style={{ background: `linear-gradient(135deg, ${categoryColor}03 0%, transparent 100%)` }}
+              className={`group relative rounded-2xl border backdrop-blur-sm p-5 transition-all duration-300 flex flex-col justify-between ${theme.borderClass} ${theme.cardBg}`}
+              style={{ background: `linear-gradient(135deg, ${statusColor}03 0%, transparent 100%)` }}
               data-testid={`card-project-${project.id}`}
             >
               <div className="flex items-start justify-between flex-wrap gap-4">
@@ -627,8 +704,21 @@ export default function Projects({
                         {categoryVal.replace("_", " ")}
                       </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Visionary: <strong>{clientName}</strong> {project.deadline ? `· Due ${new Date(project.deadline).toLocaleDateString()}` : ""}
+                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 flex-wrap">
+                      <span>Visionary: <strong>{clientName}</strong></span>
+                      {project.deadline && (
+                        <>
+                          <span>·</span>
+                          {isProjectActive ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.2)] animate-pulse-glow">
+                              <span className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
+                              DUE {new Date(project.deadline).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </span>
+                          ) : (
+                            <span>Due {new Date(project.deadline).toLocaleDateString()}</span>
+                          )}
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -685,40 +775,7 @@ export default function Projects({
                 </div>
               </div>
 
-              <div className="mt-5 space-y-2.5">
-                {/* Easy Progress Stepper */}
-                <div className="flex justify-between items-center gap-2 flex-wrap">
-                  {[
-                    { label: "Discover", val: 25 },
-                    { label: "Define", val: 50 },
-                    { label: "Design", val: 75 },
-                    { label: "Deliver", val: 100 }
-                  ].map((step) => {
-                    const isPassedOrCurrent = progressVal >= step.val;
-                    return (
-                      <button
-                        key={step.label}
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (handleUpdateProjectProgressHandy) {
-                            handleUpdateProjectProgressHandy(project.id, step.val);
-                          }
-                        }}
-                        className={`flex-1 py-1.5 px-2 rounded-lg border text-[10px] font-black tracking-wider uppercase transition-all duration-200 cursor-pointer ${
-                          isPassedOrCurrent
-                            ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.1)] hover:bg-cyan-500/20"
-                            : "bg-white/5 border-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
-                        }`}
-                        title={`Set progress to ${step.val}% (${step.label})`}
-                      >
-                        {step.label}
-                      </button>
-                    );
-                  })}
-                </div>
-
+              <div className="mt-5 space-y-2.5 group/progress relative">
                 {/* Progress bar line representation */}
                 <div className="flex items-center gap-3">
                   <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -732,6 +789,43 @@ export default function Projects({
                   </div>
                   <span className="text-xs text-muted-foreground w-8 text-right font-semibold">{progressVal}%</span>
                 </div>
+
+                {/* Easy Progress Stepper */}
+                {statusVal !== "completed" && (
+                  <div className="overflow-hidden transition-all duration-300 max-h-0 opacity-0 group-hover/progress:max-h-12 group-hover/progress:opacity-100 pt-0 group-hover/progress:pt-2">
+                    <div className="flex justify-between items-center gap-2 flex-wrap">
+                      {[
+                        { label: "Discover", val: 25 },
+                        { label: "Define", val: 50 },
+                        { label: "Design", val: 75 },
+                        { label: "Deliver", val: 100 }
+                      ].map((step) => {
+                        const isPassedOrCurrent = progressVal >= step.val;
+                        return (
+                          <button
+                            key={step.label}
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (handleUpdateProjectProgressHandy) {
+                                handleUpdateProjectProgressHandy(project.id, step.val);
+                              }
+                            }}
+                            className={`flex-1 py-1.5 px-2 rounded-lg border text-[10px] font-black tracking-wider uppercase transition-all duration-200 cursor-pointer ${
+                              isPassedOrCurrent
+                                ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.1)] hover:bg-cyan-500/20"
+                                : "bg-white/5 border-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                            }`}
+                            title={`Set progress to ${step.val}% (${step.label})`}
+                          >
+                            {step.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           );

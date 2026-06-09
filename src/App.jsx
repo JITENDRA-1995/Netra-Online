@@ -3194,19 +3194,15 @@ function App() {
     };
 
     if (newProjectStatus === 'Completed') {
-      updatedFields.stage = 4;
-      updatedFields.progress = 100;
-      updatedFields.paymentStatus = 'paid';
-
-      const remainingAmt = finalQuote - adv;
-
+      const remainingAmt = Math.max(0, finalQuote - adv);
       setCustomPaymentPrompt({
-        p: { ...project, ...updatedFields },
+        p: { ...project, status: 'Completed', stage: 4, progress: 100, paymentStatus: 'paid' },
         finalQuote: finalQuote,
         defaultAmt: remainingAmt,
         adv: adv,
         paymentMode: 'UPI'
       });
+      return; // Return early, do not update database or state until confirmed
     } else if (newProjectStatus === 'Cancelled') {
       updatedFields.paymentStatus = 'unpaid';
       updatedFields.progress = 0;
@@ -3244,6 +3240,23 @@ function App() {
     const project = ignitionQueue.find(p => p.id === projectId);
     if (!project) return;
 
+    const baseQuote = parseFloat(project.quote) || 0;
+    const discountVal = parseFloat(project.discount) || 0;
+    const finalQuote = baseQuote - discountVal;
+    const adv = parseFloat(project.advanceAmount) || 0;
+
+    if (newProgress === 100) {
+      const remainingAmt = Math.max(0, finalQuote - adv);
+      setCustomPaymentPrompt({
+        p: { ...project, status: 'Completed', stage: 4, progress: 100, paymentStatus: 'paid' },
+        finalQuote: finalQuote,
+        defaultAmt: remainingAmt,
+        adv: adv,
+        paymentMode: 'UPI'
+      });
+      return; // Return early, do not update database or state until confirmed
+    }
+
     let updatedFields = {
       progress: newProgress
     };
@@ -3251,7 +3264,6 @@ function App() {
     if (newProgress === 25) updatedFields.stage = 1;
     else if (newProgress === 50) updatedFields.stage = 2;
     else if (newProgress === 75) updatedFields.stage = 3;
-    else if (newProgress === 100) updatedFields.stage = 4;
 
     try {
       await updateProjectState(projectId, updatedFields);
@@ -5566,7 +5578,7 @@ function App() {
                     <button
                       style={{ flex: 1, padding: '0.8rem', background: '#00e5ff', color: '#000', border: 'none', borderRadius: '4px', cursor: 'pointer', fontFamily: 'Montserrat, sans-serif', fontWeight: 'bold' }}
                       onClick={async () => {
-                        const inputVal = document.getElementById('custom-payment-input').value;
+                        const inputVal = document.getElementById('custom-payment-input')?.value || '';
                         const parsed = parseFloat(inputVal);
                         const amt = (!isNaN(parsed) && parsed > 0) ? parsed : customPaymentPrompt.defaultAmt;
 
@@ -5574,7 +5586,8 @@ function App() {
                           await updateProjectState(customPaymentPrompt.p.id, {
                             stage: 4,
                             status: "Completed",
-                            paymentStatus: "paid"
+                            paymentStatus: "paid",
+                            progress: 100
                           });
                           const actionMsg = `Project marked as Completed & Final Payment of ₹${amt} Logged`;
                           await addProjectActivityLog(customPaymentPrompt.p.id, actionMsg);
@@ -5612,7 +5625,8 @@ function App() {
                           ...customPaymentPrompt.p,
                           status: "Completed",
                           stage: 4,
-                          paymentStatus: "paid"
+                          paymentStatus: "paid",
+                          progress: 100
                         };
                         const existingInvoice = invoices.find(i => i.rawProject?.id === customPaymentPrompt.p.id || i.projectId === customPaymentPrompt.p.id);
                         if (!existingInvoice) {
@@ -5630,11 +5644,11 @@ function App() {
                             });
                             setInvoices(prev => prev.map(inv => {
                               if (inv.id === existingInvoice.id) {
-                                return {
-                                  ...inv,
-                                  grandTotal: finalGrandTotal,
-                                  rawProject: completedProjectForInvoice
-                                };
+                                  return {
+                                    ...inv,
+                                    grandTotal: finalGrandTotal,
+                                    rawProject: completedProjectForInvoice
+                                  };
                               }
                               return inv;
                             }));
@@ -5649,6 +5663,7 @@ function App() {
                             paymentStatus: 'paid',
                             status: "Completed",
                             stage: 4,
+                            progress: 100,
                             activityLog: [
                               { action: `Project marked as Completed & Final Payment of ₹${amt} Logged`, time: new Date().toLocaleTimeString() },
                               ...(proj.activityLog || [])
@@ -5662,7 +5677,8 @@ function App() {
                               ...prev,
                               stage: 4,
                               status: "Completed",
-                              paymentStatus: 'paid'
+                              paymentStatus: 'paid',
+                              progress: 100
                             };
                           }
                           return prev;
