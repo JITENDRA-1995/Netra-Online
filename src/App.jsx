@@ -606,190 +606,55 @@ function App() {
 
   const handleSaveBankingDetails = async (newBanking) => {
     setBankingDetails(newBanking);
-    safeSetLocalStorage('netra_banking_details', JSON.stringify(newBanking));
-
-    // Save globally to Supabase special settings row
-    try {
-      const payload = {
-        address: JSON.stringify({ services: servicesList, vision: visionSettings, banking: newBanking, profile: adminProfile })
-      };
-      const { error: dbErr } = await supabase
-        .from('clients')
-        .update(payload)
-        .eq('email', 'settings@netra.graphics');
-
-      if (dbErr) throw dbErr;
-
-      toast({
-        title: "Payment Details Calibrated",
-        description: "Successfully updated payment instructions and digital UPI QR settings."
-      });
-    } catch (dbErr) {
-      console.error("Failed to save banking details to database:", dbErr);
-      toast({
-        variant: "destructive",
-        title: "Database Sync Failed",
-        description: "Could not save payment settings to the remote database."
-      });
-    }
+    toast({
+      title: "Payment Details Calibrated",
+      description: "Successfully updated payment instructions and digital UPI QR settings."
+    });
   };
 
   const handleSaveAdminProfile = async (newProfile) => {
     setAdminProfile(newProfile);
-    safeSetLocalStorage('netra_admin_profile', JSON.stringify(newProfile));
-
-    // Save globally to Supabase special settings row
-    try {
-      const payload = {
-        address: JSON.stringify({ services: servicesList, vision: visionSettings, banking: bankingDetails, profile: newProfile })
-      };
-      const { error: dbErr } = await supabase
-        .from('clients')
-        .update(payload)
-        .eq('email', 'settings@netra.graphics');
-
-      if (dbErr) throw dbErr;
-
-      toast({
-        title: "Admin Profile Updated",
-        description: "Successfully updated admin basic details globally."
-      });
-    } catch (dbErr) {
-      console.error("Failed to save admin profile to database:", dbErr);
-      toast({
-        variant: "destructive",
-        title: "Database Sync Failed",
-        description: "Could not save admin profile to the remote database."
-      });
-    }
+    toast({
+      title: "Admin Profile Updated",
+      description: "Successfully updated admin basic details globally."
+    });
   };
 
   const handleSaveVisionSettings = async (newSettings) => {
     setVisionSettings(newSettings);
-    safeSetLocalStorage('netra_vision_settings', JSON.stringify(newSettings));
-
-    // Save globally to Supabase special settings row
-    try {
-      const payload = {
-        address: JSON.stringify({ services: servicesList, vision: newSettings, banking: bankingDetails, profile: adminProfile })
-      };
-      const { error: dbErr } = await supabase
-        .from('clients')
-        .update(payload)
-        .eq('email', 'settings@netra.graphics');
-
-      if (dbErr) throw dbErr;
-
-      toast({
-        title: "Vision Settings Saved",
-        description: "Successfully updated the VISION page categories and slideshow assets."
-      });
-    } catch (dbErr) {
-      console.error("Failed to save vision settings to database:", dbErr);
-      toast({
-        variant: "destructive",
-        title: "Database Sync Failed",
-        description: "Could not save vision settings to the remote database."
-      });
-    }
+    toast({
+      title: "Vision Settings Saved",
+      description: "Successfully updated the VISION page categories and slideshow assets."
+    });
   };
 
   const handleAddService = async (newService) => {
     const nextList = [...servicesList, newService];
     setServicesList(nextList);
-    safeSetLocalStorage("netra_services", JSON.stringify(nextList));
-
-    // Save globally to Supabase special settings row
-    try {
-      const payload = {
-        address: JSON.stringify({ services: nextList, vision: visionSettings, banking: bankingDetails, profile: adminProfile })
-      };
-      const { error: dbErr } = await supabase
-        .from('clients')
-        .update(payload)
-        .eq('email', 'settings@netra.graphics');
-
-      if (dbErr) throw dbErr;
-
-      toast({
-        title: "Service Card Added",
-        description: `Successfully created "${newService.title}" dynamically.`
-      });
-    } catch (dbErr) {
-      console.error("Failed to save services to database:", dbErr);
-      toast({
-        variant: "destructive",
-        title: "Database Sync Failed",
-        description: "Could not sync new service to the remote database."
-      });
-    }
+    toast({
+      title: "Service Card Added",
+      description: `Successfully created "${newService.title}" dynamically.`
+    });
   };
 
   const handleDeleteService = async (serviceId) => {
     const nextList = servicesList.filter(s => s.id !== serviceId);
     setServicesList(nextList);
-    safeSetLocalStorage("netra_services", JSON.stringify(nextList));
-
-    // Also remove any vision slideshow slot that was bound to this service
     const nextVision = visionSettings.map(v => v.serviceId === serviceId ? { ...v, serviceId: 0, photos: [] } : v);
     setVisionSettings(nextVision);
-    safeSetLocalStorage("netra_vision_settings", JSON.stringify(nextVision));
-
-    // Save globally to Supabase special settings row
-    try {
-      const payload = {
-        address: JSON.stringify({ services: nextList, vision: nextVision, banking: bankingDetails, profile: adminProfile })
-      };
-      const { error: dbErr } = await supabase
-        .from('clients')
-        .update(payload)
-        .eq('email', 'settings@netra.graphics');
-
-      if (dbErr) throw dbErr;
-
-      toast({
-        title: "Service Card Deleted",
-        description: "Successfully removed card and cleaned up slot bindings."
-      });
-    } catch (dbErr) {
-      console.error("Failed to delete service from database:", dbErr);
-      toast({
-        variant: "destructive",
-        title: "Database Sync Failed",
-        description: "Could not sync deletion to the remote database."
-      });
-    }
+    toast({
+      title: "Service Card Deleted",
+      description: "Successfully removed card and cleaned up slot bindings."
+    });
   };
 
   const handleUpdateService = async (updatedService) => {
     const nextList = servicesList.map(s => s.id === updatedService.id ? updatedService : s);
     setServicesList(nextList);
-    safeSetLocalStorage("netra_services", JSON.stringify(nextList));
-
-    // Save globally to Supabase special settings row
-    try {
-      const payload = {
-        address: JSON.stringify({ services: nextList, vision: visionSettings, banking: bankingDetails, profile: adminProfile })
-      };
-      const { error: dbErr } = await supabase
-        .from('clients')
-        .update(payload)
-        .eq('email', 'settings@netra.graphics');
-
-      if (dbErr) throw dbErr;
-
-      toast({
-        title: "Service Slideshow Updated",
-        description: `Successfully synchronized work slideshow for "${updatedService.title}".`
-      });
-    } catch (dbErr) {
-      console.error("Failed to save updated service to database:", dbErr);
-      toast({
-        variant: "destructive",
-        title: "Database Sync Failed",
-        description: "Could not sync service updates to the remote database."
-      });
-    }
+    toast({
+      title: "Service Slideshow Updated",
+      description: `Successfully synchronized work slideshow for "${updatedService.title}".`
+    });
   };
 
   const handleClearAllDemoData = async () => {
@@ -864,7 +729,7 @@ function App() {
       // Update global Supabase settings row back to defaults
       try {
         const payload = {
-          address: JSON.stringify({ services: defaultServices, vision: defaultVisionSettings, banking: defaultBankingDetails, profile: defaultAdminProfile })
+          address: JSON.stringify({ services: defaultServices, vision: defaultVisionSettings, banking: defaultBankingDetails, profile: defaultAdminProfile, cashbook: [] })
         };
         await supabase
           .from('clients')
@@ -899,35 +764,14 @@ function App() {
   const handleIgniteCalibration = async () => {
     if (!calibratingService) return;
 
-    // Save update to state and localStorage
+    // Save update to state
     const nextList = servicesList.map(s => s.id === calibratingService.id ? calibratingService : s);
     setServicesList(nextList);
-    safeSetLocalStorage("netra_services", JSON.stringify(nextList));
 
-    // Save globally to Supabase special settings row
-    try {
-      const payload = {
-        address: JSON.stringify({ services: nextList, vision: visionSettings, banking: bankingDetails, profile: adminProfile })
-      };
-      const { error: dbErr } = await supabase
-        .from('clients')
-        .update(payload)
-        .eq('email', 'settings@netra.graphics');
-
-      if (dbErr) throw dbErr;
-
-      toast({
-        title: "Service Calibrated Successfully",
-        description: `Updated config for: ${calibratingService.title}`
-      });
-    } catch (dbErr) {
-      console.error("Failed to save calibrated services to database:", dbErr);
-      toast({
-        variant: "destructive",
-        title: "Database Sync Failed",
-        description: "Could not save service calibrations to the remote database."
-      });
-    }
+    toast({
+      title: "Service Calibrated Successfully",
+      description: `Updated config for: ${calibratingService.title}`
+    });
 
     setIsCalibrationModalOpen(false);
     setCalibratingService(null);
@@ -1064,6 +908,10 @@ function App() {
               setAdminProfile(parsed.profile);
               safeSetLocalStorage('netra_admin_profile', JSON.stringify(parsed.profile));
             }
+            if (parsed.cashbook) {
+              setCashbookEntries(parsed.cashbook);
+              safeSetLocalStorage('netra_cashbook', JSON.stringify(parsed.cashbook));
+            }
           } catch (parseErr) {
             console.error("Failed to parse global settings from database:", parseErr);
           }
@@ -1072,7 +920,7 @@ function App() {
             name: 'System Settings',
             email: 'settings@netra.graphics',
             phone: 'SYSTEM',
-            address: JSON.stringify({ services: servicesList, vision: visionSettings, banking: bankingDetails, profile: adminProfile }),
+            address: JSON.stringify({ services: servicesList, vision: visionSettings, banking: bankingDetails, profile: adminProfile, cashbook: cashbookEntries }),
             status: 'Active',
             access_key: 'SYSTEM'
           };
@@ -1080,10 +928,48 @@ function App() {
         }
       } catch (err) {
         console.warn("Failed to sync global settings from Supabase, running on local cache:", err);
+      } finally {
+        setIsSettingsLoaded(true);
       }
     };
     fetchGlobalSettings();
   }, []);
+
+  // Automatic sync of global settings and cashbook entries to Supabase database & local storage
+  useEffect(() => {
+    if (!isSettingsLoaded) return;
+
+    localStorage.setItem('netra_services', JSON.stringify(servicesList));
+    localStorage.setItem('netra_vision_settings', JSON.stringify(visionSettings));
+    localStorage.setItem('netra_banking_details', JSON.stringify(bankingDetails));
+    localStorage.setItem('netra_admin_profile', JSON.stringify(adminProfile));
+    localStorage.setItem('netra_cashbook', JSON.stringify(cashbookEntries));
+
+    const syncToDb = async () => {
+      try {
+        const payload = {
+          address: JSON.stringify({
+            services: servicesList,
+            vision: visionSettings,
+            banking: bankingDetails,
+            profile: adminProfile,
+            cashbook: cashbookEntries
+          })
+        };
+        const { error } = await supabase
+          .from('clients')
+          .update(payload)
+          .eq('email', 'settings@netra.graphics');
+        
+        if (error) throw error;
+      } catch (err) {
+        console.warn("Failed to sync settings to Supabase:", err);
+      }
+    };
+
+    const timer = setTimeout(syncToDb, 1000); // 1-second debounce to avoid database spam
+    return () => clearTimeout(timer);
+  }, [servicesList, visionSettings, bankingDetails, adminProfile, cashbookEntries, isSettingsLoaded]);
 
   const toggleSound = () => {
     if (!audioRef.current) return;
@@ -1524,6 +1410,7 @@ function App() {
   const [redirectFilterService, setRedirectFilterService] = useState('');
   const [invoiceProject, setInvoiceProject] = useState(null);
   const [invoices, setInvoices] = useState([]);
+  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
   const [cashbookEntries, setCashbookEntries] = useState(() => {
     const saved = localStorage.getItem('netra_cashbook');
     if (saved) {
@@ -1536,10 +1423,6 @@ function App() {
     }
     return [];
   });
-
-  useEffect(() => {
-    localStorage.setItem('netra_cashbook', JSON.stringify(cashbookEntries));
-  }, [cashbookEntries]);
   const [selectedBatchProjects, setSelectedBatchProjects] = useState([]);
   const [selectedVaultInvoices, setSelectedVaultInvoices] = useState([]);
   const [highlightedCashbookId, setHighlightedCashbookId] = useState(null);
