@@ -545,6 +545,19 @@ function ServiceSlideshowContent({ service, onClose }) {
 
 function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
+  const [cashbookEntries, setCashbookEntries] = useState(() => {
+    const saved = localStorage.getItem('netra_cashbook');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.error("Failed to parse cashbook entries from localStorage:", e);
+      }
+    }
+    return [];
+  });
   const [servicesList, setServicesList] = useState(() => {
     const saved = localStorage.getItem('netra_services');
     if (saved) {
@@ -1410,19 +1423,6 @@ function App() {
   const [redirectFilterService, setRedirectFilterService] = useState('');
   const [invoiceProject, setInvoiceProject] = useState(null);
   const [invoices, setInvoices] = useState([]);
-  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
-  const [cashbookEntries, setCashbookEntries] = useState(() => {
-    const saved = localStorage.getItem('netra_cashbook');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      } catch (e) {
-        console.error("Failed to parse cashbook entries from localStorage:", e);
-      }
-    }
-    return [];
-  });
   const [selectedBatchProjects, setSelectedBatchProjects] = useState([]);
   const [selectedVaultInvoices, setSelectedVaultInvoices] = useState([]);
   const [highlightedCashbookId, setHighlightedCashbookId] = useState(null);
