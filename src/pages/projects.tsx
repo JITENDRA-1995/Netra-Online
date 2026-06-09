@@ -1,6 +1,6 @@
-﻿import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Plus, Search, Pencil, Trash2, FileText } from "lucide-react";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Plus, Search, Pencil, Trash2, FileText, SlidersHorizontal } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -94,6 +94,7 @@ export default function Projects({
     }
   }, [initialSearch]);
   const [filterStatus, setFilterStatus] = useState("all");
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<any | null>(null);
 
@@ -419,7 +420,9 @@ export default function Projects({
             Projects
           </h1>
           <p className="text-muted-foreground text-sm mt-1 tracking-widest uppercase">
-            {filtered.length} {filterStatus !== "all" ? filterStatus : "total"} active projects
+            {filterStatus !== "all"
+              ? `${filtered.length} ${filterStatus.replace("_", " ")} projects`
+              : `${projects.length} total projects`}
           </p>
         </div>
         <Button
@@ -432,107 +435,140 @@ export default function Projects({
         </Button>
       </motion.div>
 
-      {/* Search & Filters */}
-      <motion.div variants={itemVariants} className="flex gap-3 flex-wrap">
-        <div className="flex gap-1.5 p-1 rounded-xl bg-white/5 border border-white/10 flex-wrap">
-          {["ALL", "ACTIVE", "COMPLETED", "ON_HOLD", "CANCELLED"].map(status => (
-            <Button
-              key={status}
-              size="sm"
-              variant={filterStatus === status.toLowerCase() ? "secondary" : "ghost"}
-              className={`rounded-lg text-2xs font-semibold tracking-wider ${filterStatus === status.toLowerCase() ? "bg-white/10 text-cyan-400" : "text-muted-foreground hover:text-foreground"}`}
-              onClick={() => setFilterStatus(status.toLowerCase())}
-            >
-              {status}
-            </Button>
-          ))}
-        </div>
+      {/* Status Selector & Filters Toggle */}
+      <motion.div variants={itemVariants} className="flex gap-3 items-center flex-wrap">
+        <select
+          className="h-9 px-3 bg-[#0c101d]/60 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold uppercase min-w-[160px] hover:bg-white/5 transition-all"
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          data-testid="select-filter-status"
+        >
+          <option value="all">ALL MISSIONS</option>
+          <option value="active">ACTIVE</option>
+          <option value="completed">COMPLETED</option>
+          <option value="on_hold">ON HOLD</option>
+          <option value="cancelled">CANCELLED</option>
+        </select>
 
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            className="pl-9 bg-white/5 border-white/10 rounded-xl text-foreground bg-[#0a0f1e]/40"
-            placeholder="Search projects by name or client visionary..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            data-testid="input-search-projects"
-          />
+        <Button
+          variant="ghost"
+          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          className={`h-9 gap-2 text-xs font-bold rounded-xl border transition-all select-none ${
+            showAdvancedFilters
+              ? "bg-cyan-500/10 hover:bg-cyan-500/20 border-cyan-500/30 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.15)]"
+              : "bg-white/5 hover:bg-white/10 border-white/10 text-muted-foreground"
+          }`}
+        >
+          <SlidersHorizontal className="w-3.5 h-3.5" />
+          {showAdvancedFilters ? "HIDE FILTERS" : "SHOW FILTERS"}
+        </Button>
+
+        {/* Dynamic Matched Count */}
+        <div className="flex items-center gap-2 text-3xs font-mono font-bold tracking-widest text-muted-foreground bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl uppercase ml-auto">
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+          <span>MATCHED: {filtered.length}</span>
         </div>
       </motion.div>
 
-      {/* Multi-Layer Layered Filter Bar */}
-      <motion.div variants={itemVariants} className="flex gap-4 flex-wrap items-center bg-[#0c101d]/40 backdrop-blur-sm border border-white/5 p-4 rounded-2xl w-full">
-        {/* Client Selector */}
-        <div className="flex flex-col gap-1.5 min-w-[180px] flex-1">
-          <label className="text-3xs font-bold text-muted-foreground uppercase tracking-widest">Client Name</label>
-          <select
-            className="h-9 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer w-full uppercase"
-            value={filterClient}
-            onChange={(e) => setFilterClient(e.target.value)}
+      {/* Collapsible Search & Filter Area */}
+      <AnimatePresence>
+        {showAdvancedFilters && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+            className="overflow-hidden space-y-4 w-full"
           >
-            <option value="all">ALL CLIENTS</option>
-            {uniqueClients.map(c => (
-              <option key={c} value={c}>{c.toUpperCase()}</option>
-            ))}
-          </select>
-        </div>
+            {/* Search Input (Third Attachment) */}
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                className="pl-9 bg-white/5 border border-white/10 rounded-xl text-foreground bg-[#0a0f1e]/40 h-10 w-full"
+                placeholder="Search projects by name or client visionary..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                data-testid="input-search-projects"
+              />
+            </div>
 
-        {/* Month Selector */}
-        <div className="flex flex-col gap-1.5 min-w-[150px] flex-1">
-          <label className="text-3xs font-bold text-muted-foreground uppercase tracking-widest">Month</label>
-          <select
-            className="h-9 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer w-full uppercase"
-            value={filterMonth}
-            onChange={(e) => setFilterMonth(e.target.value)}
-          >
-            <option value="all">ALL MONTHS</option>
-            {uniqueMonths.map(m => (
-              <option key={m} value={m}>{m.toUpperCase()}</option>
-            ))}
-          </select>
-        </div>
+            {/* Layered Advanced Filter Bar (Second Attachment) */}
+            <div className="flex gap-4 flex-wrap items-center bg-[#0c101d]/40 backdrop-blur-sm border border-white/5 p-4 rounded-2xl w-full">
+              {/* Client Selector */}
+              <div className="flex flex-col gap-1.5 min-w-[180px] flex-1">
+                <label className="text-3xs font-bold text-muted-foreground uppercase tracking-widest">Client Name</label>
+                <select
+                  className="h-9 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer w-full uppercase"
+                  value={filterClient}
+                  onChange={(e) => setFilterClient(e.target.value)}
+                >
+                  <option value="all">ALL CLIENTS</option>
+                  {uniqueClients.map(c => (
+                    <option key={c} value={c}>{c.toUpperCase()}</option>
+                  ))}
+                </select>
+              </div>
 
-        {/* Start Date */}
-        <div className="flex flex-col gap-1.5 min-w-[130px] flex-1">
-          <label className="text-3xs font-bold text-muted-foreground uppercase tracking-widest">Start Date</label>
-          <input
-            type="date"
-            className="h-9 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer w-full"
-            value={filterStartDate}
-            onChange={(e) => setFilterStartDate(e.target.value)}
-            style={{ colorScheme: 'dark' }}
-          />
-        </div>
+              {/* Month Selector */}
+              <div className="flex flex-col gap-1.5 min-w-[150px] flex-1">
+                <label className="text-3xs font-bold text-muted-foreground uppercase tracking-widest">Month</label>
+                <select
+                  className="h-9 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer w-full uppercase"
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(e.target.value)}
+                >
+                  <option value="all">ALL MONTHS</option>
+                  {uniqueMonths.map(m => (
+                    <option key={m} value={m}>{m.toUpperCase()}</option>
+                  ))}
+                </select>
+              </div>
 
-        {/* End Date */}
-        <div className="flex flex-col gap-1.5 min-w-[130px] flex-1">
-          <label className="text-3xs font-bold text-muted-foreground uppercase tracking-widest">End Date</label>
-          <input
-            type="date"
-            className="h-9 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer w-full"
-            value={filterEndDate}
-            onChange={(e) => setFilterEndDate(e.target.value)}
-            style={{ colorScheme: 'dark' }}
-          />
-        </div>
+              {/* Start Date */}
+              <div className="flex flex-col gap-1.5 min-w-[130px] flex-1">
+                <label className="text-3xs font-bold text-muted-foreground uppercase tracking-widest">Start Date</label>
+                <input
+                  type="date"
+                  className="h-9 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer w-full"
+                  value={filterStartDate}
+                  onChange={(e) => setFilterStartDate(e.target.value)}
+                  style={{ colorScheme: 'dark' }}
+                />
+              </div>
 
-        {/* Reset Button */}
-        {(filterClient !== "all" || filterMonth !== "all" || filterStartDate !== "" || filterEndDate !== "") && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-9 px-4 text-2xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 rounded-xl self-end"
-            onClick={() => {
-              setFilterClient("all");
-              setFilterMonth("all");
-              setFilterStartDate("");
-              setFilterEndDate("");
-            }}
-          >
-            RESET
-          </Button>
+              {/* End Date */}
+              <div className="flex flex-col gap-1.5 min-w-[130px] flex-1">
+                <label className="text-3xs font-bold text-muted-foreground uppercase tracking-widest">End Date</label>
+                <input
+                  type="date"
+                  className="h-9 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer w-full"
+                  value={filterEndDate}
+                  onChange={(e) => setFilterEndDate(e.target.value)}
+                  style={{ colorScheme: 'dark' }}
+                />
+              </div>
+
+              {/* Reset Button */}
+              {(filterClient !== "all" || filterMonth !== "all" || filterStartDate !== "" || filterEndDate !== "" || search !== "") && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-9 px-4 text-2xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 rounded-xl self-end animate-fade-in"
+                  onClick={() => {
+                    setFilterClient("all");
+                    setFilterMonth("all");
+                    setFilterStartDate("");
+                    setFilterEndDate("");
+                    setSearch("");
+                  }}
+                >
+                  RESET
+                </Button>
+              )}
+            </div>
+          </motion.div>
         )}
-      </motion.div>
+      </AnimatePresence>
 
       {/* Grid */}
       <motion.div variants={containerVariants} className="space-y-4">

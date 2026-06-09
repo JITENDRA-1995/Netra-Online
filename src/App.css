@@ -2991,6 +2991,8 @@ input[type="number"] {
 .active-module-header {
   margin-bottom: 3rem;
   text-align: left;
+  display: inline-flex;
+  flex-direction: column;
 }
 
 .module-title {
@@ -3004,12 +3006,33 @@ input[type="number"] {
 }
 
 .title-underline {
-  width: 80px;
-  height: 4px;
-  background: #00E5FF;
+  position: relative;
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
   margin-top: 1rem;
-  box-shadow: 0 0 15px #00E5FF;
+  border-radius: 9999px;
+  overflow: hidden;
+  box-shadow: none;
 }
+
+.title-underline::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -40%;
+  height: 100%;
+  width: 30%;
+  background: linear-gradient(90deg, transparent, #00E5FF, transparent);
+  filter: drop-shadow(0 0 8px #00E5FF);
+  animation: laser-scan 3s infinite linear;
+}
+
+@keyframes laser-scan {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
+
 
 .command-center-dashboard {
   width: 100%;
