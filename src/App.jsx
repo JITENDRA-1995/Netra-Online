@@ -2840,6 +2840,7 @@ function App() {
         name: clientInfo.name,
         service: serviceName,
         stage: 1,
+        progress: 25,
         status: "Active",
         deadline: formData.get('deadline'),
         isManual: true,
@@ -3238,6 +3239,40 @@ function App() {
       return p;
     }));
   };
+
+  const handleUpdateProjectProgressHandy = async (projectId, newProgress) => {
+    const project = ignitionQueue.find(p => p.id === projectId);
+    if (!project) return;
+
+    let updatedFields = {
+      progress: newProgress
+    };
+
+    if (newProgress === 25) updatedFields.stage = 1;
+    else if (newProgress === 50) updatedFields.stage = 2;
+    else if (newProgress === 75) updatedFields.stage = 3;
+    else if (newProgress === 100) updatedFields.stage = 4;
+
+    try {
+      await updateProjectState(projectId, updatedFields);
+      setIgnitionQueue(prev => prev.map(p => {
+        if (p.id === projectId) {
+          return {
+            ...p,
+            ...updatedFields
+          };
+        }
+        return p;
+      }));
+      toast({
+        title: "Project Progress Calibrated",
+        description: `Successfully updated progress to ${newProgress}%.`
+      });
+    } catch (err) {
+      console.warn("Failed to update project progress in Supabase:", err);
+    }
+  };
+
 
 
   const handleUpdateCashbookEntry = (e) => {
@@ -4434,6 +4469,7 @@ function App() {
                               setIsInvoicePreviewOpen(true);
                             }}
                             handleUpdateProjectStatusHandy={handleUpdateProjectStatusHandy}
+                            handleUpdateProjectProgressHandy={handleUpdateProjectProgressHandy}
                             setCashbookEntries={setCashbookEntries}
                             initialSearch={projectsSearchQuery}
                             onDeleteProject={(id) => {

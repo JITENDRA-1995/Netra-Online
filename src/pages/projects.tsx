@@ -59,6 +59,7 @@ interface ProjectsProps {
   setCustomPaymentPrompt?: (p: any) => void;
   onDownloadInvoice?: (p: any) => void;
   handleUpdateProjectStatusHandy?: (projectId: number, newProjectStatus: string) => void;
+  handleUpdateProjectProgressHandy?: (projectId: number, newProgress: number) => void;
   setCashbookEntries?: React.Dispatch<React.SetStateAction<any[]>>;
   initialSearch?: string;
   onDeleteProject?: (id: number) => void;
@@ -81,6 +82,7 @@ export default function Projects({
   setCustomPaymentPrompt,
   onDownloadInvoice,
   handleUpdateProjectStatusHandy,
+  handleUpdateProjectProgressHandy,
   setCashbookEntries,
   initialSearch = "",
   onDeleteProject
@@ -683,17 +685,53 @@ export default function Projects({
                 </div>
               </div>
 
-              <div className="mt-4 flex items-center gap-3">
-                <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full"
-                    style={{ background: statusColor }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progressVal}%` }}
-                    transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
-                  />
+              <div className="mt-5 space-y-2.5">
+                {/* Easy Progress Stepper */}
+                <div className="flex justify-between items-center gap-2 flex-wrap">
+                  {[
+                    { label: "Discover", val: 25 },
+                    { label: "Define", val: 50 },
+                    { label: "Design", val: 75 },
+                    { label: "Deliver", val: 100 }
+                  ].map((step) => {
+                    const isPassedOrCurrent = progressVal >= step.val;
+                    return (
+                      <button
+                        key={step.label}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (handleUpdateProjectProgressHandy) {
+                            handleUpdateProjectProgressHandy(project.id, step.val);
+                          }
+                        }}
+                        className={`flex-1 py-1.5 px-2 rounded-lg border text-[10px] font-black tracking-wider uppercase transition-all duration-200 cursor-pointer ${
+                          isPassedOrCurrent
+                            ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.1)] hover:bg-cyan-500/20"
+                            : "bg-white/5 border-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                        }`}
+                        title={`Set progress to ${step.val}% (${step.label})`}
+                      >
+                        {step.label}
+                      </button>
+                    );
+                  })}
                 </div>
-                <span className="text-xs text-muted-foreground w-8 text-right font-semibold">{progressVal}%</span>
+
+                {/* Progress bar line representation */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{ background: statusColor }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progressVal}%` }}
+                      transition={{ duration: 0.8, ease: "easeOut" }}
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground w-8 text-right font-semibold">{progressVal}%</span>
+                </div>
               </div>
             </motion.div>
           );
@@ -783,11 +821,17 @@ export default function Projects({
                       className="bg-white/5 border-white/10 rounded-xl text-xs focus:border-cyan-400" />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Progress (%)</label>
-                    <Input type="number" value={formProgress}
-                      onChange={(e) => setFormProgress(e.target.value === "" ? "" : Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                      onFocus={() => { if (formProgress === 0) setFormProgress(""); }}
-                      className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" min={0} max={100} placeholder="0" />
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Project Stage</label>
+                    <select
+                      className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold"
+                      value={formProgress}
+                      onChange={(e) => setFormProgress(parseInt(e.target.value))}
+                    >
+                      <option value={25}>Discover (25%)</option>
+                      <option value={50}>Define (50%)</option>
+                      <option value={75}>Design (75%)</option>
+                      <option value={100}>Deliver (100%)</option>
+                    </select>
                   </div>
                 </div>
                 <div className="pt-1">
