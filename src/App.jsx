@@ -1508,6 +1508,8 @@ function App() {
 
   const [isInvoicePreviewOpen, setIsInvoicePreviewOpen] = useState(false);
   const [ledgerSearch, setLedgerSearch] = useState('');
+  const [redirectFilterClient, setRedirectFilterClient] = useState('');
+  const [redirectFilterService, setRedirectFilterService] = useState('');
   const [invoiceProject, setInvoiceProject] = useState(null);
   const [invoices, setInvoices] = useState([]);
   const [cashbookEntries, setCashbookEntries] = useState(() => {
@@ -4399,6 +4401,24 @@ function App() {
                             clients={clients}
                             invoices={invoices}
                             cashbookEntries={cashbookEntries}
+                            onOpenIgnitionModal={() => { setPrefillData(null); setIsIgnitionModalOpen(true); }}
+                            onOpenCreateClient={() => { setSelectedClient(null); setIsClientModalOpen(true); }}
+                            setActiveAdminModule={setActiveAdminModule}
+                            onDownloadInvoice={(p) => {
+                              setInvoiceProject(p);
+                              setIsInvoicePreviewOpen(true);
+                            }}
+                            onFilterProjectsByClient={(clientName) => {
+                              setProjectsSearchQuery(clientName);
+                              setActiveAdminModule("PROJECTS");
+                            }}
+                            onRedirectToFinancialsProject={(p) => {
+                              setLedgerSearch('');
+                              setRedirectFilterClient(p.name || '');
+                              setRedirectFilterService(p.service || '');
+                              setFinancialTab("PROJECTS");
+                              setActiveAdminModule("FINANCIALS");
+                            }}
                           />
                         )}
 
@@ -4494,6 +4514,7 @@ function App() {
                             setCashbookEntries={setCashbookEntries}
                             invoices={invoices}
                             setInvoices={setInvoices}
+                            clients={clients}
                             monthlyTarget={monthlyTarget}
                             setMonthlyTarget={setMonthlyTarget}
                             financialTab={financialTab}
@@ -4501,6 +4522,12 @@ function App() {
                             financialMetrics={financialMetrics}
                             cashbookMetrics={cashbookMetrics}
                             highlightedCashbookId={highlightedCashbookId}
+                            ledgerSearch={ledgerSearch}
+                            setLedgerSearch={setLedgerSearch}
+                            redirectFilterClient={redirectFilterClient}
+                            setRedirectFilterClient={setRedirectFilterClient}
+                            redirectFilterService={redirectFilterService}
+                            setRedirectFilterService={setRedirectFilterService}
                             setCustomPaymentPrompt={setCustomPaymentPrompt}
                             setIsCashbookEditModalOpen={setIsCashbookEditModalOpen}
                             setSelectedCashbookEntry={setSelectedCashbookEntry}

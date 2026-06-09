@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   AreaChart,
   Area,
@@ -21,6 +21,7 @@ import {
   Zap,
   AlertTriangle,
   Clock,
+  ChevronRight,
 } from "lucide-react";
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -86,14 +87,29 @@ interface DashboardProps {
   clients?: any[];
   invoices?: any[];
   cashbookEntries?: any[];
+  onOpenIgnitionModal?: () => void;
+  onOpenCreateClient?: () => void;
+  setActiveAdminModule?: (module: string) => void;
+  onDownloadInvoice?: (project: any) => void;
+  onFilterProjectsByClient?: (clientName: string) => void;
+  onRedirectToFinancialsProject?: (project: any) => void;
 }
 
 export default function Dashboard({
   projects = [],
   clients = [],
   invoices = [],
-  cashbookEntries = []
+  cashbookEntries = [],
+  onOpenIgnitionModal,
+  onOpenCreateClient,
+  setActiveAdminModule,
+  onDownloadInvoice,
+  onFilterProjectsByClient,
+  onRedirectToFinancialsProject
 }: DashboardProps) {
+  // Active Tab state
+  const [selectedTab, setSelectedTab] = useState<'revenue' | 'projects' | 'clients' | 'invoices'>('revenue');
+
   // 1. Calculate live statistics
   const activeProjects = projects.filter(p => p.status === 'Ongoing' || p.status === 'Active').length;
   const totalClients = clients.filter(c => c.email !== 'settings@netra.graphics').length;
@@ -171,34 +187,7 @@ export default function Dashboard({
     return months;
   }, [cashbookEntries]);
 
-  // 3. Project Breakdown by Category
-  const projectBreakdown = useMemo(() => {
-    const counts: Record<string, number> = {};
-    const values: Record<string, number> = {};
-    
-    projects.forEach(p => {
-      const cat = p.category || 'branding';
-      counts[cat] = (counts[cat] || 0) + 1;
-      values[cat] = (values[cat] || 0) + (parseFloat(p.quote) || 0);
-    });
-
-    const list = Object.entries(counts).map(([category, count]) => ({
-      category,
-      count,
-      value: values[category]
-    }));
-
-    if (list.length === 0) {
-      return [
-        { category: 'branding', count: 0, value: 0 },
-        { category: 'web', count: 0, value: 0 },
-        { category: 'print', count: 0, value: 0 }
-      ];
-    }
-    return list;
-  }, [projects]);
-
-  // 4. Recent Activity Logs (from project activity logs)
+  // 4. Recent Activity Logs
   const recentActivity = useMemo(() => {
     const list = projects.flatMap(p => 
       (p.activityLog || []).map((log, idx) => {
@@ -223,8 +212,32 @@ export default function Dashboard({
       .slice(0, 10);
   }, [projects]);
 
+  const getStagePercent = (stage: any) => {
+    const s = String(stage || "").toLowerCase();
+    if (s.includes('handover') || s.includes('completion') || s === '5') return 90;
+    if (s.includes('feedback') || s.includes('review') || s === '4') return 75;
+    if (s.includes('design') || s.includes('development') || s === '3') return 50;
+    if (s.includes('brief') || s.includes('planning') || s === '2') return 25;
+    if (s.includes('ignition') || s.includes('start') || s === '1') return 10;
+    return 40;
+  };
+
+  const formatDeadline = (deadline: any) => {
+    if (!deadline) return "";
+    const parsed = new Date(deadline);
+    if (isNaN(parsed.getTime())) return String(deadline);
+    return parsed.toLocaleDateString();
+  };
+
+  const formatQuote = (quote: any) => {
+    if (quote === undefined || quote === null) return "0";
+    const num = parseFloat(String(quote).replace(/[^0-9.-]/g, ""));
+    return isNaN(num) ? "0" : num.toLocaleString();
+  };
+
   const statCards = [
     {
+      tabKey: "revenue" as const,
       label: "Total Revenue",
       value: totalRevenue,
       prefix: "₹",
@@ -235,6 +248,7 @@ export default function Dashboard({
       color: "#00d4ff",
     },
     {
+      tabKey: "projects" as const,
       label: "Active Projects",
       value: activeProjects,
       prefix: undefined,
@@ -249,6 +263,7 @@ export default function Dashboard({
       color: "#8b5cf6",
     },
     {
+      tabKey: "clients" as const,
       label: "Total Clients",
       value: totalClients,
       prefix: undefined,
@@ -259,6 +274,7 @@ export default function Dashboard({
       color: "#10b981",
     },
     {
+      tabKey: "invoices" as const,
       label: "Pending Invoices",
       value: pendingInvoices,
       prefix: "₹",
@@ -270,12 +286,416 @@ export default function Dashboard({
     },
   ];
 
+  // Views Render Helpers
+  const renderRevenueView = () => {
+    return (
+      <div className="space-y-8">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Revenue Trend Chart */}
+          <div className="xl:col-span-2 rounded-2xl border bg-card/40 backdrop-blur-sm p-6" style={{ borderColor: '#00d4ff20' }}>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="font-bold text-foreground text-lg">Revenue Trend</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">12-month overview</p>
+              </div>
+              <Zap className="w-5 h-5 text-cyan-400" />
+            </div>
+            <ResponsiveContainer width="100%" height={210}>
+              <AreaChart data={revenueTrend} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                <defs>
+                  <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#00d4ff" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#00d4ff" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="month" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                <Tooltip
+                  contentStyle={{
+                    background: "rgba(10,15,30,0.95)",
+                    border: "1px solid rgba(0,212,255,0.2)",
+                    borderRadius: "12px",
+                    color: "#fff",
+                  }}
+                  formatter={(value: number) => [`₹${value.toLocaleString()}`, ""]}
+                />
+                <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#00d4ff" strokeWidth={2} fill="url(#revenueGrad)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Expense Graph */}
+          <div className="rounded-2xl border bg-card/40 backdrop-blur-sm p-6" style={{ borderColor: '#ef444420' }}>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="font-bold text-foreground text-lg text-red-400">Expense Graph</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">12-month expenditures (Financials Sync)</p>
+              </div>
+              <TrendingDown className="w-5 h-5 text-red-500" />
+            </div>
+            <ResponsiveContainer width="100%" height={210}>
+              <AreaChart data={revenueTrend} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                <defs>
+                  <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#ef4444" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="month" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                <Tooltip
+                  contentStyle={{
+                    background: "rgba(30,10,10,0.95)",
+                    border: "1px solid rgba(239,68,68,0.2)",
+                    borderRadius: "12px",
+                    color: "#fff",
+                  }}
+                  formatter={(value: number) => [`₹${value.toLocaleString()}`, ""]}
+                />
+                <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={2} fill="url(#expenseGrad)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <Clock className="w-5 h-5 text-violet-400" />
+            <h3 className="font-bold text-foreground text-lg">Recent Activity</h3>
+          </div>
+          <div className="space-y-3">
+            {recentActivity?.map((item, i) => (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="flex items-center gap-4 p-3 rounded-xl border border-white/5 hover:border-white/10 transition-colors"
+              >
+                <span
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ background: ACTIVITY_COLORS[item.type] ?? "#666", boxShadow: `0 0 6px ${ACTIVITY_COLORS[item.type] ?? "#666"}` }}
+                />
+                <span className="text-sm text-foreground flex-1">{item.description}</span>
+                <span className="text-xs text-muted-foreground flex-shrink-0">
+                  {new Date(item.createdAt).toLocaleDateString()}
+                </span>
+              </motion.div>
+            ))}
+            {recentActivity?.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">No recent activity</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderProjectsView = () => {
+    const ongoingProjects = (projects || []).filter(p => p && (p.status === 'Ongoing' || p.status === 'Active'));
+
+    return (
+      <div className="rounded-2xl border bg-card/40 backdrop-blur-sm p-6" style={{ borderColor: '#8b5cf630' }}>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="font-bold text-foreground text-lg text-violet-400 font-sans tracking-wide">Ongoing Projects</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Currently active studio workspaces</p>
+          </div>
+          <Briefcase className="w-5 h-5 text-violet-500 animate-pulse" />
+        </div>
+
+        {ongoingProjects.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {ongoingProjects.map((p) => {
+              if (!p) return null;
+              const progress = getStagePercent(p.stage);
+              return (
+                <div 
+                  key={p.id || Math.random().toString()} 
+                  className="rounded-xl border bg-violet-950/5 hover:bg-violet-950/10 p-5 transition-all duration-300 group flex flex-col justify-between"
+                  style={{ borderColor: '#8b5cf620' }}
+                >
+                  <div>
+                    <div className="flex justify-between items-start mb-3 gap-2">
+                      <div>
+                        <h4 className="font-black text-foreground text-base group-hover:text-violet-400 transition-colors">{p.name || 'Unnamed'}</h4>
+                        <span className="text-xs text-muted-foreground font-medium">{p.service || 'General Service'}</span>
+                      </div>
+                      <span className="text-3xs font-semibold tracking-wider uppercase bg-violet-500/15 border px-2 py-0.5 rounded text-violet-400" style={{ borderColor: '#8b5cf640' }}>
+                        {p.stage || 'Ongoing'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 mt-4">
+                      <div className="flex justify-between text-3xs text-muted-foreground">
+                        <span>Workspace Progress</span>
+                        <span>{progress}%</span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-white/5 overflow-hidden">
+                        <div 
+                          className="h-full rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-500 transition-all duration-500" 
+                          style={{ width: `${progress}%` }} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center mt-6 pt-3 border-t border-white/5 text-xs">
+                    <span className="text-muted-foreground">
+                      Project Value: <strong className="text-foreground font-black">₹{formatQuote(p.quote)}</strong>
+                    </span>
+                    {p.deadline && (
+                      <span className="text-3xs text-violet-300 bg-violet-500/10 px-2 py-0.5 rounded flex items-center gap-1">
+                        <Clock className="w-2.5 h-2.5" />
+                        Due: {formatDeadline(p.deadline)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center border border-dashed rounded-xl py-16 px-4 text-center" style={{ borderColor: '#8b5cf630' }}>
+            <motion.div 
+              animate={{ 
+                scale: [1, 1.05, 1],
+                boxShadow: ["0 0 10px rgba(139,92,246,0.2)", "0 0 25px rgba(139,92,246,0.5)", "0 0 10px rgba(139,92,246,0.2)"]
+              }}
+              transition={{ repeat: Infinity, duration: 3 }}
+              onClick={() => onOpenIgnitionModal && onOpenIgnitionModal()}
+              className="w-16 h-16 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center mb-4 cursor-pointer group"
+            >
+              <Zap className="w-6 h-6 text-violet-400 group-hover:scale-125 transition-transform duration-300" />
+            </motion.div>
+            <h4 className="text-lg font-black text-foreground mb-1">
+              No ongoing project, let's ignite a new revolution!
+            </h4>
+            <p className="text-sm text-muted-foreground max-w-sm mb-6">
+              Ignite your next visionary project workspace and shape the digital canvas.
+            </p>
+            <motion.button
+              whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(139,92,246,0.4)" }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => onOpenIgnitionModal && onOpenIgnitionModal()}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-violet-600 hover:bg-violet-500 text-white font-bold text-sm tracking-wider transition-all duration-300 cursor-pointer"
+            >
+              <span className="text-lg font-bold">+</span> IGNITE PROJECT
+            </motion.button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderClientsView = () => {
+    const activeClients = clients.filter(c => c.email !== 'settings@netra.graphics');
+
+    return (
+      <div className="rounded-2xl border bg-card/40 backdrop-blur-sm p-6" style={{ borderColor: '#10b98130' }}>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div className="flex flex-col gap-1">
+            <h3 className="font-bold text-foreground text-lg text-emerald-400 font-sans tracking-wide">Active Visionaries</h3>
+            <p className="text-xs text-muted-foreground">List of clients associated with our studio</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onOpenCreateClient}
+              className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 hover:underline transition-colors flex items-center gap-1 cursor-pointer bg-transparent border-none outline-none"
+            >
+              + Create New Client
+            </button>
+            <Users className="w-5 h-5 text-emerald-500 animate-pulse" />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-white/5 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <th className="py-3 px-4">Client Name</th>
+                <th className="py-3 px-4">Email</th>
+                <th className="py-3 px-4">Phone</th>
+                <th className="py-3 px-4 text-center">Projects</th>
+                <th className="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5 text-xs text-foreground">
+              {activeClients.length > 0 ? (
+                activeClients.map((client) => {
+                  const clientProjectsCount = projects.filter(p => p.name === client.name).length;
+                  return (
+                    <tr key={client.id || client.email} className="hover:bg-emerald-500/5 transition-colors">
+                      <td className="py-3 px-4 font-bold">{client.name}</td>
+                      <td className="py-3 px-4 text-muted-foreground">{client.email || 'N/A'}</td>
+                      <td className="py-3 px-4 text-muted-foreground">{client.phone || 'N/A'}</td>
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          onClick={() => {
+                            if (onFilterProjectsByClient) {
+                              onFilterProjectsByClient(client.name);
+                            }
+                          }}
+                          className="px-2 py-0.5 rounded bg-emerald-500/10 border text-emerald-400 text-3xs font-bold hover:bg-emerald-500/20 hover:text-emerald-300 transition-colors cursor-pointer bg-transparent border-emerald-500/40 outline-none"
+                          title={`Click to view projects for ${client.name}`}
+                        >
+                          {clientProjectsCount}
+                        </button>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          onClick={() => {
+                            if (setActiveAdminModule) {
+                              setActiveAdminModule("CLIENTS");
+                            }
+                          }}
+                          className="px-3 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-medium text-2xs transition-colors flex items-center gap-1 ml-auto cursor-pointer border-none"
+                        >
+                          View in Vault <ChevronRight className="w-3 h-3" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-muted-foreground text-sm">
+                    No clients found. Click "+ Create New Client" to add a client.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  const renderInvoicesView = () => {
+    const pendingInvoicesList = projects.filter(p => {
+      if ((p.status || "").toLowerCase() === "cancelled") return false;
+      const baseQuote = parseFloat(p.quote) || 0;
+      const discountVal = parseFloat(p.discount) || 0;
+      const finalQuote = baseQuote - discountVal;
+      const isPaid = p.paymentStatus === 'paid' || (p.status || "").toLowerCase() === "completed";
+      const adv = parseFloat(p.advanceAmount) || 0;
+      const dues = isPaid ? 0 : (finalQuote - adv);
+      return dues > 0;
+    });
+
+    return (
+      <div className="rounded-2xl border bg-card/40 backdrop-blur-sm p-6" style={{ borderColor: '#f59e0b30' }}>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="font-bold text-foreground text-lg text-amber-400 font-sans tracking-wide">Pending Invoices</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Outstanding payments requiring settlement</p>
+          </div>
+          <FileText className="w-5 h-5 text-amber-500 animate-pulse" />
+        </div>
+
+        {pendingInvoicesList.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/5 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="py-3 px-4">Invoice No</th>
+                  <th className="py-3 px-4">Client / Project</th>
+                  <th className="py-3 px-4 text-right">Grand Total</th>
+                  <th className="py-3 px-4 text-right">Dues Outstanding</th>
+                  <th className="py-3 px-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-xs text-foreground">
+                {pendingInvoicesList.map((p) => {
+                  const existingInv = invoices.find(inv => inv.rawProject?.id === p.id);
+                  const invoiceNo = existingInv ? existingInv.invoiceNo : `DRAFT-${p.id.slice(0, 5).toUpperCase()}`;
+                  
+                  const baseQuote = parseFloat(p.quote) || 0;
+                  const discountVal = parseFloat(p.discount) || 0;
+                  const finalQuote = baseQuote - discountVal;
+                  const adv = parseFloat(p.advanceAmount) || 0;
+                  const dues = finalQuote - adv;
+
+                  return (
+                    <tr key={p.id} className="hover:bg-amber-500/5 transition-colors">
+                      <td className="py-3 px-4 font-mono font-bold text-amber-400">
+                        <button
+                          onClick={() => {
+                            if (onRedirectToFinancialsProject) {
+                              onRedirectToFinancialsProject(p);
+                            }
+                          }}
+                          className="hover:underline hover:text-amber-300 transition-colors cursor-pointer text-left bg-transparent border-none outline-none font-mono font-bold text-amber-400"
+                          title={`Click to redirect to Financials and filter by ${p.service}`}
+                        >
+                          {invoiceNo}
+                        </button>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-foreground">{p.name}</span>
+                          <span className="text-3xs text-muted-foreground mt-0.5">{p.service}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-right">₹{finalQuote.toLocaleString()}</td>
+                      <td className="py-3 px-4 text-right text-amber-400 font-bold">₹{dues.toLocaleString()}</td>
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          onClick={() => {
+                            if (onDownloadInvoice) {
+                              onDownloadInvoice(p);
+                            }
+                          }}
+                          className="p-1.5 rounded hover:bg-amber-500/20 text-amber-400 transition-colors inline-flex items-center justify-center cursor-pointer border-none bg-transparent"
+                          title="View Invoice"
+                        >
+                          <FileText className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            <motion.div
+              animate={{
+                rotate: [0, 5, -5, 5, 0],
+                scale: [1, 1.08, 0.95, 1.05, 1],
+              }}
+              transition={{
+                duration: 2.5,
+                repeat: Infinity,
+                repeatType: "reverse",
+                ease: "easeInOut"
+              }}
+              className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mb-4"
+            >
+              <Zap className="w-6 h-6 text-amber-400 animate-bounce" />
+            </motion.div>
+            <h4 className="text-lg font-black text-foreground mb-1">
+              Fully settled! No pending invoices.
+            </h4>
+            <p className="text-sm text-muted-foreground max-w-sm">
+              All client balances are perfectly cleared and accounts are completely balanced. Keep up the momentum!
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <motion.div
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-8"
+      className="space-y-8 animate-fade-in"
     >
       {/* Header */}
       <motion.div variants={itemVariants} className="flex justify-between items-start">
@@ -298,198 +718,87 @@ export default function Dashboard({
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {statCards.map((card, i) => (
-          <motion.div
-            key={card.label}
-            variants={itemVariants}
-            className="relative overflow-hidden rounded-2xl p-5 border backdrop-blur-sm group cursor-default"
-            style={{
-              background: `linear-gradient(135deg, ${card.color}08 0%, transparent 100%)`,
-              borderColor: `${card.color}20`,
-            }}
-            whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-            data-testid={`stat-card-${card.label.toLowerCase().replace(/ /g, "-")}`}
-          >
-            <div
-              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        {statCards.map((card, i) => {
+          const isActive = selectedTab === card.tabKey;
+          return (
+            <motion.button
+              key={card.label}
+              variants={itemVariants}
+              onClick={() => setSelectedTab(card.tabKey)}
+              className="relative overflow-hidden rounded-2xl p-5 border backdrop-blur-sm group text-left w-full transition-all duration-300 cursor-pointer text-foreground"
               style={{
-                background: `radial-gradient(circle at 50% 50%, ${card.color}10, transparent 70%)`,
+                background: isActive 
+                  ? `linear-gradient(135deg, ${card.color}12 0%, ${card.color}03 100%)` 
+                  : `linear-gradient(135deg, ${card.color}08 0%, transparent 100%)`,
+                borderColor: isActive ? card.color : `${card.color}20`,
+                boxShadow: isActive ? `0 0 25px ${card.color}15, inset 0 0 10px ${card.color}08` : 'none',
               }}
-            />
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">
-                  {card.label}
-                </span>
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ background: `${card.color}15`, border: `1px solid ${card.color}30` }}
-                >
-                  <card.icon className="w-4 h-4" style={{ color: card.color }} />
-                </div>
-              </div>
-              <div className="text-3xl font-black text-foreground mb-1">
-                <AnimatedNumber value={card.value} prefix={card.prefix} />
-              </div>
-              {card.trend !== undefined && (
-                <div className="flex items-center gap-1 text-xs">
-                  {card.trend >= 0 ? (
-                    <TrendingUp className="w-3 h-3 text-emerald-400" />
-                  ) : (
-                    <TrendingDown className="w-3 h-3 text-red-400" />
-                  )}
-                  <span className={card.trend >= 0 ? "text-emerald-400" : "text-red-400"}>
-                    {card.trend >= 0 ? "+" : ""}{card.trend}%
-                  </span>
-                  {card.trendLabel && <span className="text-muted-foreground">{card.trendLabel}</span>}
-                </div>
-              )}
-              {card.overdue !== undefined && card.overdue > 0 && (
-                <div className="flex items-center gap-1 text-xs text-amber-400">
-                  <AlertTriangle className="w-3 h-3" />
-                  <span>{card.overdue} overdue</span>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Revenue Trend */}
-        <motion.div
-          variants={itemVariants}
-          className="xl:col-span-2 rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-6"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="font-bold text-foreground text-lg">Revenue Trend</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">12-month overview</p>
-            </div>
-            <Zap className="w-5 h-5 text-cyan-400" />
-          </div>
-          <ResponsiveContainer width="100%" height={210}>
-            <AreaChart data={revenueTrend} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-              <defs>
-                <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#00d4ff" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#00d4ff" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.2} />
-                  <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="month" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-              <Tooltip
-                contentStyle={{
-                  background: "rgba(10,15,30,0.95)",
-                  border: "1px solid rgba(0,212,255,0.2)",
-                  borderRadius: "12px",
-                  color: "#fff",
-                }}
-                formatter={(value: number) => [`₹${value.toLocaleString()}`, ""]}
-              />
-              <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#00d4ff" strokeWidth={2} fill="url(#revenueGrad)" />
-              <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#8b5cf6" strokeWidth={2} fill="url(#expenseGrad)" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </motion.div>
-
-        {/* Project Breakdown */}
-        <motion.div
-          variants={itemVariants}
-          className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-6"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="font-bold text-foreground text-lg">By Category</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Project distribution</p>
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={150}>
-            <PieChart>
-              <Pie
-                data={projectBreakdown}
-                cx="50%"
-                cy="50%"
-                innerRadius={45}
-                outerRadius={68}
-                dataKey="count"
-                paddingAngle={3}
-              >
-                {projectBreakdown?.map((entry, index) => (
-                  <Cell
-                    key={entry.category}
-                    fill={CATEGORY_COLORS[entry.category] ?? "#666"}
-                    opacity={0.9}
-                  />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{
-                  background: "rgba(10,15,30,0.95)",
-                  border: "1px solid rgba(0,212,255,0.2)",
-                  borderRadius: "10px",
-                  color: "#fff",
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="mt-3 space-y-1.5">
-            {projectBreakdown?.slice(0, 4).map((item) => (
-              <div key={item.category} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ background: CATEGORY_COLORS[item.category] ?? "#666" }}
-                  />
-                  <span className="text-muted-foreground capitalize">{item.category.replace("_", " ")}</span>
-                </div>
-                <span className="font-medium text-foreground">{item.count}</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Recent Activity */}
-      <motion.div
-        variants={itemVariants}
-        className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-6"
-      >
-        <div className="flex items-center gap-3 mb-6">
-          <Clock className="w-5 h-5 text-violet-400" />
-          <h3 className="font-bold text-foreground text-lg">Recent Activity</h3>
-        </div>
-        <div className="space-y-3">
-          {recentActivity?.map((item, i) => (
-            <motion.div
-              key={item.id}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="flex items-center gap-4 p-3 rounded-xl border border-white/5 hover:border-white/10 transition-colors"
-              data-testid={`activity-item-${item.id}`}
+              whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+              whileTap={{ scale: 0.98 }}
+              data-testid={`stat-card-${card.label.toLowerCase().replace(/ /g, "-")}`}
             >
-              <span
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{ background: ACTIVITY_COLORS[item.type] ?? "#666", boxShadow: `0 0 6px ${ACTIVITY_COLORS[item.type] ?? "#666"}` }}
+              <div
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                style={{
+                  background: `radial-gradient(circle at 50% 50%, ${card.color}15, transparent 70%)`,
+                }}
               />
-              <span className="text-sm text-foreground flex-1">{item.description}</span>
-              <span className="text-xs text-muted-foreground flex-shrink-0">
-                {new Date(item.createdAt).toLocaleDateString()}
-              </span>
-            </motion.div>
-          ))}
-          {recentActivity?.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">No recent activity</p>
-          )}
-        </div>
-      </motion.div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">
+                    {card.label}
+                  </span>
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                    style={{ background: `${card.color}15`, border: `1px solid ${card.color}30` }}
+                  >
+                    <card.icon className="w-4 h-4" style={{ color: card.color }} />
+                  </div>
+                </div>
+                <div className="text-3xl font-black text-foreground mb-1">
+                  <AnimatedNumber value={card.value} prefix={card.prefix} />
+                </div>
+                {card.trend !== undefined && (
+                  <div className="flex items-center gap-1 text-xs">
+                    {card.trend >= 0 ? (
+                      <TrendingUp className="w-3 h-3 text-emerald-400" />
+                    ) : (
+                      <TrendingDown className="w-3 h-3 text-red-400" />
+                    )}
+                    <span className={card.trend >= 0 ? "text-emerald-400" : "text-red-400"}>
+                      {card.trend >= 0 ? "+" : ""}{card.trend}%
+                    </span>
+                    {card.trendLabel && <span className="text-muted-foreground">{card.trendLabel}</span>}
+                  </div>
+                )}
+                {card.overdue !== undefined && card.overdue > 0 && (
+                  <div className="flex items-center gap-1 text-xs text-amber-400">
+                    <AlertTriangle className="w-3 h-3 animate-bounce" />
+                    <span>{card.overdue} overdue</span>
+                  </div>
+                )}
+              </div>
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {/* Dynamic Detail Panel */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={selectedTab}
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -15 }}
+          transition={{ duration: 0.2 }}
+          className="w-full"
+        >
+          {selectedTab === 'revenue' && renderRevenueView()}
+          {selectedTab === 'projects' && renderProjectsView()}
+          {selectedTab === 'clients' && renderClientsView()}
+          {selectedTab === 'invoices' && renderInvoicesView()}
+        </motion.div>
+      </AnimatePresence>
     </motion.div>
   );
 }

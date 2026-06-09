@@ -1,0 +1,12 @@
+{
+  "type": "netra_backup_profile",
+  "timestamp": 1780715084000,
+  "version": "1.0",
+  "data": {
+    "businessName": "Netra Graphics Test Studio",
+    "address": "Mendarda-Sasan Road",
+    "phone": "+91 73590 93035",
+    "email": "test@netra.graphics",
+    "gst": "22AAAAA0000A1Z5"
+  }
+}

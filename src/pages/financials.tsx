@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   TrendingUp,
@@ -30,6 +30,7 @@ interface FinancialsProps {
   setCashbookEntries: React.Dispatch<React.SetStateAction<any[]>>;
   invoices: any[];
   setInvoices: React.Dispatch<React.SetStateAction<any[]>>;
+  clients?: any[];
   monthlyTarget: number;
   setMonthlyTarget: (t: number) => void;
   financialTab: string;
@@ -60,6 +61,12 @@ interface FinancialsProps {
   handleMarkMilestonePaid?: (p: any, type: 'deposit' | 'retainer') => void;
   handleUpdateProjectStatusHandy?: (projectId: number, newProjectStatus: string) => void;
   highlightedCashbookId?: number | null;
+  ledgerSearch?: string;
+  setLedgerSearch?: (s: string) => void;
+  redirectFilterClient?: string;
+  setRedirectFilterClient?: (s: string) => void;
+  redirectFilterService?: string;
+  setRedirectFilterService?: (s: string) => void;
 }
 
 const containerVariants = {
@@ -79,6 +86,7 @@ export default function Financials({
   setCashbookEntries,
   invoices,
   setInvoices,
+  clients = [],
   monthlyTarget,
   setMonthlyTarget,
   financialTab,
@@ -97,19 +105,153 @@ export default function Financials({
   handleAddCashbookEntry,
   handleMarkMilestonePaid,
   handleUpdateProjectStatusHandy,
-  highlightedCashbookId
+  highlightedCashbookId,
+  ledgerSearch,
+  setLedgerSearch,
+  redirectFilterClient,
+  setRedirectFilterClient,
+  redirectFilterService,
+  setRedirectFilterService,
 }: FinancialsProps) {
   const { toast } = useToast();
-  const [ledgerSearch, setLedgerSearch] = useState("");
+  const [localSearch, setLocalSearch] = useState("");
 
-  const filteredProjects = ignitionQueue.filter(p =>
-    p.name.toLowerCase().includes(ledgerSearch.toLowerCase()) ||
-    p.service.toLowerCase().includes(ledgerSearch.toLowerCase())
-  );
+  const currentSearch = ledgerSearch !== undefined ? ledgerSearch : localSearch;
+  const changeSearch = setLedgerSearch ? setLedgerSearch : setLocalSearch;
+
+  // Filter states
+  const [projClient, setProjClient] = useState<string>("all");
+  const [projService, setProjService] = useState<string>("all");
+  const [projManualService, setProjManualService] = useState<string>("");
+
+  // Apply redirect filter from dashboard when props change
+  useEffect(() => {
+    if (redirectFilterClient && redirectFilterClient !== '') {
+      setProjClient(redirectFilterClient);
+      if (setRedirectFilterClient) setRedirectFilterClient('');
+    }
+  }, [redirectFilterClient]);
+
+  useEffect(() => {
+    if (redirectFilterService && redirectFilterService !== '') {
+      setProjService(redirectFilterService);
+      if (setRedirectFilterService) setRedirectFilterService('');
+    }
+  }, [redirectFilterService]);
+
+  const [cashClient, setCashClient] = useState<string>("all");
+  const [cashCategory, setCashCategory] = useState<string>("all");
+  const [cashManualService, setCashManualService] = useState<string>("");
+
+  // Derived lists for dropdowns
+  const availableClients = useMemo(() => {
+    const names = new Set<string>();
+    if (clients && Array.isArray(clients)) {
+      clients.forEach(c => {
+        if (c && c.name && c.email !== 'settings@netra.graphics') {
+          names.add(c.name);
+        }
+      });
+    }
+    if (ignitionQueue && Array.isArray(ignitionQueue)) {
+      ignitionQueue.forEach(p => {
+        if (p && p.name) names.add(p.name);
+      });
+    }
+    return Array.from(names).sort();
+  }, [clients, ignitionQueue]);
+
+  const availableServices = useMemo(() => {
+    const services = new Set<string>();
+    if (ignitionQueue && Array.isArray(ignitionQueue)) {
+      ignitionQueue.forEach(p => {
+        if (p && p.service) services.add(p.service);
+      });
+    }
+    return Array.from(services).sort();
+  }, [ignitionQueue]);
+
+  const availableCategories = useMemo(() => {
+    const categories = new Set<string>();
+    if (cashbookEntries && Array.isArray(cashbookEntries)) {
+      cashbookEntries.forEach(entry => {
+        if (entry && entry.category) categories.add(entry.category);
+      });
+    }
+    return Array.from(categories).sort();
+  }, [cashbookEntries]);
+
+  // Filter logic
+  const filteredProjects = useMemo(() => {
+    return ignitionQueue.filter(p => {
+      // 1. Global text search
+      if (currentSearch) {
+        const query = currentSearch.toLowerCase();
+        const matchesQuery =
+          p.name.toLowerCase().includes(query) ||
+          p.service.toLowerCase().includes(query);
+        if (!matchesQuery) return false;
+      }
+
+      // 2. Client dropdown filter
+      if (projClient !== "all") {
+        if (p.name.toLowerCase() !== projClient.toLowerCase()) return false;
+      }
+
+      // 3. Service dropdown filter
+      if (projService !== "all") {
+        if (p.service.toLowerCase() !== projService.toLowerCase()) return false;
+      }
+
+      // 4. Service manual filter
+      if (projManualService) {
+        const manualQuery = projManualService.toLowerCase();
+        if (!p.service.toLowerCase().includes(manualQuery)) return false;
+      }
+
+      return true;
+    });
+  }, [ignitionQueue, currentSearch, projClient, projService, projManualService]);
+
+  const filteredCashbookEntries = useMemo(() => {
+    return cashbookEntries.filter(entry => {
+      // 1. Global text search
+      if (currentSearch) {
+        const query = currentSearch.toLowerCase();
+        const matchesQuery =
+          entry.desc.toLowerCase().includes(query) ||
+          entry.category.toLowerCase().includes(query) ||
+          (entry.mode && entry.mode.toLowerCase().includes(query));
+        if (!matchesQuery) return false;
+      }
+
+      // 2. Client dropdown filter (client name in entry.desc)
+      if (cashClient !== "all") {
+        const clientQuery = cashClient.toLowerCase();
+        if (!entry.desc.toLowerCase().includes(clientQuery)) return false;
+      }
+
+      // 3. Category dropdown filter
+      if (cashCategory !== "all") {
+        if (entry.category.toLowerCase() !== cashCategory.toLowerCase()) return false;
+      }
+
+      // 4. Manual service/category/desc filter
+      if (cashManualService) {
+        const manualQuery = cashManualService.toLowerCase();
+        const matchesManual =
+          entry.desc.toLowerCase().includes(manualQuery) ||
+          entry.category.toLowerCase().includes(manualQuery);
+        if (!matchesManual) return false;
+      }
+
+      return true;
+    });
+  }, [cashbookEntries, currentSearch, cashClient, cashCategory, cashManualService]);
 
   const filteredInvoices = invoices.filter(inv =>
-    inv.clientName.toLowerCase().includes(ledgerSearch.toLowerCase()) ||
-    (inv.projectService && inv.projectService.toLowerCase().includes(ledgerSearch.toLowerCase()))
+    inv.clientName.toLowerCase().includes(currentSearch.toLowerCase()) ||
+    (inv.projectService && inv.projectService.toLowerCase().includes(currentSearch.toLowerCase()))
   );
 
   return (
@@ -253,15 +395,6 @@ export default function Financials({
                 <p className="text-xs text-muted-foreground">Calibrate contract quotes, discounts, and log transactions</p>
               </div>
               <div className="flex items-center gap-3">
-                <div className="relative w-64">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                  <Input
-                    className="pl-9 h-9 bg-white/5 border-white/10 text-xs rounded-xl"
-                    placeholder="Search ledger..."
-                    value={ledgerSearch}
-                    onChange={(e) => setLedgerSearch(e.target.value)}
-                  />
-                </div>
                 {selectedBatchProjects.length > 0 && (
                   <Button
                     size="sm"
@@ -300,6 +433,68 @@ export default function Financials({
                   </Button>
                 )}
               </div>
+            </div>
+
+            {/* Multi-Level Filters Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2">
+              {/* Global Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  className="pl-9 h-9 bg-white/5 border-white/10 text-xs rounded-xl text-foreground placeholder:text-muted-foreground focus:border-emerald-500/50"
+                  placeholder="Global search..."
+                  value={currentSearch}
+                  onChange={(e) => changeSearch(e.target.value)}
+                />
+              </div>
+
+              {/* Client Select */}
+              <select
+                value={projClient}
+                onChange={(e) => setProjClient(e.target.value)}
+                className="h-9 px-3 bg-[#0a0f1e] border border-white/10 text-xs rounded-xl text-foreground focus:border-emerald-500/50 cursor-pointer w-full"
+              >
+                <option value="all">All Clients</option>
+                {availableClients.map(client => (
+                  <option key={client} value={client}>{client}</option>
+                ))}
+              </select>
+
+              {/* Service Select */}
+              <select
+                value={projService}
+                onChange={(e) => setProjService(e.target.value)}
+                className="h-9 px-3 bg-[#0a0f1e] border border-white/10 text-xs rounded-xl text-foreground focus:border-emerald-500/50 cursor-pointer w-full"
+              >
+                <option value="all">All Services</option>
+                {availableServices.map(service => (
+                  <option key={service} value={service}>{service}</option>
+                ))}
+              </select>
+
+              {/* Service Manual Input */}
+              <Input
+                className="h-9 bg-white/5 border-white/10 text-xs rounded-xl text-foreground placeholder:text-muted-foreground focus:border-emerald-500/50"
+                placeholder="Manual service..."
+                value={projManualService}
+                onChange={(e) => setProjManualService(e.target.value)}
+              />
+
+              {/* Reset Button */}
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={projClient === "all" && projService === "all" && projManualService === "" && currentSearch === ""}
+                onClick={() => {
+                  setProjClient("all");
+                  setProjService("all");
+                  setProjManualService("");
+                  changeSearch("");
+                }}
+                className="h-9 px-3 text-2xs font-extrabold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 border border-rose-500/20 rounded-xl disabled:opacity-40"
+              >
+                RESET FILTERS
+              </Button>
             </div>
 
             <div className="overflow-x-auto border border-white/5 rounded-xl">
@@ -658,9 +853,73 @@ export default function Financials({
 
             {/* List */}
             <motion.div variants={itemVariants} className="xl:col-span-2 rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 space-y-4">
-              <div>
-                <h3 className="font-bold text-foreground text-lg">Cashbook Entries Ledger</h3>
-                <p className="text-xs text-muted-foreground">Historical records of cash flow items</p>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h3 className="font-bold text-foreground text-lg">Cashbook Entries Ledger</h3>
+                  <p className="text-xs text-muted-foreground">Historical records of cash flow items</p>
+                </div>
+              </div>
+
+              {/* Multi-Level Filters Grid for Cashbook */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2">
+                {/* Global Search */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    className="pl-9 h-9 bg-white/5 border-white/10 text-xs rounded-xl text-foreground placeholder:text-muted-foreground focus:border-emerald-500/50"
+                    placeholder="Global search..."
+                    value={currentSearch}
+                    onChange={(e) => changeSearch(e.target.value)}
+                  />
+                </div>
+
+                {/* Client Select */}
+                <select
+                  value={cashClient}
+                  onChange={(e) => setCashClient(e.target.value)}
+                  className="h-9 px-3 bg-[#0a0f1e] border border-white/10 text-xs rounded-xl text-foreground focus:border-emerald-500/50 cursor-pointer w-full"
+                >
+                  <option value="all">All Clients</option>
+                  {availableClients.map(client => (
+                    <option key={client} value={client}>{client}</option>
+                  ))}
+                </select>
+
+                {/* Category Select */}
+                <select
+                  value={cashCategory}
+                  onChange={(e) => setCashCategory(e.target.value)}
+                  className="h-9 px-3 bg-[#0a0f1e] border border-white/10 text-xs rounded-xl text-foreground focus:border-emerald-500/50 cursor-pointer w-full"
+                >
+                  <option value="all">All Categories</option>
+                  {availableCategories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+
+                {/* Service Manual Input */}
+                <Input
+                  className="h-9 bg-white/5 border-white/10 text-xs rounded-xl text-foreground placeholder:text-muted-foreground focus:border-emerald-500/50"
+                  placeholder="Manual category/desc..."
+                  value={cashManualService}
+                  onChange={(e) => setCashManualService(e.target.value)}
+                />
+
+                {/* Reset Button */}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={cashClient === "all" && cashCategory === "all" && cashManualService === "" && currentSearch === ""}
+                  onClick={() => {
+                    setCashClient("all");
+                    setCashCategory("all");
+                    setCashManualService("");
+                    changeSearch("");
+                  }}
+                  className="h-9 px-3 text-2xs font-extrabold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 border border-rose-500/20 rounded-xl disabled:opacity-40"
+                >
+                  RESET FILTERS
+                </Button>
               </div>
 
               <div className="overflow-x-auto border border-white/5 rounded-xl">
@@ -675,8 +934,8 @@ export default function Financials({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 text-xs">
-                    {cashbookEntries.length > 0 ? (
-                      cashbookEntries.map(entry => {
+                    {filteredCashbookEntries.length > 0 ? (
+                      filteredCashbookEntries.map(entry => {
                         const isHighlighted = highlightedCashbookId === entry.id;
                         return (
                           <tr
@@ -737,7 +996,7 @@ export default function Financials({
                     ) : (
                       <tr>
                         <td colSpan={5} className="p-8 text-center text-muted-foreground uppercase tracking-widest text-3xs font-semibold">
-                          LEDGER IS VOID OF ENTRIES
+                          {currentSearch || cashClient !== "all" || cashCategory !== "all" || cashManualService ? "NO MATCHING ENTRIES FOUND" : "LEDGER IS VOID OF ENTRIES"}
                         </td>
                       </tr>
                     )}

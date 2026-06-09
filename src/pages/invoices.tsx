@@ -254,12 +254,16 @@ export default function InvoicesPage({
     if (!matchesSearch) return false;
 
     // 2. Tab filter (Saved vs Draft vs Custom)
-    const isDraft = inv.rawProject && inv.rawProject.id && inv.rawProject.status && inv.rawProject.status !== 'Completed';
-    const isCustom = !inv.projectId || (inv.rawProject && inv.rawProject.isStandalone) || inv.invoiceNo.includes('/C');
+    const hasProject = !!(inv.rawProject && inv.rawProject.id);
+    const isStandalone = hasProject && inv.rawProject.isStandalone;
+    const isCustom = !hasProject || isStandalone || inv.invoiceNo.includes('/C');
+    
+    // Project with status other than completed goes to draft
+    const isDraft = hasProject && !isCustom && inv.rawProject.status !== 'Completed';
     
     let matchesTab = false;
     if (invoiceTab === "DRAFT") {
-      matchesTab = isDraft && !isCustom;
+      matchesTab = isDraft;
     } else if (invoiceTab === "CUSTOM") {
       matchesTab = isCustom;
     } else {
@@ -406,7 +410,7 @@ export default function InvoicesPage({
 
     const customInvoiceId = `custom-${Date.now()}`;
     const stableInvoiceNo = editingInvoiceNo || (() => {
-      const customInvoices = invoices.filter(inv => !inv.projectId || inv.invoiceNo.includes('/C'));
+      const customInvoices = invoices.filter(inv => !inv.rawProject?.id || inv.rawProject?.isStandalone || inv.invoiceNo.includes('/C'));
       return getCustomInvoiceNumber(new Date(), customInvoices.length + 1);
     })();
 
