@@ -1,21 +1,33 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import './App.css';
 import './Login.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import Dashboard from '@/pages/dashboard';
-import Projects from '@/pages/projects';
-import Clients from '@/pages/clients';
-import Inquiries from '@/pages/inquiries';
-import Financials from '@/pages/financials';
-import SettingsPage from '@/pages/settings';
-import { Portfolio } from '@/pages/Portfolio';
 import { useToast } from '@/hooks/use-toast';
 import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ChevronLeft, X, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail, Menu, Volume2, VolumeX, Coins } from 'lucide-react';
-import InvoicesPage from '@/pages/invoices';
+
+// Lazy loaded page components to optimize bundle size and load performance
+const Dashboard = React.lazy(() => import('@/pages/dashboard'));
+const Projects = React.lazy(() => import('@/pages/projects'));
+const Clients = React.lazy(() => import('@/pages/clients'));
+const Inquiries = React.lazy(() => import('@/pages/inquiries'));
+const Financials = React.lazy(() => import('@/pages/financials'));
+const SettingsPage = React.lazy(() => import('@/pages/settings'));
+const Portfolio = React.lazy(() => import('@/pages/Portfolio').then(m => ({ default: m.Portfolio })));
+const InvoicesPage = React.lazy(() => import('@/pages/invoices'));
+
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-[400px] w-full bg-[#050508]/20 backdrop-blur-sm rounded-3xl border border-white/5">
+    <div className="flex flex-col items-center gap-4">
+      <div className="relative w-12 h-12">
+        <div className="absolute inset-0 rounded-full border-4 border-cyan-500/10"></div>
+        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-cyan-400 animate-spin"></div>
+      </div>
+      <p className="text-cyan-400/80 text-xs font-mono tracking-widest uppercase animate-pulse">Initializing Module...</p>
+    </div>
+  </div>
+);
 
 const queryClient = new QueryClient();
 import { supabase } from './supabase/client';
@@ -1830,6 +1842,9 @@ function App() {
     if (actions) actions.style.display = 'none';
 
     try {
+      const html2canvas = (await import('html2canvas')).default;
+      const jsPDF = (await import('jspdf')).default;
+
       const canvas = await html2canvas(input, {
         scale: 3,
         useCORS: true,
@@ -1865,12 +1880,15 @@ function App() {
 
     saveInvoiceToVault(p, invNo);
 
-    const pdf = new jsPDF('p', 'mm', 'a4');
     const actions = document.querySelector('.invoice-modal-overlay .no-print');
     if (actions) actions.style.display = 'none';
 
     try {
+      const html2canvas = (await import('html2canvas')).default;
+      const jsPDF = (await import('jspdf')).default;
+
       window.scrollTo(0, 0);
+      const pdf = new jsPDF('p', 'mm', 'a4');
       for (let i = 0; i < pageNodes.length; i++) {
         const canvas = await html2canvas(pageNodes[i], {
           scale: 2,
@@ -3767,11 +3785,13 @@ function App() {
               {/* Service Vault Page / Netra-Showcase */}
               <section className={`vault-page ${isVaultActive ? 'active' : ''} ${isTransitioning ? 'transitioning' : ''}`} ref={vaultRef}>
                 {isVaultActive && (
-                  <Portfolio
-                    onContactClick={goToContact}
-                    visionSettings={visionSettings}
-                    servicesList={servicesList}
-                  />
+                  <Suspense fallback={<PageLoader />}>
+                    <Portfolio
+                      onContactClick={goToContact}
+                      visionSettings={visionSettings}
+                      servicesList={servicesList}
+                    />
+                  </Suspense>
                 )}
               </section>
 
@@ -4442,7 +4462,8 @@ function App() {
                       </div>
 
                       <div className="module-content-area">
-                        {activeAdminModule === "DASHBOARD" && (
+                        <Suspense fallback={<PageLoader />}>
+                          {activeAdminModule === "DASHBOARD" && (
                           <Dashboard
                             projects={ignitionQueue}
                             clients={clients}
@@ -4619,6 +4640,7 @@ function App() {
                             setAdminProfile={setAdminProfile}
                           />
                         )}
+                        </Suspense>
                       </div>
 
 
