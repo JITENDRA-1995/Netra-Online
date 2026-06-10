@@ -822,6 +822,7 @@ function App() {
   // Refs to make current values accessible inside static useEffect closures
   const isPlayingRef = useRef(false);
   const clickSoundEnabledRef = useRef(false);
+  const isSyncingFromDbRef = useRef(false);
 
   // Keep refs in sync with state
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
@@ -987,6 +988,8 @@ function App() {
     localStorage.setItem('netra_admin_profile', JSON.stringify(adminProfile));
     localStorage.setItem('netra_cashbook', JSON.stringify(cashbookEntries));
     localStorage.setItem('netra_trash', JSON.stringify(trashItems));
+
+    if (isSyncingFromDbRef.current) return;
 
     const syncToDb = async () => {
       try {
@@ -1323,6 +1326,146 @@ function App() {
       }
     };
     loadSupabaseData();
+  }, []);
+
+  useEffect(() => {
+    // 1. Subscribe to projects table changes
+    const projectsChannel = supabase
+      .channel('projects-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, async () => {
+        try {
+          const dbProjects = await getProjects();
+          if (dbProjects) {
+            setIgnitionQueue(dbProjects);
+          }
+        } catch (err) {
+          console.warn("Real-time projects refresh failed:", err);
+        }
+      })
+      .subscribe();
+
+    // 2. Subscribe to invoices table changes
+    const invoicesChannel = supabase
+      .channel('invoices-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, async () => {
+        try {
+          const dbInvoices = await getInvoices();
+          if (dbInvoices) {
+            const mappedInvoices = dbInvoices.map(inv => {
+              if (inv.clientName && inv.clientName.startsWith("JSON_MOCK:")) {
+                try {
+                  const parsed = JSON.parse(inv.clientName.substring(10));
+                  return {
+                    ...inv,
+                    clientName: parsed.name,
+                    projectService: parsed.service,
+                    rawProject: {
+                      id: inv.id,
+                      name: parsed.name,
+                      service: parsed.service,
+                      quote: parsed.quote || (parsed.rate * parsed.qty),
+                      discount: parsed.discount || 0,
+                      advanceAmount: parsed.advanceAmount || 0,
+                      phone: parsed.phone,
+                      email: parsed.email,
+                      address: parsed.address,
+                      gst: parsed.gst,
+                      status: 'Completed',
+                      isStandalone: true,
+                      items: (parsed.items && parsed.items.length > 0) ? parsed.items : [{
+                        service: parsed.service,
+                        quote: parsed.rate * parsed.qty,
+                        discount: parsed.discount,
+                        qty: parsed.qty,
+                        rate: parsed.rate
+                      }]
+                    }
+                  };
+                } catch (parseErr) {
+                  console.error("Failed to parse JSON_MOCK custom invoice:", parseErr);
+                }
+              }
+              return inv;
+            });
+            setInvoices(mappedInvoices);
+          }
+        } catch (err) {
+          console.warn("Real-time invoices refresh failed:", err);
+        }
+      })
+      .subscribe();
+
+    // 3. Subscribe to clients table changes (for settings & clients list)
+    const clientsChannel = supabase
+      .channel('clients-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, async (payload) => {
+        if (payload.new && payload.new.email === 'settings@netra.graphics') {
+          try {
+            const parsed = JSON.parse(payload.new.address);
+            isSyncingFromDbRef.current = true;
+
+            if (parsed.services && JSON.stringify(parsed.services) !== localStorage.getItem('netra_services')) {
+              setServicesList(parsed.services);
+            }
+            if (parsed.vision) {
+              const cleanedVision = parsed.vision.map(item => ({
+                ...item,
+                photos: (item.photos || []).filter(p => p.url && !p.url.includes("unsplash.com"))
+              }));
+              if (JSON.stringify(cleanedVision) !== localStorage.getItem('netra_vision_settings')) {
+                setVisionSettings(cleanedVision);
+              }
+            }
+            if (parsed.banking && JSON.stringify(parsed.banking) !== localStorage.getItem('netra_banking_details')) {
+              setBankingDetails(parsed.banking);
+            }
+            if (parsed.profile && JSON.stringify(parsed.profile) !== localStorage.getItem('netra_admin_profile')) {
+              setAdminProfile(parsed.profile);
+            }
+            if (parsed.cashbook && JSON.stringify(parsed.cashbook) !== localStorage.getItem('netra_cashbook')) {
+              setCashbookEntries(parsed.cashbook);
+            }
+            if (parsed.trash && Array.isArray(parsed.trash) && JSON.stringify(parsed.trash) !== localStorage.getItem('netra_trash')) {
+              const now = Date.now();
+              const validTrash = parsed.trash.filter(item => {
+                if (!item || !item.deletedAt) return false;
+                const expiry = new Date(item.deletedAt).getTime() + 24 * 60 * 60 * 1000;
+                return expiry > now;
+              });
+              setTrashItems(validTrash);
+            }
+          } catch (parseErr) {
+            console.error("Failed to parse realtime settings:", parseErr);
+          } finally {
+            setTimeout(() => {
+              isSyncingFromDbRef.current = false;
+            }, 100);
+          }
+        } else {
+          try {
+            const dbClients = await getClients();
+            if (dbClients) {
+              const mapped = dbClients.map(c => ({
+                ...c,
+                joinedDate: c.joined_date || c.joinedDate,
+                accessKey: c.access_key || c.accessKey
+              }));
+              setClients(mapped);
+            }
+          } catch (err) {
+            console.warn("Real-time clients refresh failed:", err);
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      if (supabase.removeChannel) {
+        supabase.removeChannel(projectsChannel);
+        supabase.removeChannel(invoicesChannel);
+        supabase.removeChannel(clientsChannel);
+      }
+    };
   }, []);
 
   const triggerBellPulse = () => {
@@ -2095,9 +2238,26 @@ function App() {
     let updated = false;
     let newEntries = [...cashbookEntries];
 
+    // Filter out incorrect "Custom Invoice" cashbook entries that are actually project-linked invoices
+    const filteredEntries = newEntries.filter(entry => {
+      if (entry.desc && entry.desc.startsWith("Custom Invoice:")) {
+        const matchingInvoice = invoices.find(inv => 
+          inv.id === entry.invoiceId || 
+          inv.invoiceNo === entry.invoiceNo || 
+          entry.desc.includes(inv.invoiceNo)
+        );
+        if (matchingInvoice && matchingInvoice.projectId) {
+          updated = true;
+          return false;
+        }
+      }
+      return true;
+    });
+    newEntries = filteredEntries;
+
     invoices.forEach(inv => {
       // Standalone invoices have projectId === null
-      const isStandalone = !inv.projectId && inv.clientName;
+      const isStandalone = (!inv.projectId || inv.projectId === null) && inv.clientName;
       if (!isStandalone) return;
 
       const hasEntry = newEntries.some(entry => 
@@ -6260,7 +6420,7 @@ function App() {
                            <button
                              className="action-btn btn-edit"
                              onClick={() => {
-                               const isStandalone = !invoiceProject.projectId || invoiceProject.isStandalone || stableInvoiceNo?.includes('/C');
+                               const isStandalone = (invoiceProject.projectId === null) || invoiceProject.isStandalone || stableInvoiceNo?.includes('/C') || (invoiceProject.id && typeof invoiceProject.id === 'string' && (invoiceProject.id.startsWith('custom-') || invoiceProject.id.startsWith('local-')));
                                setEditingInvoiceData({
                                  id: existingInvoice?.id || invoiceProject.id,
                                  invoiceNo: stableInvoiceNo,
@@ -6277,7 +6437,7 @@ function App() {
                                  rate: invoiceProject.rate || (invoiceProject.quote / (invoiceProject.qty || 1)),
                                  items: invoiceProject.items || [],
                                  isStandalone: isStandalone,
-                                 projectId: invoiceProject.projectId
+                                 projectId: isStandalone ? null : (invoiceProject.projectId || invoiceProject.id)
                                });
                                if (isStandalone) {
                                  setActiveAdminModule("INVOICES");

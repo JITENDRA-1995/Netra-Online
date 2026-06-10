@@ -1515,7 +1515,7 @@ export default function InvoicesPage({
                           className="w-7 h-7 hover:bg-cyan-500/10 hover:text-cyan-400"
                           title="View Invoice Document"
                           onClick={() => {
-                            setInvoiceProject({ ...inv.rawProject, invoiceNo: inv.invoiceNo });
+                            setInvoiceProject({ ...inv.rawProject, invoiceNo: inv.invoiceNo, projectId: inv.projectId });
                             setIsInvoicePreviewOpen(true);
                           }}
                         >

@@ -18,6 +18,7 @@ export const getInvoices = async () => {
   return data.map(inv => ({
     id: inv.id,
     invoiceNo: inv.invoice_no,
+    projectId: inv.project_id,
     clientName: inv.client_name,
     projectService: inv.project_service,
     issueDate: new Date(inv.issue_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
