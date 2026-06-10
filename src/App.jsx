@@ -3820,11 +3820,17 @@ function App() {
     const visionVal = document.getElementById('vision').value;
     const serviceVal = selectedProject || "General Inquiry";
 
+    // Strip leading zeros from phone number to ensure WhatsApp redirection compatibility
+    let cleanedPhoneVal = phoneVal.trim();
+    while (cleanedPhoneVal.startsWith('0')) {
+      cleanedPhoneVal = cleanedPhoneVal.substring(1);
+    }
+
     try {
       await createInquiry({
         name: nameVal,
         email: emailVal,
-        phone: phoneVal,
+        phone: cleanedPhoneVal,
         service: serviceVal,
         desc: visionVal,
         status: 'New Spark'
@@ -6482,7 +6488,10 @@ function App() {
                               })();
 
                               // Clean phone and prepend country code
-                              const cleanedPhone = rawPhone.replace(/\D/g, '');
+                              let cleanedPhone = rawPhone.replace(/\D/g, '');
+                              while (cleanedPhone.startsWith('0')) {
+                                cleanedPhone = cleanedPhone.substring(1);
+                              }
                               const finalPhone = cleanedPhone.length === 10 ? '91' + cleanedPhone : cleanedPhone;
 
                               window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, '_blank');

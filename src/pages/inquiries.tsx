@@ -164,7 +164,11 @@ export default function Inquiries({
     const msg = `Hello ${inq.name}, update from Netra Graphics. Your inquiry for "${inq.service}" has been ${actionText}. Remark: ${remarkText}. Let's ignite the future!`;
 
     // Trigger WhatsApp link
-    const cleanPhone = inq.phone.replace(/[\s\-\+]/g, "");
+    let cleanedPhone = inq.phone.replace(/\D/g, "");
+    while (cleanedPhone.startsWith("0")) {
+      cleanedPhone = cleanedPhone.substring(1);
+    }
+    const cleanPhone = cleanedPhone.length === 10 ? "91" + cleanedPhone : cleanedPhone;
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
 
     // Update status locally
@@ -346,9 +350,12 @@ export default function Inquiries({
                             
                             // 3. Send positive WhatsApp greeting confirmation
                             const msg = `Namaste ${inq.name}! We have received and accepted your spark for "${inq.service}" at Netra Graphics. Our team is super excited to work with you and start the ignition process! Let's build something exceptional.`;
-                            const cleanedPhone = inq.phone.replace(/\D/g, "");
-                            const finalPhone = cleanedPhone.length === 10 ? "91" + cleanedPhone : cleanedPhone;
-                            window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+                             let cleanedPhone = inq.phone.replace(/\D/g, "");
+                             while (cleanedPhone.startsWith("0")) {
+                               cleanedPhone = cleanedPhone.substring(1);
+                             }
+                             const finalPhone = cleanedPhone.length === 10 ? "91" + cleanedPhone : cleanedPhone;
+                             window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, '_blank');
                             
                             toast({
                               title: "Spark Accepted!",
@@ -366,9 +373,12 @@ export default function Inquiries({
                           onClick={() => {
                             // 1. Send sad/apologetic WhatsApp refusal greeting
                             const sadMsg = `Namaste ${inq.name}. We regret to inform you that we are currently unable to take on new projects for "${inq.service}" at this time due to scheduling conflicts. We hope to collaborate in the future under better alignments. Thank you for reaching out to Netra Graphics.`;
-                            const cleanedPhone = inq.phone.replace(/\D/g, "");
-                            const finalPhone = cleanedPhone.length === 10 ? "91" + cleanedPhone : cleanedPhone;
-                            window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(sadMsg)}`, '_blank');
+                             let cleanedPhone = inq.phone.replace(/\D/g, "");
+                             while (cleanedPhone.startsWith("0")) {
+                               cleanedPhone = cleanedPhone.substring(1);
+                             }
+                             const finalPhone = cleanedPhone.length === 10 ? "91" + cleanedPhone : cleanedPhone;
+                             window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(sadMsg)}`, '_blank');
                             
                             // 2. Dismiss/remove the spark from local state list and delete from backend DB
                             deleteInquiry(inq.id).catch(err => {

@@ -128,6 +128,7 @@ export default function Financials({
 }: FinancialsProps) {
   const { toast } = useToast();
   const [localSearch, setLocalSearch] = useState("");
+  const [cashbookMode, setCashbookMode] = useState<"INCOME" | "EXPENSE">("INCOME");
 
   const currentSearch = ledgerSearch !== undefined ? ledgerSearch : localSearch;
   const changeSearch = setLedgerSearch ? setLedgerSearch : setLocalSearch;
@@ -981,60 +982,113 @@ export default function Financials({
 
       {financialTab === "CASHBOOK" && (
         <motion.div variants={containerVariants} className="space-y-6 flex flex-col h-[calc(100vh-180px)]">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 overflow-hidden">
-            {/* Income Ledger */}
-            <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 flex flex-col overflow-hidden space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
-                  <h3 className="font-bold text-foreground text-base">Cashbook Entries Ledger (Income)</h3>
-                  <p className="text-xs text-muted-foreground">Historical records of incoming payments</p>
-                </div>
-                <Button
-                  size="sm"
-                  className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold text-2xs rounded-lg cursor-pointer"
-                  onClick={() => {
-                    setModalEntryType("INCOME");
-                    setIsAddModalOpen(true);
-                  }}
-                >
-                  <Plus className="w-3 h-3 mr-1" /> NEW INCOME
-                </Button>
+          <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 flex flex-col flex-1 overflow-hidden space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h3 className="font-bold text-foreground text-base">
+                  {cashbookMode === "INCOME" ? "Cashbook Entries Ledger (Income)" : "Cashbook Entries Ledger (Expense)"}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  {cashbookMode === "INCOME" ? "Historical records of incoming payments" : "Historical records of outgoing payments"}
+                </p>
               </div>
-
-              {/* Separate Filters for Income */}
-              <div className="flex items-center gap-2">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-                    <Input
-                      className="pl-8 h-8 bg-white/5 border-white/10 text-2xs rounded-lg text-foreground placeholder:text-muted-foreground focus:border-emerald-500/50 focus:ring-0"
-                      placeholder="Search income..."
-                      value={incSearch}
-                      onChange={(e) => setIncSearch(e.target.value)}
-                    />
-                  </div>
-                  <select
-                    value={incClient}
-                    onChange={(e) => setIncClient(e.target.value)}
-                    className="h-8 px-2 bg-[#0a0f1e] border border-white/10 text-2xs rounded-lg text-foreground focus:border-emerald-500/50 cursor-pointer w-full font-bold bg-[#0a0f1e]"
+              
+              <div className="flex items-center gap-3">
+                {/* INCOME / EXPENSE Mode Toggle */}
+                <div className="flex bg-white/5 border border-white/10 rounded-xl p-0.5">
+                  <button
+                    onClick={() => setCashbookMode("INCOME")}
+                    className={`px-3.5 py-1.5 rounded-lg text-2xs font-extrabold transition-all cursor-pointer ${
+                      cashbookMode === "INCOME"
+                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 shadow-sm"
+                        : "text-muted-foreground hover:text-foreground bg-transparent border border-transparent"
+                    }`}
                   >
-                    <option value="all">All Clients</option>
-                    {availableClients.map(client => (
-                      <option key={client} value={client}>{client}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={incCategory}
-                    onChange={(e) => setIncCategory(e.target.value)}
-                    className="h-8 px-2 bg-[#0a0f1e] border border-white/10 text-2xs rounded-lg text-foreground focus:border-emerald-500/50 cursor-pointer w-full font-bold bg-[#0a0f1e]"
+                    INCOME
+                  </button>
+                  <button
+                    onClick={() => setCashbookMode("EXPENSE")}
+                    className={`px-3.5 py-1.5 rounded-lg text-2xs font-extrabold transition-all cursor-pointer ${
+                      cashbookMode === "EXPENSE"
+                        ? "bg-rose-500/20 text-rose-400 border border-rose-500/20 shadow-sm"
+                        : "text-muted-foreground hover:text-foreground bg-transparent border border-transparent"
+                    }`}
                   >
-                    <option value="all">All Categories</option>
-                    {availableIncomeCategories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
+                    EXPENSE
+                  </button>
                 </div>
-                {(incSearch !== "" || incClient !== "all" || incCategory !== "all") && (
+
+                {/* Add new entry button */}
+                {cashbookMode === "INCOME" ? (
+                  <Button
+                    size="sm"
+                    className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold text-2xs rounded-xl cursor-pointer py-4"
+                    onClick={() => {
+                      setModalEntryType("INCOME");
+                      setIsAddModalOpen(true);
+                    }}
+                  >
+                    <Plus className="w-3 h-3 mr-1" /> NEW INCOME
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    className="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 font-bold text-2xs rounded-xl cursor-pointer py-4"
+                    onClick={() => {
+                      setModalEntryType("EXPENSE");
+                      setIsAddModalOpen(true);
+                    }}
+                  >
+                    <Plus className="w-3 h-3 mr-1" /> NEW EXPENSE
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Separate Filters */}
+            <div className="flex items-center gap-2 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                  <Input
+                    className={`pl-8 h-9 bg-white/5 border-white/10 text-xs rounded-xl text-foreground placeholder:text-muted-foreground focus:ring-0 ${
+                      cashbookMode === "INCOME" ? "focus:border-emerald-500/50" : "focus:border-rose-500/50"
+                    }`}
+                    placeholder={cashbookMode === "INCOME" ? "Search income..." : "Search expense..."}
+                    value={cashbookMode === "INCOME" ? incSearch : expSearch}
+                    onChange={(e) => cashbookMode === "INCOME" ? setIncSearch(e.target.value) : setExpSearch(e.target.value)}
+                  />
+                </div>
+                
+                {/* Client and Category dropdowns only show in INCOME mode */}
+                {cashbookMode === "INCOME" && (
+                  <>
+                    <select
+                      value={incClient}
+                      onChange={(e) => setIncClient(e.target.value)}
+                      className="h-9 px-3 bg-[#0a0f1e] border border-white/10 text-xs rounded-xl text-foreground focus:border-emerald-500/50 cursor-pointer w-full font-bold bg-[#0a0f1e]"
+                    >
+                      <option value="all">All Clients</option>
+                      {availableClients.map(client => (
+                        <option key={client} value={client}>{client}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={incCategory}
+                      onChange={(e) => setIncCategory(e.target.value)}
+                      className="h-9 px-3 bg-[#0a0f1e] border border-white/10 text-xs rounded-xl text-foreground focus:border-emerald-500/50 cursor-pointer w-full font-bold bg-[#0a0f1e]"
+                    >
+                      <option value="all">All Categories</option>
+                      {availableIncomeCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
+              </div>
+              
+              {cashbookMode === "INCOME" ? (
+                (incSearch !== "" || incClient !== "all" || incCategory !== "all") && (
                   <Button
                     size="sm"
                     variant="ghost"
@@ -1043,26 +1097,42 @@ export default function Financials({
                       setIncClient("all");
                       setIncCategory("all");
                     }}
-                    className="h-8 px-2 text-3xs font-extrabold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 border border-rose-500/20 rounded-lg shrink-0"
+                    className="h-9 px-3 text-2xs font-extrabold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 border border-rose-500/20 rounded-xl shrink-0"
                   >
                     RESET
                   </Button>
-                )}
-              </div>
+                )
+              ) : (
+                expSearch !== "" && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setExpSearch("");
+                    }}
+                    className="h-9 px-3 text-2xs font-extrabold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 border border-rose-500/20 rounded-xl shrink-0"
+                  >
+                    RESET
+                  </Button>
+                )
+              )}
+            </div>
 
-              <div className="overflow-x-auto overflow-y-auto border border-white/5 rounded-xl flex-1 scrollbar-thin">
-                <table className="w-full text-sm text-left border-collapse">
-                  <thead className="sticky top-0 bg-[#0a0f1e] z-10 border-b border-white/5">
-                    <tr className="border-b border-white/5 bg-white/[0.01] text-xs text-muted-foreground uppercase tracking-wider font-semibold">
-                      <th className="p-3">Date</th>
-                      <th className="p-3">Description / Category</th>
-                      <th className="p-3">Mode</th>
-                      <th className="p-3 text-right">Amount</th>
-                      <th className="p-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5 text-xs">
-                    {filteredIncomeEntries.length > 0 ? (
+            {/* Table */}
+            <div className="overflow-x-auto overflow-y-auto border border-white/5 rounded-xl flex-1 scrollbar-thin mt-2">
+              <table className="w-full text-sm text-left border-collapse">
+                <thead className="sticky top-0 bg-[#0a0f1e] z-10 border-b border-white/5">
+                  <tr className="border-b border-white/5 bg-white/[0.01] text-xs text-muted-foreground uppercase tracking-wider font-semibold">
+                    <th className="p-3">Date</th>
+                    <th className="p-3">Description / Category</th>
+                    <th className="p-3">Mode</th>
+                    <th className="p-3 text-right">Amount</th>
+                    <th className="p-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 text-xs">
+                  {cashbookMode === "INCOME" ? (
+                    filteredIncomeEntries.length > 0 ? (
                       filteredIncomeEntries.map(entry => {
                         const isHighlighted = highlightedCashbookId === entry.id;
                         return (
@@ -1143,93 +1213,9 @@ export default function Financials({
                           No Income Entries Found
                         </td>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </motion.div>
-
-            {/* Expense Ledger */}
-            <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 flex flex-col overflow-hidden space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
-                  <h3 className="font-bold text-foreground text-base">Cashbook Entries Ledger (Expense)</h3>
-                  <p className="text-xs text-muted-foreground">Historical records of outgoing payments</p>
-                </div>
-                <Button
-                  size="sm"
-                  className="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 font-bold text-2xs rounded-lg cursor-pointer"
-                  onClick={() => {
-                    setModalEntryType("EXPENSE");
-                    setIsAddModalOpen(true);
-                  }}
-                >
-                  <Plus className="w-3 h-3 mr-1" /> NEW EXPENSE
-                </Button>
-              </div>
-
-              {/* Separate Filters for Expense */}
-              <div className="flex items-center gap-2">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-                    <Input
-                      className="pl-8 h-8 bg-white/5 border-white/10 text-2xs rounded-lg text-foreground placeholder:text-muted-foreground focus:border-rose-500/50 focus:ring-0"
-                      placeholder="Search expense..."
-                      value={expSearch}
-                      onChange={(e) => setExpSearch(e.target.value)}
-                    />
-                  </div>
-                  <select
-                    value={expClient}
-                    onChange={(e) => setExpClient(e.target.value)}
-                    className="h-8 px-2 bg-[#0a0f1e] border border-white/10 text-2xs rounded-lg text-foreground focus:border-rose-500/50 cursor-pointer w-full font-bold bg-[#0a0f1e]"
-                  >
-                    <option value="all">All Clients</option>
-                    {availableClients.map(client => (
-                      <option key={client} value={client}>{client}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={expCategory}
-                    onChange={(e) => setExpCategory(e.target.value)}
-                    className="h-8 px-2 bg-[#0a0f1e] border border-white/10 text-2xs rounded-lg text-foreground focus:border-rose-500/50 cursor-pointer w-full font-bold bg-[#0a0f1e]"
-                  >
-                    <option value="all">All Categories</option>
-                    {availableExpenseCategories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-                {(expSearch !== "" || expClient !== "all" || expCategory !== "all") && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setExpSearch("");
-                      setExpClient("all");
-                      setExpCategory("all");
-                    }}
-                    className="h-8 px-2 text-3xs font-extrabold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 border border-rose-500/20 rounded-lg shrink-0"
-                  >
-                    RESET
-                  </Button>
-                )}
-              </div>
-
-              <div className="overflow-x-auto overflow-y-auto border border-white/5 rounded-xl flex-1 scrollbar-thin">
-                <table className="w-full text-sm text-left border-collapse">
-                  <thead className="sticky top-0 bg-[#0a0f1e] z-10 border-b border-white/5">
-                    <tr className="border-b border-white/5 bg-white/[0.01] text-xs text-muted-foreground uppercase tracking-wider font-semibold">
-                      <th className="p-3">Date</th>
-                      <th className="p-3">Description / Category</th>
-                      <th className="p-3">Mode</th>
-                      <th className="p-3 text-right">Amount</th>
-                      <th className="p-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5 text-xs">
-                    {filteredExpenseEntries.length > 0 ? (
+                    )
+                  ) : (
+                    filteredExpenseEntries.length > 0 ? (
                       filteredExpenseEntries.map(entry => {
                         const isHighlighted = highlightedCashbookId === entry.id;
                         return (
@@ -1310,12 +1296,12 @@ export default function Financials({
                           No Expense Entries Found
                         </td>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </motion.div>
-          </div>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
         </motion.div>
       )}
 
