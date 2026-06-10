@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Search, Pencil, Trash2, Building2, Mail, Phone, Calendar } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Building2, Mail, Phone, Calendar, Key, Copy, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -13,6 +13,8 @@ interface Client {
   status: string;
   joinedDate?: string;
   gst?: string;
+  accessKey?: string;
+  access_key?: string;
 }
 
 interface ClientsProps {
@@ -175,6 +177,59 @@ export default function Clients({
                       </span>
                     </div>
                   )}
+
+                  {/* Access Key Display */}
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+                    <div className="flex items-center gap-2">
+                      <Key className="w-3.5 h-3.5 text-cyan-400" />
+                      <span className="font-mono text-xs uppercase tracking-wider text-cyan-400 font-bold">
+                        KEY: {client.accessKey || client.access_key || "N/A"}
+                      </span>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Copy Login Credentials"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const keyText = client.accessKey || client.access_key || "";
+                          const textToCopy = `Portal URL: ${window.location.origin}\nEmail: ${client.email}\nPasscode: ${keyText}`;
+                          navigator.clipboard.writeText(textToCopy);
+                          alert("Credentials copied to clipboard!");
+                        }}
+                        className="w-6 h-6 rounded bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-cyan-400 border border-white/5 transition-all"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </Button>
+                      {client.phone && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Share on WhatsApp"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Clean phone number: remove non-digits, and leading 0
+                            let cleanPhone = client.phone.replace(/\D/g, "");
+                            if (cleanPhone.startsWith("0")) {
+                              cleanPhone = cleanPhone.substring(1);
+                            }
+                            // Prepend 91 if it's 10 digits
+                            if (cleanPhone.length === 10) {
+                              cleanPhone = "91" + cleanPhone;
+                            }
+                            const keyText = client.accessKey || client.access_key || "";
+                            const message = `Hi ${client.name}, your Netra Graphics portal is active! Access it here: ${window.location.origin} using your Email: ${client.email} and Passcode: ${keyText}`;
+                            const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+                            window.open(whatsappUrl, "_blank");
+                          }}
+                          className="w-6 h-6 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-all"
+                        >
+                          <Share2 className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 

@@ -1105,6 +1105,17 @@ function App() {
   const [isClientVaultActive, setIsClientVaultActive] = useState(() => {
     return localStorage.getItem('netra_client_active') === 'true';
   });
+  const [currentClient, setCurrentClient] = useState(() => {
+    const saved = localStorage.getItem('netra_client_session');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved client session:", e);
+      }
+    }
+    return null;
+  });
   const [isIgnitionModalOpen, setIsIgnitionModalOpen] = useState(false);
   const [ignitionQty, setIgnitionQty] = useState(1);
   const [ignitionRate, setIgnitionRate] = useState("");
@@ -1201,6 +1212,7 @@ function App() {
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [clientViewMode, setClientViewMode] = useState("LIST"); // LIST, VIEW
+  const [clientModalPasscode, setClientModalPasscode] = useState("");
 
   const [accessKey, setAccessKey] = useState("");
   const [remarkModal, setRemarkModal] = useState({ open: false, inquiryId: null, type: null });
@@ -1240,6 +1252,14 @@ function App() {
   useEffect(() => {
     localStorage.setItem('netra_client_active', isClientVaultActive);
   }, [isClientVaultActive]);
+
+  useEffect(() => {
+    if (currentClient) {
+      localStorage.setItem('netra_client_session', JSON.stringify(currentClient));
+    } else {
+      localStorage.removeItem('netra_client_session');
+    }
+  }, [currentClient]);
 
   useEffect(() => {
     localStorage.setItem('netra_active_admin_module', activeAdminModule);
@@ -2730,18 +2750,43 @@ function App() {
     } else {
       // Client Access
       if (accessKey && passphrase) {
-        if (saveLoginInfo) {
-          localStorage.setItem('netra_saved_client_key', accessKey);
-          localStorage.setItem('netra_saved_client_pass', passphrase);
-        } else {
-          localStorage.removeItem('netra_saved_client_key');
-          localStorage.removeItem('netra_saved_client_pass');
+        const btn = e.target.querySelector('button[type="submit"]');
+        const originalText = btn ? btn.innerText : "";
+        if (btn) btn.innerText = "VERIFYING PASSCODE...";
+
+        try {
+          // Verify with database
+          const clientData = await verifyClientVaultKey(accessKey.trim(), passphrase.trim());
+
+          if (clientData) {
+            if (saveLoginInfo) {
+              localStorage.setItem('netra_saved_client_key', accessKey);
+              localStorage.setItem('netra_saved_client_pass', passphrase);
+            } else {
+              localStorage.removeItem('netra_saved_client_key');
+              localStorage.removeItem('netra_saved_client_pass');
+            }
+
+            setCurrentClient({
+              ...clientData,
+              joinedDate: clientData.joined_date || clientData.joinedDate,
+              accessKey: clientData.access_key || clientData.accessKey
+            });
+
+            triggerInstantTransition(() => {
+              clearAllPages();
+              setIsClientVaultActive(true);
+              pushPageToHistory('client-vault');
+            });
+          } else {
+            setLoginError("ACCESS DENIED: Invalid Email or Passcode.");
+          }
+        } catch (err) {
+          console.error("Client verification error:", err);
+          setLoginError("VERIFICATION ERROR: " + (err.message || "Failed to connect to database."));
+        } finally {
+          if (btn) btn.innerText = originalText;
         }
-        triggerInstantTransition(() => {
-          clearAllPages();
-          setIsClientVaultActive(true);
-          pushPageToHistory('client-vault');
-        });
       } else {
         setLoginError("Please enter your Client Access Key and Passphrase.");
       }
@@ -2754,6 +2799,8 @@ function App() {
     localStorage.removeItem('netra_client_active');
     localStorage.removeItem('netra_active_admin_module');
     localStorage.removeItem('netra_admin_grid_active');
+    localStorage.removeItem('netra_client_session');
+    setCurrentClient(null);
     triggerInstantTransition(() => {
       clearAllPages();
       pushPageToHistory('home');
@@ -3501,6 +3548,7 @@ function App() {
       const rawPhone = formData.get('phone')?.trim();
       const rawAddress = formData.get('address')?.trim();
       const gst = formData.get('gst') || '';
+      const rawAccessKey = formData.get('accessKey')?.trim().toUpperCase();
 
       if (!rawName) {
         alert("Please enter a valid client name.");
@@ -3509,6 +3557,7 @@ function App() {
 
       // Generate a unique fallback email if empty to satisfy UNIQUE NOT NULL DB constraint
       const emailVal = rawEmail || `${rawName.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Date.now()}@netra.graphics`;
+      const passcodeVal = rawAccessKey || clientModalPasscode;
 
       if (selectedClient) {
         // Check if another client has this email
@@ -3524,7 +3573,8 @@ function App() {
           phone: rawPhone,
           address: rawAddress,
           gst: gst,
-          status: selectedClient.status || 'Active'
+          status: selectedClient.status || 'Active',
+          accessKey: passcodeVal
         };
 
         const updatedClient = await updateClientProfile(selectedClient.id, clientData);
@@ -3547,7 +3597,6 @@ function App() {
           return;
         }
 
-        const randomAccessKey = Math.random().toString(36).substring(2, 8).toUpperCase();
         const clientData = {
           name: rawName,
           email: emailVal,
@@ -3555,7 +3604,7 @@ function App() {
           address: rawAddress,
           gst: gst,
           status: 'Active',
-          accessKey: randomAccessKey
+          accessKey: passcodeVal || Math.random().toString(36).substring(2, 8).toUpperCase()
         };
 
         const newClient = await createClientProfile(clientData);
@@ -3578,6 +3627,7 @@ function App() {
 
     setIsClientModalOpen(false);
     setSelectedClient(null);
+    setClientModalPasscode("");
   };
 
   const deleteClient = async (id) => {
@@ -4573,13 +4623,27 @@ function App() {
                         if (k && p) {
                           setAccessKey(k);
                           setPassphrase(p);
-                          setTimeout(() => {
-                            triggerInstantTransition(() => {
-                              clearAllPages();
-                              setIsClientVaultActive(true);
-                              pushPageToHistory('client-vault');
-                            });
-                          }, 100);
+                          setLoginError("");
+                          try {
+                            const clientData = await verifyClientVaultKey(k.trim(), p.trim());
+                            if (clientData) {
+                              setCurrentClient({
+                                ...clientData,
+                                joinedDate: clientData.joined_date || clientData.joinedDate,
+                                accessKey: clientData.access_key || clientData.accessKey
+                              });
+                              triggerInstantTransition(() => {
+                                clearAllPages();
+                                setIsClientVaultActive(true);
+                                pushPageToHistory('client-vault');
+                              });
+                            } else {
+                              setLoginError("ACCESS DENIED: Auto-login failed. Invalid saved credentials.");
+                            }
+                          } catch (err) {
+                            console.error("Client auto login failed:", err);
+                            setLoginError("VERIFICATION ERROR: " + (err.message || "Failed to connect to database."));
+                          }
                         }
                       }
                     };
@@ -4851,7 +4915,7 @@ function App() {
                             invoices={invoices}
                             cashbookEntries={cashbookEntries}
                             onOpenIgnitionModal={() => { setPrefillData(null); setIsIgnitionModalOpen(true); }}
-                            onOpenCreateClient={() => { setSelectedClient(null); setIsClientModalOpen(true); }}
+                            onOpenCreateClient={() => { setSelectedClient(null); setClientModalPasscode(Math.random().toString(36).substring(2, 8).toUpperCase()); setIsClientModalOpen(true); }}
                             setActiveAdminModule={setActiveAdminModule}
                             onDownloadInvoice={(p) => {
                               setInvoiceProject(p);
@@ -4910,8 +4974,8 @@ function App() {
                           <Clients
                             clients={clients}
                             ignitionQueue={ignitionQueue}
-                            onOpenCreateClient={() => { setSelectedClient(null); setIsClientModalOpen(true); }}
-                            onOpenEditClient={(client) => { setSelectedClient(client); setIsClientModalOpen(true); }}
+                            onOpenCreateClient={() => { setSelectedClient(null); setClientModalPasscode(Math.random().toString(36).substring(2, 8).toUpperCase()); setIsClientModalOpen(true); }}
+                            onOpenEditClient={(client) => { setSelectedClient(client); setClientModalPasscode(client.accessKey || client.access_key || ""); setIsClientModalOpen(true); }}
                             onDeleteClient={deleteClient}
                           />
                         )}
@@ -5255,6 +5319,43 @@ function App() {
                                   <div className="input-group" style={{ width: '100%' }}>
                                     <label>GST Number (Optional)</label>
                                     <input type="text" name="gst" defaultValue={selectedClient?.gst} placeholder="22AAAAA0000A1Z5" />
+                                  </div>
+                                </div>
+
+                                <div className="form-row">
+                                  <div className="input-group" style={{ width: '100%' }}>
+                                    <label>Vault Passcode / Access Key</label>
+                                    <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                                      <input 
+                                        type="text" 
+                                        name="accessKey" 
+                                        value={clientModalPasscode} 
+                                        onChange={(e) => setClientModalPasscode(e.target.value.toUpperCase())} 
+                                        placeholder="6-CHAR PASSCODE" 
+                                        style={{ flexGrow: 1, textTransform: 'uppercase', fontFamily: 'monospace', letterSpacing: '0.15em' }}
+                                        required 
+                                      />
+                                      <button 
+                                        type="button" 
+                                        onClick={() => setClientModalPasscode(Math.random().toString(36).substring(2, 8).toUpperCase())}
+                                        style={{
+                                          padding: '0 16px',
+                                          background: 'rgba(8, 217, 214, 0.1)',
+                                          border: '1px solid rgba(8, 217, 214, 0.3)',
+                                          color: '#08d9d6',
+                                          fontWeight: 'bold',
+                                          fontSize: '11px',
+                                          borderRadius: '8px',
+                                          cursor: 'pointer',
+                                          textTransform: 'uppercase',
+                                          letterSpacing: '0.05em',
+                                          height: '42px',
+                                          transition: 'all 0.2s ease-in-out'
+                                        }}
+                                      >
+                                        Regenerate
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
 
