@@ -380,7 +380,8 @@ export default function Projects({
         qty: qtyVal,
         rate: rateVal,
         description: formDescription,
-        priority: formPriority
+        priority: formPriority,
+        acknowledgedDeadline: editingProject?.acknowledgedDeadline || ''
       })}`;
 
       const updatedProject = {
@@ -403,6 +404,7 @@ export default function Projects({
         discountPercent: formDiscountType === "%" ? discountInput.toFixed(2) : ((discountInput / (budgetVal || 1)) * 100).toFixed(2),
         advanceAmount: advanceVal,
         paymentStatus: paymentStatus,
+        acknowledgedDeadline: editingProject?.acknowledgedDeadline || '',
         client: editingProject.client ? {
           ...editingProject.client,
           email: formClientEmail,

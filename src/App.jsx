@@ -1256,7 +1256,6 @@ function App() {
   useEffect(() => {
     // Clear any previous mock database states from local storage to ensure a clean launch
     localStorage.removeItem("netra_db_state");
-    localStorage.removeItem("netra_read_flames");
 
     const loadSupabaseData = async () => {
       try {
@@ -1536,7 +1535,9 @@ function App() {
     const deadline = new Date(q.deadline);
     const now = new Date();
     const diff = deadline - now;
-    return diff <= 5 * 24 * 60 * 60 * 1000 && !readFlames.includes(q.id);
+    const isWithin5Days = diff <= 5 * 24 * 60 * 60 * 1000;
+    const isAcknowledged = q.acknowledgedDeadline === q.deadline;
+    return isWithin5Days && !isAcknowledged && !readFlames.includes(q.id);
   });
 
   const hasUrgentAlert = flames.length > 0 || sparks.length > 0;
@@ -1552,14 +1553,34 @@ function App() {
   }, [isAdminGridActive]);
 
   const markAllAlertsAsRead = async () => {
-    // 1. Mark all flames as read
-    const flameIds = flames.map(f => f.id);
-    if (flameIds.length > 0) {
+    // 1. Mark all flames as read in database and local state
+    if (flames.length > 0) {
+      const flameIds = flames.map(f => f.id);
       setReadFlames(prev => {
         const next = [...prev, ...flameIds];
         localStorage.setItem("netra_read_flames", JSON.stringify(next));
         return next;
       });
+
+      // Update in Supabase database
+      for (const flame of flames) {
+        try {
+          await updateProjectState(flame.id, { acknowledgedDeadline: flame.deadline });
+        } catch (err) {
+          console.error(`Failed to update acknowledged deadline for project ${flame.id}:`, err);
+        }
+      }
+
+      // Update local ignitionQueue state so UI refreshes immediately
+      setIgnitionQueue(prev =>
+        prev.map(p => {
+          const matched = flames.find(f => f.id === p.id);
+          if (matched) {
+            return { ...p, acknowledgedDeadline: matched.deadline };
+          }
+          return p;
+        })
+      );
     }
 
     // 2. Mark all sparks as read in Supabase and locally
@@ -1614,12 +1635,25 @@ function App() {
     }
   };
 
-  const markFlameAsRead = (projectId) => {
+  const markFlameAsRead = async (projectId) => {
+    const project = ignitionQueue.find(p => p.id === projectId);
+    if (!project) return;
+
     setReadFlames(prev => {
       const next = [...prev, projectId];
       localStorage.setItem("netra_read_flames", JSON.stringify(next));
       return next;
     });
+
+    try {
+      await updateProjectState(projectId, { acknowledgedDeadline: project.deadline });
+      setIgnitionQueue(prev =>
+        prev.map(p => (p.id === projectId ? { ...p, acknowledgedDeadline: project.deadline } : p))
+      );
+    } catch (err) {
+      console.error(`Failed to update acknowledged deadline for project ${projectId}:`, err);
+    }
+
     toast({ title: "Alert acknowledged" });
   };
 

@@ -28,6 +28,7 @@ export const getProjects = async () => {
     let rate = parseFloat(project.quote);
     let descText = project.description || '';
     let priority = 'Normal';
+    let acknowledgedDeadline = '';
 
     if (descText.startsWith("JSON_METADATA:")) {
       try {
@@ -36,6 +37,7 @@ export const getProjects = async () => {
         rate = parsed.rate || (parseFloat(project.quote) / qty);
         descText = parsed.description || '';
         priority = parsed.priority || 'Normal';
+        acknowledgedDeadline = parsed.acknowledgedDeadline || '';
       } catch (e) {
         console.error("Failed to parse JSON_METADATA in project description:", e);
       }
@@ -61,6 +63,7 @@ export const getProjects = async () => {
       category: project.category || 'branding',
       progress: Math.max(20, project.progress || 0),
       priority: priority,
+      acknowledgedDeadline: acknowledgedDeadline,
       client: project.clients ? {
         id: project.clients.id,
         name: project.clients.name,
@@ -97,7 +100,8 @@ export const igniteProject = async (projectData) => {
     qty: projectData.qty || 1,
     rate: projectData.rate || (projectData.quote / (projectData.qty || 1)),
     description: desc,
-    priority: projectData.priority || 'Normal'
+    priority: projectData.priority || 'Normal',
+    acknowledgedDeadline: ''
   })}`;
 
   // 1. Insert core project details
@@ -181,8 +185,8 @@ export const updateProjectState = async (projectId, updates) => {
   if (updates.category !== undefined) updatePayload.category = updates.category;
   if (updates.progress !== undefined) updatePayload.progress = updates.progress;
 
-  // Handle QTY and Rate serialization if description, quote, qty, rate, or priority are updated
-  if (updates.description !== undefined || updates.qty !== undefined || updates.rate !== undefined || updates.quote !== undefined || updates.priority !== undefined) {
+  // Handle QTY and Rate serialization if description, quote, qty, rate, priority, or acknowledgedDeadline are updated
+  if (updates.description !== undefined || updates.qty !== undefined || updates.rate !== undefined || updates.quote !== undefined || updates.priority !== undefined || updates.acknowledgedDeadline !== undefined) {
     // 1. Fetch current description and quote to extract existing metadata
     const { data: currentProj } = await supabase
       .from('projects')
@@ -194,6 +198,7 @@ export const updateProjectState = async (projectId, updates) => {
     let existingRate = currentProj ? parseFloat(currentProj.quote) : 0;
     let existingDesc = currentProj ? (currentProj.description || '') : '';
     let existingPriority = 'Normal';
+    let existingAcknowledgedDeadline = '';
 
     if (existingDesc.startsWith("JSON_METADATA:")) {
       try {
@@ -202,6 +207,7 @@ export const updateProjectState = async (projectId, updates) => {
         existingRate = parsed.rate || (currentProj ? parseFloat(currentProj.quote) / existingQty : 0);
         existingDesc = parsed.description || '';
         existingPriority = parsed.priority || 'Normal';
+        existingAcknowledgedDeadline = parsed.acknowledgedDeadline || '';
       } catch (e) {
         console.error("Failed to parse JSON_METADATA during project update:", e);
       }
@@ -211,6 +217,7 @@ export const updateProjectState = async (projectId, updates) => {
     let newRate = updates.rate !== undefined ? updates.rate : existingRate;
     const newDesc = updates.description !== undefined ? updates.description : existingDesc;
     const newPriority = updates.priority !== undefined ? updates.priority : existingPriority;
+    const newAcknowledgedDeadline = updates.acknowledgedDeadline !== undefined ? updates.acknowledgedDeadline : existingAcknowledgedDeadline;
     
     // If quote is updated but rate is not, recalculate rate to match new quote
     if (updates.quote !== undefined && updates.rate === undefined) {
@@ -221,7 +228,8 @@ export const updateProjectState = async (projectId, updates) => {
       qty: newQty,
       rate: newRate,
       description: newDesc,
-      priority: newPriority
+      priority: newPriority,
+      acknowledgedDeadline: newAcknowledgedDeadline
     })}`;
   }
 
