@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Search, Pencil, Trash2, FileText, SlidersHorizontal } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
@@ -149,6 +149,11 @@ export default function Projects({
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<any | null>(null);
+  
+  // Priority and Completed Tab states
+  const [showCompletedTab, setShowCompletedTab] = useState(false);
+  const [sortBy, setSortBy] = useState("date_desc");
+  const [formPriority, setFormPriority] = useState("Normal");
 
   // Layered filter states
   const [filterClient, setFilterClient] = useState("all");
@@ -242,7 +247,17 @@ export default function Projects({
     // 2. Status filter
     const statusVal = (p.status || "active").toLowerCase().replace(" ", "_");
     const normalizedStatus = statusVal === "ongoing" ? "active" : statusVal;
-    const matchStatus = filterStatus === "all" || normalizedStatus === filterStatus;
+    
+    let matchStatus = false;
+    if (showCompletedTab) {
+      matchStatus = normalizedStatus === "completed";
+    } else {
+      if (normalizedStatus === "completed") {
+        matchStatus = false;
+      } else {
+        matchStatus = filterStatus === "all" || normalizedStatus === filterStatus;
+      }
+    }
 
     // 3. Client visionary filter
     const matchClient = filterClient === "all" || clientName.trim().toLowerCase() === filterClient.trim().toLowerCase();
@@ -274,6 +289,32 @@ export default function Projects({
     return matchSearch && matchStatus && matchClient && matchMonth && matchDateRange;
   });
 
+  const sortedAndFiltered = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      if (sortBy === "az") {
+        const nameA = a.service || a.name || "";
+        const nameB = b.service || b.name || "";
+        return nameA.localeCompare(nameB);
+      }
+      if (sortBy === "priority_desc") {
+        const priorityWeight = { "High": 3, "Normal": 2, "Low": 1 };
+        const wA = priorityWeight[a.priority as keyof typeof priorityWeight] || 2;
+        const wB = priorityWeight[b.priority as keyof typeof priorityWeight] || 2;
+        return wB - wA;
+      }
+      if (sortBy === "priority_asc") {
+        const priorityWeight = { "High": 3, "Normal": 2, "Low": 1 };
+        const wA = priorityWeight[a.priority as keyof typeof priorityWeight] || 2;
+        const wB = priorityWeight[b.priority as keyof typeof priorityWeight] || 2;
+        return wA - wB;
+      }
+      // Default: date_desc (latest first)
+      const dateA = a.createdAt || 0;
+      const dateB = b.createdAt || 0;
+      return dateB - dateA;
+    });
+  }, [filtered, sortBy]);
+
   function openEdit(project: any) {
     setEditingProject(project);
     
@@ -293,6 +334,7 @@ export default function Projects({
     setFormCategory(["branding", "web", "print", "motion", "illustration", "social_media", "packaging"].includes(currentCategory) ? currentCategory : "branding");
     setFormBudget(grossQuote);
     setFormProgress(project.progress || 0);
+    setFormPriority(project.priority || "Normal");
     setFormDeadline(project.deadline ? project.deadline.split('T')[0] : "");
     setFormDiscountValue(loadedDiscount);
     setFormDiscountType(project.discountType || 'rs');
@@ -333,11 +375,12 @@ export default function Projects({
         paymentStatus = 'part';
       }
 
-      // Serialize qty/rate into JSON_METADATA format (matches getProjects parser)
+      // Serialize qty/rate/priority into JSON_METADATA format (matches getProjects parser)
       const serializedDescription = `JSON_METADATA:${JSON.stringify({
         qty: qtyVal,
         rate: rateVal,
-        description: formDescription
+        description: formDescription,
+        priority: formPriority
       })}`;
 
       const updatedProject = {
@@ -353,6 +396,7 @@ export default function Projects({
         budget: budgetVal,
         deadline: formDeadline,
         progress: typeof formProgress === "number" ? formProgress : 0,
+        priority: formPriority,
         discount: discountAmt,
         discountValue: discountInput.toString(),
         discountType: formDiscountType,
@@ -507,16 +551,55 @@ export default function Projects({
       {/* Status Selector & Filters Toggle */}
       <motion.div variants={itemVariants} className="flex gap-3 items-center flex-wrap">
         <select
-          className="h-9 px-3 bg-[#0c101d]/60 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold uppercase min-w-[160px] hover:bg-white/5 transition-all"
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
+          className="h-9 px-3 bg-[#0c101d]/60 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold uppercase min-w-[165px] hover:bg-white/5 transition-all"
+          value={showCompletedTab ? "completed" : filterStatus}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (val === "completed") {
+              setShowCompletedTab(true);
+              setFilterStatus("completed");
+            } else {
+              setShowCompletedTab(false);
+              setFilterStatus(val);
+            }
+          }}
           data-testid="select-filter-status"
         >
-          <option value="all">ALL MISSIONS</option>
+          {showCompletedTab && <option value="completed">COMPLETED</option>}
+          <option value="all">ALL ACTIVE MISSIONS</option>
           <option value="active">ACTIVE</option>
-          <option value="completed">COMPLETED</option>
           <option value="on_hold">ON HOLD</option>
           <option value="cancelled">CANCELLED</option>
+        </select>
+
+        <Button
+          onClick={() => {
+            if (showCompletedTab) {
+              setShowCompletedTab(false);
+              setFilterStatus("all");
+            } else {
+              setShowCompletedTab(true);
+              setFilterStatus("completed");
+            }
+          }}
+          className={`h-9 px-4 text-xs font-bold rounded-xl border transition-all ${
+            showCompletedTab
+              ? "bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+              : "bg-white/5 hover:bg-white/10 border-white/10 text-muted-foreground"
+          }`}
+        >
+          COMPLETED PROJECT
+        </Button>
+
+        <select
+          className="h-9 px-3 bg-[#0c101d]/60 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold uppercase min-w-[180px] hover:bg-white/5 transition-all"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+        >
+          <option value="date_desc">LATEST IGNITION</option>
+          <option value="az">A-Z NAME</option>
+          <option value="priority_desc">PRIORITY: HIGH TO LOW</option>
+          <option value="priority_asc">PRIORITY: LOW TO HIGH</option>
         </select>
 
         <Button
@@ -641,7 +724,7 @@ export default function Projects({
 
       {/* Grid */}
       <motion.div variants={containerVariants} className="space-y-4">
-        {filtered.map((project) => {
+        {sortedAndFiltered.map((project) => {
           const serviceName = project.service || project.name || "Unnamed Project";
           const clientName = project.clientName || project.name || "Unknown Client";
           const budgetVal = project.budget !== undefined ? project.budget : (parseFloat(project.quote) || 0);
@@ -649,9 +732,11 @@ export default function Projects({
           const progressVal = statusVal === "completed" ? 100 : (project.progress || 20);
           const categoryVal = (project.category || "branding").toLowerCase().replace(" ", "_");
 
-          const statusColor = STATUS_COLORS[statusVal] ?? "#666";
+          const isHighPriority = project.priority === "High";
+          const statusColor = isHighPriority ? "#ef4444" : (STATUS_COLORS[statusVal] ?? "#666");
           const categoryColor = CATEGORY_COLORS[categoryVal] ?? "#666";
-          const theme = STATUS_THEMES[statusVal] ?? {
+          
+          let theme = STATUS_THEMES[statusVal] ?? {
             color: statusColor,
             borderClass: "border-white/5 group-hover:border-white/10",
             bgGradient: "linear-gradient(135deg, transparent 0%, transparent 100%)",
@@ -660,6 +745,17 @@ export default function Projects({
             cardBg: "bg-card/40"
           };
 
+          if (isHighPriority) {
+            theme = {
+              color: "#ef4444",
+              borderClass: "border-red-500/40 group-hover:border-red-500/60 shadow-[0_0_20px_rgba(239,68,68,0.2)]",
+              bgGradient: "linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, transparent 100%)",
+              glowColor: "rgba(239, 68, 68, 0.2)",
+              textHighlight: "text-red-400 font-bold",
+              cardBg: "bg-[#160d0e]/80"
+            };
+          }
+
           const isProjectActive = statusVal === "active" || statusVal === "ongoing";
 
           return (
@@ -667,7 +763,7 @@ export default function Projects({
               key={project.id}
               variants={itemVariants}
               className={`group relative rounded-2xl border backdrop-blur-sm p-5 transition-all duration-300 flex flex-col justify-between ${theme.borderClass} ${theme.cardBg}`}
-              style={{ background: `linear-gradient(135deg, ${statusColor}03 0%, transparent 100%)` }}
+              style={{ background: isHighPriority ? `linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, transparent 100%)` : `linear-gradient(135deg, ${statusColor}03 0%, transparent 100%)` }}
               data-testid={`card-project-${project.id}`}
             >
               <div className="flex items-start justify-between flex-wrap gap-4">
@@ -718,6 +814,23 @@ export default function Projects({
                             <span>Due {new Date(project.deadline).toLocaleDateString()}</span>
                           )}
                         </>
+                      )}
+                      <span>·</span>
+                      {project.priority === "High" ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_12px_rgba(239,68,68,0.2)] animate-pulse-glow">
+                          <span className="w-1 h-1 rounded-full bg-red-400 animate-ping" />
+                          HIGH PRIORITY
+                        </span>
+                      ) : project.priority === "Low" ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-500/10 text-slate-400 border border-slate-500/20">
+                          <span className="w-1 h-1 rounded-full bg-slate-400" />
+                          LOW PRIORITY
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_12px_rgba(6,182,212,0.2)]">
+                          <span className="w-1 h-1 rounded-full bg-cyan-400" />
+                          NORMAL PRIORITY
+                        </span>
                       )}
                     </p>
                   </div>
@@ -894,6 +1007,15 @@ export default function Projects({
                       <option value="on_hold">On Hold</option>
                       <option value="cancelled">Cancelled</option>
                     </select>
+                    <div className="pt-2">
+                      <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold block mb-1">Set Priority</label>
+                      <select className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold"
+                        value={formPriority} onChange={(e) => setFormPriority(e.target.value)}>
+                        <option value="Low">Low</option>
+                        <option value="Normal">Normal</option>
+                        <option value="High">High</option>
+                      </select>
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Category</label>

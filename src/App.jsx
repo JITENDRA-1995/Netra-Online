@@ -2783,6 +2783,7 @@ function App() {
         stage: 1,
         progress: 20,
         status: "Active",
+        priority: "Normal",
         deadline: formData.get('deadline'),
         isManual: true,
         client: clientInfo,
@@ -4441,18 +4442,25 @@ function App() {
                     </div>
 
                     {/* Offer to Save Login checkbox */}
-                    <div className="flex items-center gap-2 px-1 pb-2 select-none">
-                      <input
-                        type="checkbox"
-                        id="saveLoginCheckbox"
-                        checked={saveLoginInfo}
-                        onChange={e => setSaveLoginInfo(e.target.checked)}
-                        className="rounded border-white/10 bg-white/5 cursor-pointer"
-                        style={{ accentColor: !isAdminSelected ? '#08d9d6' : '#ff2e63' }}
-                      />
-                      <label htmlFor="saveLoginCheckbox" className="text-2xs text-white/50 cursor-pointer hover:text-white/80 transition-colors">
-                        Save my login information
-                      </label>
+                    <div className="flex flex-col gap-1.5 px-1 pb-2">
+                      <div className="flex items-center gap-2 select-none">
+                        <input
+                          type="checkbox"
+                          id="saveLoginCheckbox"
+                          checked={saveLoginInfo}
+                          onChange={e => setSaveLoginInfo(e.target.checked)}
+                          className="rounded border-white/10 bg-white/5 cursor-pointer"
+                          style={{ accentColor: !isAdminSelected ? '#08d9d6' : '#ff2e63' }}
+                        />
+                        <label htmlFor="saveLoginCheckbox" className="text-2xs text-white/50 cursor-pointer hover:text-white/80 transition-colors">
+                          Save my login information
+                        </label>
+                      </div>
+                      {!isAdminSelected && (
+                        <p className="text-[10px] text-white/40 leading-normal italic pl-0.5 mt-0.5">
+                          Don't have an account? Contact your designer for access.
+                        </p>
+                      )}
                     </div>
 
                     <AnimatePresence>
