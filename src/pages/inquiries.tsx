@@ -327,7 +327,7 @@ export default function Inquiries({
                 <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
                   <span className="text-2xs text-muted-foreground font-mono">{inq.phone}</span>
                   <div className="flex items-center gap-1">
-                    {inq.status.toLowerCase() === "new spark" && (
+                    {!(inq.status.toLowerCase().includes("ignit") || inq.status.toLowerCase() === "accepted") && (
                       <>
                         <Button
                           size="icon"
