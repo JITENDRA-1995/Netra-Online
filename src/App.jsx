@@ -17,6 +17,17 @@ const SettingsPage = React.lazy(() => import('@/pages/settings'));
 const Portfolio = React.lazy(() => import('@/pages/Portfolio').then(m => ({ default: m.Portfolio })));
 const InvoicesPage = React.lazy(() => import('@/pages/invoices'));
 
+// Client Vault Components
+import { ClientVaultLayout } from './pages/client-vault/layout';
+import { ClientDashboard } from './pages/client-vault/dashboard';
+import { ClientProjects } from './pages/client-vault/projects';
+import { ClientProjectDetail } from './pages/client-vault/project-detail';
+import { ClientProjectMessages } from './pages/client-vault/project-messages';
+import { ClientProjectAssets } from './pages/client-vault/project-assets';
+import { ClientInvoices } from './pages/client-vault/invoices';
+import { ClientInvoiceDetail } from './pages/client-vault/invoice-detail';
+import { ClientProfile } from './pages/client-vault/profile';
+
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[400px] w-full bg-[#050508]/20 backdrop-blur-sm rounded-3xl border border-white/5">
     <div className="flex flex-col items-center gap-4">
@@ -1105,6 +1116,17 @@ function App() {
   const [isClientVaultActive, setIsClientVaultActive] = useState(() => {
     return localStorage.getItem('netra_client_active') === 'true';
   });
+  const [activeClientTab, setActiveClientTab] = useState(() => {
+    return localStorage.getItem('netra_active_client_tab') || 'DASHBOARD';
+  });
+  const [selectedClientProjectId, setSelectedClientProjectId] = useState(() => {
+    const id = localStorage.getItem('netra_selected_client_project_id');
+    return id ? parseInt(id) : null;
+  });
+  const [selectedClientInvoiceId, setSelectedClientInvoiceId] = useState(() => {
+    const id = localStorage.getItem('netra_selected_client_invoice_id');
+    return id ? parseInt(id) : null;
+  });
   const [currentClient, setCurrentClient] = useState(() => {
     const saved = localStorage.getItem('netra_client_session');
     if (saved) {
@@ -1252,6 +1274,26 @@ function App() {
   useEffect(() => {
     localStorage.setItem('netra_client_active', isClientVaultActive);
   }, [isClientVaultActive]);
+
+  useEffect(() => {
+    localStorage.setItem('netra_active_client_tab', activeClientTab);
+  }, [activeClientTab]);
+
+  useEffect(() => {
+    if (selectedClientProjectId) {
+      localStorage.setItem('netra_selected_client_project_id', selectedClientProjectId.toString());
+    } else {
+      localStorage.removeItem('netra_selected_client_project_id');
+    }
+  }, [selectedClientProjectId]);
+
+  useEffect(() => {
+    if (selectedClientInvoiceId) {
+      localStorage.setItem('netra_selected_client_invoice_id', selectedClientInvoiceId.toString());
+    } else {
+      localStorage.removeItem('netra_selected_client_invoice_id');
+    }
+  }, [selectedClientInvoiceId]);
 
   useEffect(() => {
     if (currentClient) {
@@ -2794,13 +2836,17 @@ function App() {
   };
 
   const handleLogout = (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     localStorage.removeItem('netra_admin_active');
     localStorage.removeItem('netra_client_active');
     localStorage.removeItem('netra_active_admin_module');
     localStorage.removeItem('netra_admin_grid_active');
     localStorage.removeItem('netra_client_session');
+    localStorage.removeItem('netra_active_client_tab');
+    localStorage.removeItem('netra_selected_client_project_id');
+    localStorage.removeItem('netra_selected_client_invoice_id');
     setCurrentClient(null);
+    setIsClientVaultActive(false);
     triggerInstantTransition(() => {
       clearAllPages();
       pushPageToHistory('home');
@@ -5740,14 +5786,70 @@ function App() {
             </div>
           </section>
 
-          {/* Client Vault Placeholder */}
+          {/* Client Vault Layout and sub-pages */}
           <section className={`client-vault-page ${isClientVaultActive ? 'active' : ''}`}>
-            <div className="vault-background client-bg"></div>
-            <div className="vault-content">
-              <h1 className="vision-title">CLIENT VAULT</h1>
-              <p className="vision-subtitle">Secure access granted. Your brand's evolution is stored here.</p>
-              <button className="vision-back-btn" onClick={goHome}>EXIT TO MAIN FRAME</button>
-            </div>
+            {isClientVaultActive && currentClient && (
+              <ClientVaultLayout
+                currentClient={currentClient}
+                activeTab={activeClientTab}
+                onTabChange={setActiveClientTab}
+                onLogout={handleLogout}
+              >
+                {activeClientTab === 'DASHBOARD' && (
+                  <ClientDashboard
+                    currentClient={currentClient}
+                    onTabChange={setActiveClientTab}
+                    setSelectedProjectId={setSelectedClientProjectId}
+                  />
+                )}
+                {activeClientTab === 'PROJECTS' && (
+                  <ClientProjects
+                    currentClient={currentClient}
+                    onTabChange={setActiveClientTab}
+                    setSelectedProjectId={setSelectedClientProjectId}
+                  />
+                )}
+                {activeClientTab === 'PROJECT_DETAIL' && (
+                  <ClientProjectDetail
+                    projectId={selectedClientProjectId}
+                    onTabChange={setActiveClientTab}
+                    setSelectedProjectId={setSelectedClientProjectId}
+                  />
+                )}
+                {activeClientTab === 'MESSAGES' && (
+                  <ClientProjectMessages
+                    projectId={selectedClientProjectId}
+                    currentClient={currentClient}
+                    onTabChange={setActiveClientTab}
+                  />
+                )}
+                {activeClientTab === 'ASSETS' && (
+                  <ClientProjectAssets
+                    projectId={selectedClientProjectId}
+                    onTabChange={setActiveClientTab}
+                  />
+                )}
+                {activeClientTab === 'INVOICES' && (
+                  <ClientInvoices
+                    currentClient={currentClient}
+                    onTabChange={setActiveClientTab}
+                    setSelectedInvoiceId={setSelectedClientInvoiceId}
+                  />
+                )}
+                {activeClientTab === 'INVOICE_DETAIL' && (
+                  <ClientInvoiceDetail
+                    invoiceId={selectedClientInvoiceId}
+                    onTabChange={setActiveClientTab}
+                  />
+                )}
+                {activeClientTab === 'PROFILE' && (
+                  <ClientProfile
+                    currentClient={currentClient}
+                    setCurrentClient={setCurrentClient}
+                  />
+                )}
+              </ClientVaultLayout>
+            )}
           </section>
 
           {/* Cinematic Splash Overlay System */}
