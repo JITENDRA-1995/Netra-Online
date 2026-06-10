@@ -2762,7 +2762,7 @@ function App() {
         }
       }
 
-      const milestoneNames = ["Discovery", "Moodboard", "Sketching", "Final Flame"];
+      const milestoneNames = ["Discovery", "Moodboard", "Sketching", "Printing", "Final Flame"];
       const qtyVal = parseInt(formData.get('qty')) || 1;
       const rateVal = parseFloat(formData.get('rate')) || 0;
       const quoteVal = parseFloat(formData.get('quote')) || (qtyVal * rateVal) || 15000;
@@ -2781,7 +2781,7 @@ function App() {
         name: clientInfo.name,
         service: serviceName,
         stage: 1,
-        progress: 25,
+        progress: 20,
         status: "Active",
         deadline: formData.get('deadline'),
         isManual: true,
@@ -3137,7 +3137,7 @@ function App() {
     if (newProjectStatus === 'Completed') {
       const remainingAmt = Math.max(0, finalQuote - adv);
       setCustomPaymentPrompt({
-        p: { ...project, status: 'Completed', stage: 4, progress: 100, paymentStatus: 'paid' },
+        p: { ...project, status: 'Completed', stage: 5, progress: 100, paymentStatus: 'paid' },
         finalQuote: finalQuote,
         defaultAmt: remainingAmt,
         adv: adv,
@@ -3146,13 +3146,13 @@ function App() {
       return; // Return early, do not update database or state until confirmed
     } else if (newProjectStatus === 'Cancelled') {
       updatedFields.paymentStatus = 'unpaid';
-      updatedFields.progress = 0;
+      updatedFields.progress = 20;
       setCashbookEntries(prev => prev.filter(entry => entry.projectId !== project.id));
     } else if (newProjectStatus === 'Active') {
       updatedFields.stage = 1;
       if (project.status === 'Completed') {
         updatedFields.paymentStatus = adv > 0 ? 'part' : 'unpaid';
-        updatedFields.progress = 25;
+        updatedFields.progress = 20;
       }
     }
 
@@ -3189,7 +3189,7 @@ function App() {
     if (newProgress === 100) {
       const remainingAmt = Math.max(0, finalQuote - adv);
       setCustomPaymentPrompt({
-        p: { ...project, status: 'Completed', stage: 4, progress: 100, paymentStatus: 'paid' },
+        p: { ...project, status: 'Completed', stage: 5, progress: 100, paymentStatus: 'paid' },
         finalQuote: finalQuote,
         defaultAmt: remainingAmt,
         adv: adv,
@@ -3202,9 +3202,10 @@ function App() {
       progress: newProgress
     };
 
-    if (newProgress === 25) updatedFields.stage = 1;
-    else if (newProgress === 50) updatedFields.stage = 2;
-    else if (newProgress === 75) updatedFields.stage = 3;
+    if (newProgress === 20) updatedFields.stage = 1;
+    else if (newProgress === 40) updatedFields.stage = 2;
+    else if (newProgress === 60) updatedFields.stage = 3;
+    else if (newProgress === 80) updatedFields.stage = 4;
 
     try {
       await updateProjectState(projectId, updatedFields);
@@ -3438,7 +3439,7 @@ function App() {
           client_id: p.client?.id || p.client_id,
           description: serializedDesc,
           category: p.category || 'branding',
-          progress: p.progress || 0,
+          progress: Math.max(20, p.progress || 0),
           created_at: p.createdAt ? new Date(p.createdAt).toISOString() : new Date().toISOString()
         }]);
         if (pError) throw pError;

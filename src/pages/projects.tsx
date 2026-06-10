@@ -646,7 +646,7 @@ export default function Projects({
           const clientName = project.clientName || project.name || "Unknown Client";
           const budgetVal = project.budget !== undefined ? project.budget : (parseFloat(project.quote) || 0);
           const statusVal = (project.status || "active").toLowerCase().replace(" ", "_");
-          const progressVal = statusVal === "completed" ? 100 : (project.progress || 0);
+          const progressVal = statusVal === "completed" ? 100 : (project.progress || 20);
           const categoryVal = (project.category || "branding").toLowerCase().replace(" ", "_");
 
           const statusColor = STATUS_COLORS[statusVal] ?? "#666";
@@ -795,9 +795,10 @@ export default function Projects({
                   <div className="overflow-hidden transition-all duration-300 max-h-0 opacity-0 group-hover/progress:max-h-12 group-hover/progress:opacity-100 pt-0 group-hover/progress:pt-2">
                     <div className="flex justify-between items-center gap-2 flex-wrap">
                       {[
-                        { label: "Discover", val: 25 },
-                        { label: "Define", val: 50 },
-                        { label: "Design", val: 75 },
+                        { label: "Discover", val: 20 },
+                        { label: "Define", val: 40 },
+                        { label: "Design", val: 60 },
+                        { label: "Print", val: 80 },
                         { label: "Deliver", val: 100 }
                       ].map((step) => {
                         const isPassedOrCurrent = progressVal >= step.val;
@@ -921,9 +922,10 @@ export default function Projects({
                       value={formProgress}
                       onChange={(e) => setFormProgress(parseInt(e.target.value))}
                     >
-                      <option value={25}>Discover (25%)</option>
-                      <option value={50}>Define (50%)</option>
-                      <option value={75}>Design (75%)</option>
+                      <option value={20}>Discover (20%)</option>
+                      <option value={40}>Define (40%)</option>
+                      <option value={60}>Design (60%)</option>
+                      <option value={80}>Print (80%)</option>
                       <option value={100}>Deliver (100%)</option>
                     </select>
                   </div>

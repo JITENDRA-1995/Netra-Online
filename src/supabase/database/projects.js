@@ -57,7 +57,7 @@ export const getProjects = async () => {
       qty: qty,
       rate: rate,
       category: project.category || 'branding',
-      progress: project.progress || 0,
+      progress: Math.max(20, project.progress || 0),
       client: project.clients ? {
         id: project.clients.id,
         name: project.clients.name,
@@ -115,7 +115,7 @@ export const igniteProject = async (projectData) => {
         client_id: projectData.client_id,
         description: serializedDesc,
         category: projectData.category || 'branding',
-        progress: projectData.progress || 0
+        progress: Math.max(20, projectData.progress || 0)
       }
     ])
     .select()
