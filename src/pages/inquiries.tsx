@@ -33,6 +33,7 @@ interface Inquiry {
   status: string;
   date: string;
   createdAt?: string;
+  description?: string;
 }
 
 interface InquiriesProps {
@@ -489,8 +490,8 @@ export default function Inquiries({
 
               <div className="space-y-2">
                 <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Message Narrative</label>
-                <p className="p-3 rounded-xl bg-white/5 border border-white/5 text-muted-foreground leading-relaxed text-2xs">
-                  Interested in a premium &apos;{selectedInquiry.service}&apos; design calibration for our new venture in {selectedInquiry.location}. Please provide availability options and budget quotes.
+                <p className="p-3 rounded-xl bg-white/5 border border-white/5 text-muted-foreground leading-relaxed text-2xs whitespace-pre-wrap">
+                  {selectedInquiry.description || `Interested in a premium '${selectedInquiry.service}' design calibration for our new venture in ${selectedInquiry.location}. Please provide availability options and budget quotes.`}
                 </p>
               </div>
 

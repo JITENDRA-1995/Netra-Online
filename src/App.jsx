@@ -1459,11 +1459,48 @@ function App() {
       })
       .subscribe();
 
+    // 4. Subscribe to inquiries table changes
+    const inquiriesChannel = supabase
+      .channel('inquiries-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inquiries' }, async (payload) => {
+        try {
+          const dbInquiries = await getInquiries();
+          if (dbInquiries) {
+            setInquiries(dbInquiries);
+          }
+          const newInq = payload.new;
+          if (newInq) {
+            toast({
+              title: "🔥 New Spark Ignited!",
+              description: `${newInq.name} sent an inquiry for ${newInq.service || 'Design'}.`,
+              duration: 8000
+            });
+            triggerBellPulse();
+          }
+        } catch (err) {
+          console.warn("Real-time inquiries refresh failed:", err);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inquiries' }, async (payload) => {
+        if (payload.eventType !== 'INSERT') {
+          try {
+            const dbInquiries = await getInquiries();
+            if (dbInquiries) {
+              setInquiries(dbInquiries);
+            }
+          } catch (err) {
+            console.warn("Real-time inquiries refresh failed:", err);
+          }
+        }
+      })
+      .subscribe();
+
     return () => {
       if (supabase.removeChannel) {
         supabase.removeChannel(projectsChannel);
         supabase.removeChannel(invoicesChannel);
         supabase.removeChannel(clientsChannel);
+        supabase.removeChannel(inquiriesChannel);
       }
     };
   }, []);
@@ -2815,7 +2852,8 @@ function App() {
       email: inq.email,
       phone: inq.phone || '',
       address: inq.location || '',
-      serviceId: serviceMatch ? serviceMatch.id : ''
+      serviceId: serviceMatch ? serviceMatch.id : '',
+      description: inq.description || inq.desc || ''
     });
     setIgnitionClientType("NEW");
     setIsReviewDrawerOpen(false);
@@ -2944,6 +2982,7 @@ function App() {
         progress: 20,
         status: "Active",
         priority: "Normal",
+        description: prefillData?.description || '',
         deadline: formData.get('deadline'),
         isManual: true,
         client: clientInfo,
