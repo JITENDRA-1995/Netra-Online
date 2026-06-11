@@ -84,6 +84,68 @@ export default function InvoicesPage({
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
   const [editingInvoiceNo, setEditingInvoiceNo] = useState<string | null>(null);
 
+  // Settlement states
+  const [selectedSettleInvoice, setSelectedSettleInvoice] = useState<any | null>(null);
+  const [isSettleOpen, setIsSettleOpen] = useState(false);
+  const [settlePaymentMode, setSettlePaymentMode] = useState<"UPI" | "BANK" | "CASH">("UPI");
+
+  const executeSettlement = async () => {
+    if (!selectedSettleInvoice) return;
+    const inv = selectedSettleInvoice;
+    try {
+      await updateInvoice(inv.id, {
+        paymentStatus: "Paid",
+        invoiceNo: inv.invoiceNo,
+        projectId: inv.projectId,
+        clientName: inv.clientName,
+        projectService: inv.projectService,
+        grandTotal: inv.grandTotal,
+        clientLink: inv.clientLink,
+        invoiceTotal: inv.grandTotal,
+        microJobIds: inv.microJobIds
+      });
+
+      setInvoices(prev => prev.map(item => {
+        if (item.id === inv.id) {
+          return {
+            ...item,
+            paymentStatus: "Paid"
+          };
+        }
+        return item;
+      }));
+
+      const cashbookEntry = {
+        id: Date.now(),
+        date: new Date().toISOString().split("T")[0],
+        desc: `Cumulative Jobs Settlement - ${inv.clientName} (Inv #${inv.invoiceNo})`,
+        category: "Micro-Jobs Revenue",
+        amount: inv.grandTotal,
+        mode: settlePaymentMode,
+        type: "INCOME",
+        invoiceId: inv.id,
+        invoiceNo: inv.invoiceNo
+      };
+
+      setCashbookEntries(prev => [cashbookEntry, ...prev]);
+
+      toast({
+        title: "Settlement Complete",
+        description: `Invoice ${inv.invoiceNo} status updated to Paid and cashbook entry recorded.`
+      });
+
+      setIsSettleOpen(false);
+      setSelectedSettleInvoice(null);
+    } catch (err: any) {
+      console.error("Failed to execute settlement:", err);
+      toast({
+        title: "Settlement Failed",
+        description: err.message || "An error occurred during database update.",
+        variant: "destructive"
+      });
+    }
+  };
+
   useEffect(() => {
     if (prefilledEditData && prefilledEditData.isStandalone) {
       setEditingInvoiceId(prefilledEditData.id);
@@ -1241,6 +1303,136 @@ export default function InvoicesPage({
         )}
       </AnimatePresence>
 
+      {/* Settlement Modal */}
+      <AnimatePresence>
+        {isSettleOpen && selectedSettleInvoice && (
+          <div className="modal-overlay z-[10005]" style={{ zIndex: 10050 }}>
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="ignition-modal max-w-md w-[90vw] border border-emerald-500/30 bg-[#080c18]/98"
+            >
+              <button
+                type="button"
+                className="close-modal text-emerald-400 hover:text-emerald-300"
+                onClick={() => {
+                  setIsSettleOpen(false);
+                  setSelectedSettleInvoice(null);
+                }}
+              >
+                ✕
+              </button>
+
+              <div className="modal-header border-b border-emerald-500/10 pb-4 mb-5 text-left">
+                <h2 className="font-extrabold text-emerald-400 text-lg flex items-center gap-2">
+                  💳 SETTLE CUMULATIVE INVOICE
+                </h2>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Execute payment settlement and record revenue</p>
+              </div>
+
+              <div className="space-y-4 text-left text-xs text-white/80">
+                <div className="p-4 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.02] space-y-1">
+                  <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Billing Info</div>
+                  <div className="text-sm font-black text-white">{selectedSettleInvoice.invoiceNo}</div>
+                  <div className="text-[10px] text-muted-foreground uppercase font-mono">
+                    Client: {selectedSettleInvoice.clientName}
+                  </div>
+                  <div className="text-sm text-emerald-400 font-extrabold font-mono mt-1">
+                    Settlement Amount: ₹{selectedSettleInvoice.grandTotal.toLocaleString("en-IN")}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Payment Mode</label>
+                  <select
+                    className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold uppercase transition-all"
+                    value={settlePaymentMode}
+                    onChange={(e) => setSettlePaymentMode(e.target.value as "UPI" | "BANK" | "CASH")}
+                  >
+                    <option value="UPI">UPI / Digital QR</option>
+                    <option value="BANK">Bank Transfer</option>
+                    <option value="CASH">Cash Payment</option>
+                  </select>
+                </div>
+
+                {settlePaymentMode === "UPI" && (
+                  <div className="rounded-xl border border-white/5 bg-white/[0.01] p-4 flex flex-col items-center justify-center gap-3">
+                    <div className="w-28 h-28 bg-white p-1.5 rounded-lg flex items-center justify-center relative group overflow-hidden">
+                      {bankingDetails?.upiId ? (
+                        <img 
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`upi://pay?pa=${bankingDetails.upiId}&pn=${bankingDetails.accountName}&am=${selectedSettleInvoice.grandTotal}&cu=INR`)}`}
+                          alt="Settlement UPI QR Checkout" 
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <div className="text-center p-2 text-muted-foreground/30">
+                          🌐
+                          <span className="text-[8px] uppercase font-mono block mt-1">Awaiting VPA...</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-center space-y-0.5">
+                      <div className="text-[9px] uppercase tracking-widest text-white/40 font-semibold font-mono font-sans">Scan QR to Complete Payment</div>
+                      <div className="text-[10px] font-bold text-white truncate max-w-[200px] mx-auto font-sans">{bankingDetails?.accountName || "Savanhirapra"}</div>
+                      <div className="text-[9px] font-mono text-cyan-400 truncate max-w-[200px] mx-auto">{bankingDetails?.upiId}</div>
+                    </div>
+                  </div>
+                )}
+
+                {settlePaymentMode === "BANK" && (
+                  <div className="rounded-xl border border-white/5 bg-white/[0.01] p-4 space-y-2 font-mono text-[10px] text-white/70">
+                    <div className="flex justify-between border-b border-white/5 pb-1">
+                      <span className="text-white/40 font-sans">Bank Name:</span>
+                      <span className="font-bold text-white font-sans">{bankingDetails?.bankName}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-white/5 pb-1">
+                      <span className="text-white/40 font-sans">Acc Name:</span>
+                      <span className="font-bold text-white font-sans">{bankingDetails?.accountName}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-white/5 pb-1">
+                      <span className="text-white/40">Acc Number:</span>
+                      <span className="font-bold text-white">{bankingDetails?.accountNumber}</span>
+                    </div>
+                    <div className="flex justify-between pb-1">
+                      <span className="text-white/40">IFSC Code:</span>
+                      <span className="font-bold text-white">{bankingDetails?.ifscCode}</span>
+                    </div>
+                  </div>
+                )}
+
+                {settlePaymentMode === "CASH" && (
+                  <div className="p-4 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.01] text-center space-y-1">
+                    <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest font-sans">Cash Settlement</div>
+                    <p className="text-[10px] text-muted-foreground uppercase max-w-[240px] mx-auto font-sans">Confirm that physical cash of ₹{selectedSettleInvoice.grandTotal.toLocaleString("en-IN")} has been received and verified.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-between items-center pt-5 border-t border-white/5 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSettleOpen(false);
+                    setSelectedSettleInvoice(null);
+                  }}
+                  className="border border-white/10 text-white hover:bg-white/5 text-xs rounded-xl px-5 h-9 bg-transparent cursor-pointer font-bold transition-all"
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="button"
+                  onClick={executeSettlement}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold text-xs rounded-xl px-6 h-9 shadow-lg shadow-emerald-500/10 cursor-pointer border-none transition-all"
+                >
+                  CONFIRM SETTLEMENT
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Invoice Vault List */}
       <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
@@ -1475,6 +1667,7 @@ export default function InvoicesPage({
                 <th className="p-4">Invoice No</th>
                 <th className="p-4">Client / Project</th>
                 <th className="p-4 text-center">Issue Date</th>
+                <th className="p-4 text-center">Status</th>
                 <th className="p-4 text-right">Grand Total</th>
                 <th className="p-4 text-right">Actions</th>
               </tr>
@@ -1506,13 +1699,37 @@ export default function InvoicesPage({
                       </div>
                     </td>
                     <td className="p-4 text-center text-muted-foreground">{inv.issueDate}</td>
+                    <td className="p-4 text-center">
+                      <Badge
+                        className={`text-3xs uppercase tracking-wider font-extrabold border-0 px-2.5 py-1 rounded-md ${
+                          inv.paymentStatus === 'Paid'
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                        }`}
+                      >
+                        {inv.paymentStatus || 'Paid'}
+                      </Badge>
+                    </td>
                     <td className="p-4 text-right font-bold text-foreground">₹{inv.grandTotal.toLocaleString()}</td>
                     <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {inv.paymentStatus === 'Pending' && inv.microJobIds && inv.microJobIds.length > 0 && (
+                          <Button
+                            size="sm"
+                            className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 gap-1 font-bold text-xs h-7 px-2.5 rounded-lg"
+                            title="Settle Invoice"
+                            onClick={() => {
+                              setSelectedSettleInvoice(inv);
+                              setIsSettleOpen(true);
+                            }}
+                          >
+                            <span>💳 SETTLE</span>
+                          </Button>
+                        )}
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="w-7 h-7 hover:bg-cyan-500/10 hover:text-cyan-400"
+                          className="w-7 h-7 hover:bg-cyan-500/10 hover:text-cyan-400 border border-white/5"
                           title="View Invoice Document"
                           onClick={() => {
                             setInvoiceProject({ ...inv.rawProject, invoiceNo: inv.invoiceNo, projectId: inv.projectId });
@@ -1524,7 +1741,7 @@ export default function InvoicesPage({
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="w-7 h-7 hover:bg-amber-500/10 hover:text-amber-400"
+                          className="w-7 h-7 hover:bg-amber-500/10 hover:text-amber-400 border border-white/5"
                           title="Edit Invoice Details"
                           onClick={() => {
                             if (onEditInvoice) {
@@ -1537,7 +1754,7 @@ export default function InvoicesPage({
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="w-7 h-7 hover:bg-red-500/10 hover:text-red-400"
+                          className="w-7 h-7 hover:bg-red-500/10 hover:text-red-400 border border-white/5"
                           title="Delete Record"
                           onClick={() => {
                             setInvoiceToDelete(inv);
@@ -1552,7 +1769,7 @@ export default function InvoicesPage({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-muted-foreground uppercase tracking-widest text-3xs font-semibold">
+                  <td colSpan={7} className="p-8 text-center text-muted-foreground uppercase tracking-widest text-3xs font-semibold">
                     {invoiceTab === "DRAFT" ? "NO TEMPORARY DRAFT INVOICES IN VAULT" : invoiceTab === "CUSTOM" ? "NO CUSTOM INVOICES IN VAULT" : "LEDGER IS VOID OF SAVED INVOICES"}
                   </td>
                 </tr>

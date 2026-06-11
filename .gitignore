@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+scratch/
+
 
 # Editor directories and files
 .vscode/*
@@ -27,5 +29,7 @@ dist-ssr
 Netra-Portal/
 Netra-Nexus/
 Netra-Showcase/
+Client-Portal/
+
 
 

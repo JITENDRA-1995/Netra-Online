@@ -23,6 +23,10 @@ export const getInvoices = async () => {
     projectService: inv.project_service,
     issueDate: new Date(inv.issue_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
     grandTotal: parseFloat(inv.grand_total),
+    clientLink: inv.client_link,
+    invoiceTotal: inv.invoice_total ? parseFloat(inv.invoice_total) : parseFloat(inv.grand_total),
+    paymentStatus: inv.payment_status || 'Paid',
+    microJobIds: inv.micro_job_ids || [],
     rawProject: inv.projects ? (() => {
       let qty = 1;
       let rate = parseFloat(inv.projects.quote);
@@ -71,7 +75,11 @@ export const saveInvoice = async (invoiceData) => {
         issue_date: (invoiceData.issueDate && !isNaN(new Date(invoiceData.issueDate).getTime()))
           ? new Date(invoiceData.issueDate).toISOString().split('T')[0]
           : new Date().toISOString().split('T')[0],
-        grand_total: invoiceData.grandTotal || invoiceData.grand_total
+        grand_total: invoiceData.grandTotal || invoiceData.grand_total,
+        client_link: invoiceData.clientLink || invoiceData.client_link || null,
+        invoice_total: invoiceData.invoiceTotal || invoiceData.invoice_total || invoiceData.grandTotal || invoiceData.grand_total,
+        payment_status: invoiceData.paymentStatus || invoiceData.payment_status || 'Pending',
+        micro_job_ids: invoiceData.microJobIds || invoiceData.micro_job_ids || []
       }
     ])
     .select()
@@ -108,7 +116,11 @@ export const updateInvoice = async (invoiceId, invoiceData) => {
       issue_date: (invoiceData.issueDate && !isNaN(new Date(invoiceData.issueDate).getTime())) 
         ? new Date(invoiceData.issueDate).toISOString().split('T')[0] 
         : undefined,
-      grand_total: invoiceData.grandTotal || invoiceData.grand_total
+      grand_total: invoiceData.grandTotal || invoiceData.grand_total,
+      client_link: invoiceData.clientLink || invoiceData.client_link,
+      invoice_total: invoiceData.invoiceTotal || invoiceData.invoice_total,
+      payment_status: invoiceData.paymentStatus || invoiceData.payment_status,
+      micro_job_ids: invoiceData.microJobIds || invoiceData.micro_job_ids
     })
     .eq('id', invoiceId)
     .select()

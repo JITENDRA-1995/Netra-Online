@@ -2371,15 +2371,26 @@ function App() {
     let updated = false;
     let newEntries = [...cashbookEntries];
 
-    // Filter out incorrect "Custom Invoice" cashbook entries that are actually project-linked invoices
+    // Filter out incorrect cashbook entries:
+    // 1. "Custom Invoice" entries that are actually project-linked invoices
+    // 2. Entries associated with standalone invoices that are not paid
     const filteredEntries = newEntries.filter(entry => {
-      if (entry.desc && entry.desc.startsWith("Custom Invoice:")) {
-        const matchingInvoice = invoices.find(inv => 
-          inv.id === entry.invoiceId || 
-          inv.invoiceNo === entry.invoiceNo || 
-          entry.desc.includes(inv.invoiceNo)
-        );
-        if (matchingInvoice && matchingInvoice.projectId) {
+      const matchingInvoice = invoices.find(inv => 
+        inv.id === entry.invoiceId || 
+        inv.invoiceNo === entry.invoiceNo || 
+        (entry.invoiceNo && entry.desc && entry.desc.includes(inv.invoiceNo))
+      );
+
+      if (matchingInvoice) {
+        // A. If it's a project-linked invoice, it shouldn't have a "Custom Invoice:" entry
+        if (matchingInvoice.projectId && entry.desc && entry.desc.startsWith("Custom Invoice:")) {
+          updated = true;
+          return false;
+        }
+        // B. If it's a standalone invoice but is NOT Paid, it shouldn't be in the cashbook
+        const isStandalone = !matchingInvoice.projectId || matchingInvoice.projectId === null;
+        const isPaid = (matchingInvoice.paymentStatus || "").toLowerCase() === "paid";
+        if (isStandalone && !isPaid) {
           updated = true;
           return false;
         }
@@ -2392,6 +2403,30 @@ function App() {
       // Standalone invoices have projectId === null
       const isStandalone = (!inv.projectId || inv.projectId === null) && inv.clientName;
       if (!isStandalone) return;
+
+      // Only reconcile if the standalone invoice is Paid
+      const isPaid = (inv.paymentStatus || "").toLowerCase() === "paid";
+      if (!isPaid) return;
+
+      // Deduplicate cashbook entries for this invoice if there are multiple matches
+      const invoiceMatches = newEntries.filter(entry => 
+        entry.invoiceId === inv.id || 
+        (entry.invoiceNo && entry.invoiceNo === inv.invoiceNo) ||
+        (entry.desc && entry.desc.includes(inv.invoiceNo))
+      );
+      if (invoiceMatches.length > 1) {
+        const keepId = invoiceMatches[0].id;
+        newEntries = newEntries.filter(entry => {
+          const isMatch = entry.invoiceId === inv.id || 
+                          (entry.invoiceNo && entry.invoiceNo === inv.invoiceNo) ||
+                          (entry.desc && entry.desc.includes(inv.invoiceNo));
+          if (isMatch) {
+            return entry.id === keepId;
+          }
+          return true;
+        });
+        updated = true;
+      }
 
       const hasEntry = newEntries.some(entry => 
         entry.invoiceId === inv.id || 
@@ -4986,6 +5021,9 @@ function App() {
                             projects={ignitionQueue}
                             setProjects={setIgnitionQueue}
                             clients={clients}
+                            setClients={setClients}
+                            invoices={invoices}
+                            setInvoices={setInvoices}
                             onOpenIgnitionModal={() => { setPrefillData(null); setIsIgnitionModalOpen(true); }}
                             setCustomPaymentPrompt={setCustomPaymentPrompt}
                             onDownloadInvoice={(p) => {

@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "../supabase/client";
+import { getMicroJobs, createMicroJob, linkJobsToInvoice, saveInvoice } from "../supabase/database";
+
 
 const STATUS_COLORS: Record<string, string> = {
   active: "#10b981",    // Green
@@ -113,6 +115,8 @@ interface ProjectsProps {
   setCashbookEntries?: React.Dispatch<React.SetStateAction<any[]>>;
   initialSearch?: string;
   onDeleteProject?: (id: number) => void;
+  invoices?: any[];
+  setInvoices?: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 const containerVariants = {
@@ -135,16 +139,192 @@ export default function Projects({
   handleUpdateProjectProgressHandy,
   setCashbookEntries,
   initialSearch = "",
-  onDeleteProject
+  onDeleteProject,
+  invoices = [],
+  setInvoices = () => {}
 }: ProjectsProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<"Missions" | "MicroJobs">("Missions");
+  const [microJobs, setMicroJobs] = useState<any[]>([]);
+  const [isLoadingJobs, setIsLoadingJobs] = useState(false);
+  const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
+  const [isQuickJobModalOpen, setIsQuickJobModalOpen] = useState(false);
+
+  const fetchJobs = async () => {
+    setIsLoadingJobs(true);
+    try {
+      const jobs = await getMicroJobs();
+      setMicroJobs(jobs);
+    } catch (err) {
+      console.error("Failed to fetch micro-jobs:", err);
+    } finally {
+      setIsLoadingJobs(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchJobs();
+  }, []);
+
+  useEffect(() => {
+    setSelectedJobIds([]);
+  }, [activeTab]);
+
 
   useEffect(() => {
     if (initialSearch !== undefined) {
       setSearch(initialSearch);
     }
   }, [initialSearch]);
+
+  // Quick Log Job Form States
+  const [newJobClientLink, setNewJobClientLink] = useState<number | "">("");
+  const [newJobTaskName, setNewJobTaskName] = useState("");
+  const [newJobAmount, setNewJobAmount] = useState<number | "">("");
+  const [newJobDate, setNewJobDate] = useState(() => new Date().toISOString().split('T')[0]);
+
+  const getUniqueInvoiceNumber = () => {
+    const date = new Date();
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}${mm}${dd}`;
+    let serial = invoices.length + 1;
+    let invNo = `NG/${dateStr}/${String(serial).padStart(4, '0')}`;
+    while (invoices.some(i => i.invoiceNo === invNo)) {
+      serial++;
+      invNo = `NG/${dateStr}/${String(serial).padStart(4, '0')}`;
+    }
+    return invNo;
+  };
+
+  const handleGenerateCumulativeInvoice = async () => {
+    if (selectedJobIds.length === 0) return;
+    
+    const selectedJobs = unbilledJobs.filter(job => selectedJobIds.includes(job.jobId));
+    const clientLinks = [...new Set(selectedJobs.map(job => job.clientLink))];
+    
+    if (clientLinks.length > 1) {
+      toast({
+        title: "Client Mismatch",
+        description: "Cumulative invoices can only be generated for a single client at a time.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const targetClientLink = clientLinks[0];
+    if (!targetClientLink) {
+      toast({
+        title: "No Client Linked",
+        description: "Selected micro-jobs must be associated with a client to generate an invoice.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const firstJob = selectedJobs[0];
+    const clientName = firstJob.client?.name || "Unknown Client";
+    const totalAmount = selectedJobs.reduce((sum, job) => sum + job.amount, 0);
+    const servicesDesc = `Cumulative Micro-Jobs: ${selectedJobs.map(job => job.taskName).join(', ')}`;
+    const invoiceNo = getUniqueInvoiceNumber();
+    
+    try {
+      // 1. Save invoice to Supabase
+      const dbInvoice = await saveInvoice({
+        invoiceNo,
+        clientName,
+        projectService: servicesDesc,
+        grandTotal: totalAmount,
+        clientLink: targetClientLink,
+        invoiceTotal: totalAmount,
+        paymentStatus: 'Pending',
+        microJobIds: selectedJobIds
+      });
+      
+      // 2. Link jobs to the invoice in Supabase
+      await linkJobsToInvoice(selectedJobIds, dbInvoice.id);
+      
+      // 3. Construct formatted invoice and update parent state
+      const formattedInvoice = {
+        id: dbInvoice.id,
+        invoiceNo: dbInvoice.invoice_no,
+        projectId: dbInvoice.project_id,
+        clientName: dbInvoice.client_name,
+        projectService: dbInvoice.project_service,
+        issueDate: new Date(dbInvoice.issue_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        grandTotal: parseFloat(dbInvoice.grand_total),
+        clientLink: dbInvoice.client_link,
+        invoiceTotal: parseFloat(dbInvoice.invoice_total),
+        paymentStatus: dbInvoice.payment_status || 'Pending',
+        microJobIds: dbInvoice.micro_job_ids || [],
+        rawProject: null
+      };
+      
+      setInvoices(prev => [formattedInvoice, ...prev]);
+      
+      // 4. Clear checkboxes and refresh lists
+      setSelectedJobIds([]);
+      await fetchJobs();
+      
+      toast({
+        title: "Invoice Ignited",
+        description: `Cumulative invoice ${invoiceNo} generated successfully for ${clientName}.`
+      });
+    } catch (err: any) {
+      console.error("Failed to generate cumulative invoice:", err);
+      toast({
+        title: "Generation Failed",
+        description: err.message || "An error occurred during invoice creation.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleCreateJob = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newJobClientLink || !newJobTaskName || !newJobAmount) {
+      toast({
+        title: "Missing fields",
+        description: "All fields are required.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      await createMicroJob({
+        clientLink: Number(newJobClientLink),
+        taskName: newJobTaskName,
+        amount: Number(newJobAmount),
+        dateLogged: newJobDate ? new Date(newJobDate).toISOString() : undefined
+      });
+      
+      toast({
+        title: "Job Logged Successfully",
+        description: `Logged "${newJobTaskName}" for client.`
+      });
+      
+      // Reset form states
+      setNewJobClientLink("");
+      setNewJobTaskName("");
+      setNewJobAmount("");
+      setNewJobDate(new Date().toISOString().split('T')[0]);
+      setIsQuickJobModalOpen(false);
+      
+      // Refresh list
+      await fetchJobs();
+    } catch (err: any) {
+      console.error("Failed to create micro job:", err);
+      toast({
+        title: "Logging Failed",
+        description: err.message || "Failed to log micro-job in database.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const [filterStatus, setFilterStatus] = useState("all");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -165,6 +345,11 @@ export default function Projects({
   const uniqueClients = Array.from(
     new Set(projects.map((p) => p.clientName || p.client?.name || p.name || "").filter(Boolean))
   );
+
+  const unbilledJobs = useMemo(() => {
+    return microJobs.filter(job => job.billingStatus === "Unbilled");
+  }, [microJobs]);
+
 
   // Extract unique project creation months
   const uniqueMonths = Array.from(
@@ -535,47 +720,75 @@ export default function Projects({
             Projects
           </h1>
           <p className="text-muted-foreground text-sm mt-1 tracking-widest uppercase">
-            {filterStatus !== "all"
+            {activeTab === "MicroJobs"
+              ? `${unbilledJobs.length} unbilled micro jobs`
+              : filterStatus !== "all"
               ? `${filtered.length} ${filterStatus.replace("_", " ")} projects`
               : `${projects.length} total projects`}
           </p>
         </div>
-        <Button
-          onClick={onOpenIgnitionModal}
-          className="bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 gap-2 font-bold text-xs rounded-xl"
-          data-testid="button-create-project"
-        >
-          <Plus className="w-4 h-4" />
-          START NEW IGNITION
-        </Button>
+        {activeTab === "Missions" ? (
+          <Button
+            onClick={onOpenIgnitionModal}
+            className="bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 gap-2 font-bold text-xs rounded-xl"
+            data-testid="button-create-project"
+          >
+            <Plus className="w-4 h-4" />
+            START NEW IGNITION
+          </Button>
+        ) : (
+          <Button
+            onClick={() => setIsQuickJobModalOpen(true)}
+            className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 gap-2 font-bold text-xs rounded-xl"
+            data-testid="button-log-microjob"
+          >
+            <Plus className="w-4 h-4" />
+            LOG NEW JOB
+          </Button>
+        )}
       </motion.div>
 
       {/* Status Selector & Filters Toggle */}
       <motion.div variants={itemVariants} className="flex gap-3 items-center flex-wrap">
-        <select
-          className="h-9 px-3 bg-[#0c101d]/60 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold uppercase min-w-[165px] hover:bg-white/5 transition-all"
-          value={showCompletedTab ? "completed" : filterStatus}
-          onChange={(e) => {
-            const val = e.target.value;
-            if (val === "completed") {
-              setShowCompletedTab(true);
-              setFilterStatus("completed");
-            } else {
+        {showCompletedTab ? (
+          <Button
+            onClick={() => {
+              setActiveTab("Missions");
               setShowCompletedTab(false);
-              setFilterStatus(val);
-            }
-          }}
-          data-testid="select-filter-status"
-        >
-          {showCompletedTab && <option value="completed">COMPLETED</option>}
-          <option value="all">ALL ACTIVE MISSIONS</option>
-          <option value="active">ACTIVE</option>
-          <option value="on_hold">ON HOLD</option>
-          <option value="cancelled">CANCELLED</option>
-        </select>
+              setFilterStatus("all");
+            }}
+            className="h-9 px-4 text-xs font-bold rounded-xl border bg-white/5 hover:bg-white/10 border-white/10 text-muted-foreground transition-all uppercase"
+          >
+            ALL ACTIVE MISSIONS
+          </Button>
+        ) : (
+          <select
+            className="h-9 px-3 bg-[#0c101d]/60 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold uppercase min-w-[165px] hover:bg-white/5 transition-all"
+            value={activeTab === "MicroJobs" ? "microjobs" : filterStatus}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "microjobs") {
+                setActiveTab("MicroJobs");
+                setShowCompletedTab(false);
+              } else {
+                setActiveTab("Missions");
+                setShowCompletedTab(false);
+                setFilterStatus(val);
+              }
+            }}
+            data-testid="select-filter-status"
+          >
+            <option value="all">ALL ACTIVE MISSIONS</option>
+            <option value="active">ACTIVE</option>
+            <option value="on_hold">ON HOLD</option>
+            <option value="cancelled">CANCELLED</option>
+            {activeTab === "MicroJobs" && <option value="microjobs">MICRO-JOBS LEDGER</option>}
+          </select>
+        )}
 
         <Button
           onClick={() => {
+            setActiveTab("Missions");
             if (showCompletedTab) {
               setShowCompletedTab(false);
               setFilterStatus("all");
@@ -585,7 +798,7 @@ export default function Projects({
             }
           }}
           className={`h-9 px-4 text-xs font-bold rounded-xl border transition-all ${
-            showCompletedTab
+            activeTab === "Missions" && showCompletedTab
               ? "bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
               : "bg-white/5 hover:bg-white/10 border-white/10 text-muted-foreground"
           }`}
@@ -593,40 +806,65 @@ export default function Projects({
           COMPLETED PROJECT
         </Button>
 
-        <select
-          className="h-9 px-3 bg-[#0c101d]/60 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold uppercase min-w-[180px] hover:bg-white/5 transition-all"
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-        >
-          <option value="date_desc">LATEST IGNITION</option>
-          <option value="az">A-Z NAME</option>
-          <option value="priority_desc">PRIORITY: HIGH TO LOW</option>
-          <option value="priority_asc">PRIORITY: LOW TO HIGH</option>
-        </select>
-
         <Button
-          variant="ghost"
-          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-          className={`h-9 gap-2 text-xs font-bold rounded-xl border transition-all select-none ${
-            showAdvancedFilters
+          onClick={() => {
+            if (activeTab === "MicroJobs") {
+              setActiveTab("Missions");
+            } else {
+              setActiveTab("MicroJobs");
+            }
+          }}
+          className={`h-9 px-4 text-xs font-bold rounded-xl border transition-all ${
+            activeTab === "MicroJobs"
               ? "bg-cyan-500/10 hover:bg-cyan-500/20 border-cyan-500/30 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.15)]"
               : "bg-white/5 hover:bg-white/10 border-white/10 text-muted-foreground"
           }`}
         >
-          <SlidersHorizontal className="w-3.5 h-3.5" />
-          {showAdvancedFilters ? "HIDE FILTERS" : "SHOW FILTERS"}
+          ⚡ MICRO-JOBS LEDGER
         </Button>
+
+        {activeTab === "Missions" && (
+          <select
+            className="h-9 px-3 bg-[#0c101d]/60 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold uppercase min-w-[180px] hover:bg-white/5 transition-all"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+          >
+            <option value="date_desc">LATEST IGNITION</option>
+            <option value="az">A-Z NAME</option>
+            <option value="priority_desc">PRIORITY: HIGH TO LOW</option>
+            <option value="priority_asc">PRIORITY: LOW TO HIGH</option>
+          </select>
+        )}
+
+        {activeTab === "Missions" && (
+          <Button
+            variant="ghost"
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className={`h-9 gap-2 text-xs font-bold rounded-xl border transition-all select-none ${
+              showAdvancedFilters
+                ? "bg-cyan-500/10 hover:bg-cyan-500/20 border-cyan-500/30 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.15)]"
+                : "bg-white/5 hover:bg-white/10 border-white/10 text-muted-foreground"
+            }`}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            {showAdvancedFilters ? "HIDE FILTERS" : "SHOW FILTERS"}
+          </Button>
+        )}
 
         {/* Dynamic Matched Count */}
         <div className="flex items-center gap-2 text-3xs font-mono font-bold tracking-widest text-muted-foreground bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl uppercase ml-auto">
           <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-          <span>MATCHED: {filtered.length}</span>
+          <span>
+            {activeTab === "MicroJobs"
+              ? `UNBILLED: ${unbilledJobs.length}`
+              : `MATCHED: ${filtered.length}`}
+          </span>
         </div>
       </motion.div>
 
       {/* Collapsible Search & Filter Area */}
       <AnimatePresence>
-        {showAdvancedFilters && (
+        {activeTab === "Missions" && showAdvancedFilters && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
@@ -725,234 +963,347 @@ export default function Projects({
       </AnimatePresence>
 
       {/* Grid */}
-      <motion.div variants={containerVariants} className="space-y-4">
-        {sortedAndFiltered.map((project) => {
-          const serviceName = project.service || project.name || "Unnamed Project";
-          const clientName = project.clientName || project.name || "Unknown Client";
-          const budgetVal = project.budget !== undefined ? project.budget : (parseFloat(project.quote) || 0);
-          const statusVal = (project.status || "active").toLowerCase().replace(" ", "_");
-          const progressVal = statusVal === "completed" ? 100 : (project.progress || 20);
-          const categoryVal = (project.category || "branding").toLowerCase().replace(" ", "_");
+      {activeTab === "Missions" ? (
+        <motion.div variants={containerVariants} className="space-y-4">
+          {sortedAndFiltered.map((project) => {
+            const serviceName = project.service || project.name || "Unnamed Project";
+            const clientName = project.clientName || project.name || "Unknown Client";
+            const budgetVal = project.budget !== undefined ? project.budget : (parseFloat(project.quote) || 0);
+            const statusVal = (project.status || "active").toLowerCase().replace(" ", "_");
+            const progressVal = statusVal === "completed" ? 100 : (project.progress || 20);
+            const categoryVal = (project.category || "branding").toLowerCase().replace(" ", "_");
 
-          const isHighPriority = project.priority === "High";
-          const statusColor = isHighPriority ? "#ef4444" : (STATUS_COLORS[statusVal] ?? "#666");
-          const categoryColor = CATEGORY_COLORS[categoryVal] ?? "#666";
-          
-          let theme = STATUS_THEMES[statusVal] ?? {
-            color: statusColor,
-            borderClass: "border-white/5 group-hover:border-white/10",
-            bgGradient: "linear-gradient(135deg, transparent 0%, transparent 100%)",
-            glowColor: "transparent",
-            textHighlight: "text-foreground",
-            cardBg: "bg-card/40"
-          };
-
-          if (isHighPriority) {
-            theme = {
-              color: "#ef4444",
-              borderClass: "border-red-500/40 group-hover:border-red-500/60 shadow-[0_0_20px_rgba(239,68,68,0.2)]",
-              bgGradient: "linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, transparent 100%)",
-              glowColor: "rgba(239, 68, 68, 0.2)",
-              textHighlight: "text-red-400 font-bold",
-              cardBg: "bg-[#160d0e]/80"
+            const isHighPriority = project.priority === "High";
+            const statusColor = isHighPriority ? "#ef4444" : (STATUS_COLORS[statusVal] ?? "#666");
+            const categoryColor = CATEGORY_COLORS[categoryVal] ?? "#666";
+            
+            let theme = STATUS_THEMES[statusVal] ?? {
+              color: statusColor,
+              borderClass: "border-white/5 group-hover:border-white/10",
+              bgGradient: "linear-gradient(135deg, transparent 0%, transparent 100%)",
+              glowColor: "transparent",
+              textHighlight: "text-foreground",
+              cardBg: "bg-card/40"
             };
-          }
 
-          const isProjectActive = statusVal === "active" || statusVal === "ongoing";
+            if (isHighPriority) {
+              theme = {
+                color: "#ef4444",
+                borderClass: "border-red-500/40 group-hover:border-red-500/60 shadow-[0_0_20px_rgba(239,68,68,0.2)]",
+                bgGradient: "linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, transparent 100%)",
+                glowColor: "rgba(239, 68, 68, 0.2)",
+                textHighlight: "text-red-400 font-bold",
+                cardBg: "bg-[#160d0e]/80"
+              };
+            }
 
-          return (
-            <motion.div
-              key={project.id}
-              variants={itemVariants}
-              className={`group relative rounded-2xl border backdrop-blur-sm p-5 transition-all duration-300 flex flex-col justify-between ${theme.borderClass} ${theme.cardBg}`}
-              style={{ background: isHighPriority ? `linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, transparent 100%)` : `linear-gradient(135deg, ${statusColor}03 0%, transparent 100%)` }}
-              data-testid={`card-project-${project.id}`}
-            >
-              <div className="flex items-start justify-between flex-wrap gap-4">
-                <div className="flex items-start gap-4">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold uppercase"
-                    style={{
-                      background: `${categoryColor}15`,
-                      border: `1px solid ${categoryColor}30`,
-                      color: categoryColor,
-                    }}
-                  >
-                    {categoryVal.slice(0, 2)}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <h3 className="font-bold text-foreground text-sm">{serviceName}</h3>
-                      <Badge
-                        className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5"
-                        style={{
-                          background: `${statusColor}15`,
-                          color: statusColor,
-                        }}
-                      >
-                        {statusVal.replace("_", " ")}
-                      </Badge>
-                      <Badge
-                        className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5"
-                        style={{
-                          background: `${categoryColor}15`,
-                          color: categoryColor,
-                        }}
-                      >
-                        {categoryVal.replace("_", " ")}
-                      </Badge>
+            const isProjectActive = statusVal === "active" || statusVal === "ongoing";
+
+            return (
+              <motion.div
+                key={project.id}
+                variants={itemVariants}
+                className={`group relative rounded-2xl border backdrop-blur-sm p-5 transition-all duration-300 flex flex-col justify-between ${theme.borderClass} ${theme.cardBg}`}
+                style={{ background: isHighPriority ? `linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, transparent 100%)` : `linear-gradient(135deg, ${statusColor}03 0%, transparent 100%)` }}
+                data-testid={`card-project-${project.id}`}
+              >
+                <div className="flex items-start justify-between flex-wrap gap-4">
+                  <div className="flex items-start gap-4">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold uppercase"
+                      style={{
+                        background: `${categoryColor}15`,
+                        border: `1px solid ${categoryColor}30`,
+                        color: categoryColor,
+                      }}
+                    >
+                      {categoryVal.slice(0, 2)}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 flex-wrap">
-                      <span>Visionary: <strong>{clientName}</strong></span>
-                      {project.deadline && (
-                        <>
-                          <span>·</span>
-                          {isProjectActive ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.2)] animate-pulse-glow">
-                              <span className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
-                              DUE {new Date(project.deadline).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}
-                            </span>
-                          ) : (
-                            <span>Due {new Date(project.deadline).toLocaleDateString()}</span>
-                          )}
-                        </>
-                      )}
-                      <span>·</span>
-                      {project.priority === "High" ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_12px_rgba(239,68,68,0.2)] animate-pulse-glow">
-                          <span className="w-1 h-1 rounded-full bg-red-400 animate-ping" />
-                          HIGH PRIORITY
-                        </span>
-                      ) : project.priority === "Low" ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-500/10 text-slate-400 border border-slate-500/20">
-                          <span className="w-1 h-1 rounded-full bg-slate-400" />
-                          LOW PRIORITY
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_12px_rgba(6,182,212,0.2)]">
-                          <span className="w-1 h-1 rounded-full bg-cyan-400" />
-                          NORMAL PRIORITY
-                        </span>
-                      )}
-                    </p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <h3 className="font-bold text-foreground text-sm">{serviceName}</h3>
+                        <Badge
+                          className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5"
+                          style={{
+                            background: `${statusColor}15`,
+                            color: statusColor,
+                          }}
+                        >
+                          {statusVal.replace("_", " ")}
+                        </Badge>
+                        <Badge
+                          className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5"
+                          style={{
+                            background: `${categoryColor}15`,
+                            color: categoryColor,
+                          }}
+                        >
+                          {categoryVal.replace("_", " ")}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 flex-wrap">
+                        <span>Visionary: <strong>{clientName}</strong></span>
+                        {project.deadline && (
+                          <>
+                            <span>·</span>
+                            {isProjectActive ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.2)] animate-pulse-glow">
+                                <span className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
+                                DUE {new Date(project.deadline).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </span>
+                            ) : (
+                              <span>Due {new Date(project.deadline).toLocaleDateString()}</span>
+                            )}
+                          </>
+                        )}
+                        <span>·</span>
+                        {project.priority === "High" ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_12px_rgba(239,68,68,0.2)] animate-pulse-glow">
+                            <span className="w-1 h-1 rounded-full bg-red-400 animate-ping" />
+                            HIGH PRIORITY
+                          </span>
+                        ) : project.priority === "Low" ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-500/10 text-slate-400 border border-slate-500/20">
+                            <span className="w-1 h-1 rounded-full bg-slate-400" />
+                            LOW PRIORITY
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_12px_rgba(6,182,212,0.2)]">
+                            <span className="w-1 h-1 rounded-full bg-cyan-400" />
+                            NORMAL PRIORITY
+                          </span>
+                        )}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-extrabold text-foreground">₹{budgetVal.toLocaleString()}</span>
-                  <div className="flex gap-1.5 opacity-80 hover:opacity-100 transition-opacity">
-                    {statusVal === "completed" && onDownloadInvoice && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-extrabold text-foreground">₹{budgetVal.toLocaleString()}</span>
+                    <div className="flex gap-1.5 opacity-80 hover:opacity-100 transition-opacity">
+                      {statusVal === "completed" && onDownloadInvoice && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="w-7 h-7 rounded-lg hover:bg-emerald-500/10 hover:text-emerald-400 border border-white/5"
+                          onClick={() => onDownloadInvoice(project)}
+                          title="Download Invoice"
+                          data-testid={`button-invoice-project-${project.id}`}
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                      <select
+                        className="h-7 px-1.5 bg-[#0c101d] border border-white/10 rounded-lg text-3xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold bg-[#0c101d]"
+                        value={project.status}
+                        onChange={(e) => {
+                          if (handleUpdateProjectStatusHandy) {
+                            handleUpdateProjectStatusHandy(project.id, e.target.value);
+                          }
+                        }}
+                        title="Quick Status Update"
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Completed">Completed</option>
+                        <option value="On Hold">On Hold</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="w-7 h-7 rounded-lg hover:bg-emerald-500/10 hover:text-emerald-400 border border-white/5"
-                        onClick={() => onDownloadInvoice(project)}
-                        title="Download Invoice"
-                        data-testid={`button-invoice-project-${project.id}`}
+                        className="w-7 h-7 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-400 border border-white/5"
+                        onClick={() => openEdit(project)}
+                        data-testid={`button-edit-project-${project.id}`}
                       >
-                        <FileText className="w-3.5 h-3.5" />
+                        <Pencil className="w-3.5 h-3.5" />
                       </Button>
-                    )}
-                    <select
-                      className="h-7 px-1.5 bg-[#0c101d] border border-white/10 rounded-lg text-3xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold bg-[#0c101d]"
-                      value={project.status}
-                      onChange={(e) => {
-                        if (handleUpdateProjectStatusHandy) {
-                          handleUpdateProjectStatusHandy(project.id, e.target.value);
-                        }
-                      }}
-                      title="Quick Status Update"
-                    >
-                      <option value="Active">Active</option>
-                      <option value="Completed">Completed</option>
-                      <option value="On Hold">On Hold</option>
-                      <option value="Cancelled">Cancelled</option>
-                    </select>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="w-7 h-7 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-400 border border-white/5"
-                      onClick={() => openEdit(project)}
-                      data-testid={`button-edit-project-${project.id}`}
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="w-7 h-7 rounded-lg hover:bg-red-500/10 hover:text-red-400 border border-white/5"
-                      onClick={() => handleDelete(project.id)}
-                      data-testid={`button-delete-project-${project.id}`}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 space-y-2.5 group/progress relative">
-                {/* Progress bar line representation */}
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                    <motion.div
-                      className="h-full rounded-full"
-                      style={{ background: statusColor }}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${progressVal}%` }}
-                      transition={{ duration: 0.8, ease: "easeOut" }}
-                    />
-                  </div>
-                  <span className="text-xs text-muted-foreground w-8 text-right font-semibold">{progressVal}%</span>
-                </div>
-
-                {/* Easy Progress Stepper */}
-                {statusVal !== "completed" && (
-                  <div className="overflow-hidden transition-all duration-300 max-h-0 opacity-0 group-hover/progress:max-h-12 group-hover/progress:opacity-100 pt-0 group-hover/progress:pt-2">
-                    <div className="flex justify-between items-center gap-2 flex-wrap">
-                      {[
-                        { label: "Discover", val: 20 },
-                        { label: "Define", val: 40 },
-                        { label: "Design", val: 60 },
-                        { label: "Print", val: 80 },
-                        { label: "Deliver", val: 100 }
-                      ].map((step) => {
-                        const isPassedOrCurrent = progressVal >= step.val;
-                        return (
-                          <button
-                            key={step.label}
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              if (handleUpdateProjectProgressHandy) {
-                                handleUpdateProjectProgressHandy(project.id, step.val);
-                              }
-                            }}
-                            className={`flex-1 py-1.5 px-2 rounded-lg border text-[10px] font-black tracking-wider uppercase transition-all duration-200 cursor-pointer ${
-                              isPassedOrCurrent
-                                ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.1)] hover:bg-cyan-500/20"
-                                : "bg-white/5 border-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
-                            }`}
-                            title={`Set progress to ${step.val}% (${step.label})`}
-                          >
-                            {step.label}
-                          </button>
-                        );
-                      })}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="w-7 h-7 rounded-lg hover:bg-red-500/10 hover:text-red-400 border border-white/5"
+                        onClick={() => handleDelete(project.id)}
+                        data-testid={`button-delete-project-${project.id}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   </div>
-                )}
-              </div>
-            </motion.div>
-          );
-        })}
-        {filtered.length === 0 && (
-          <div className="col-span-3 text-center py-20 text-muted-foreground border border-white/5 rounded-2xl">
-            <Plus className="w-10 h-10 mx-auto mb-3 opacity-20" />
-            <p className="uppercase tracking-widest text-3xs font-semibold">NO ACTIVE MISSIONS CALIBRATED</p>
+                </div>
+
+                <div className="mt-5 space-y-2.5 group/progress relative">
+                  {/* Progress bar line representation */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{ background: statusColor }}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${progressVal}%` }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
+                      />
+                    </div>
+                    <span className="text-xs text-muted-foreground w-8 text-right font-semibold">{progressVal}%</span>
+                  </div>
+
+                  {/* Easy Progress Stepper */}
+                  {statusVal !== "completed" && (
+                    <div className="overflow-hidden transition-all duration-300 max-h-0 opacity-0 group-hover/progress:max-h-12 group-hover/progress:opacity-100 pt-0 group-hover/progress:pt-2">
+                      <div className="flex justify-between items-center gap-2 flex-wrap">
+                        {[
+                          { label: "Discover", val: 20 },
+                          { label: "Define", val: 40 },
+                          { label: "Design", val: 60 },
+                          { label: "Print", val: 80 },
+                          { label: "Deliver", val: 100 }
+                        ].map((step) => {
+                          const isPassedOrCurrent = progressVal >= step.val;
+                          return (
+                            <button
+                              key={step.label}
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (handleUpdateProjectProgressHandy) {
+                                  handleUpdateProjectProgressHandy(project.id, step.val);
+                                }
+                              }}
+                              className={`flex-1 py-1.5 px-2 rounded-lg border text-[10px] font-black tracking-wider uppercase transition-all duration-200 cursor-pointer ${
+                                isPassedOrCurrent
+                                  ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.1)] hover:bg-cyan-500/20"
+                                  : "bg-white/5 border-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                              }`}
+                              title={`Set progress to ${step.val}% (${step.label})`}
+                            >
+                              {step.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+          {filtered.length === 0 && (
+            <div className="col-span-3 text-center py-20 text-muted-foreground border border-white/5 rounded-2xl">
+              <Plus className="w-10 h-10 mx-auto mb-3 opacity-20" />
+              <p className="uppercase tracking-widest text-3xs font-semibold">NO ACTIVE MISSIONS CALIBRATED</p>
+            </div>
+          )}
+        </motion.div>
+      ) : (
+        <motion.div
+          variants={containerVariants}
+          className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 space-y-4 text-left"
+        >
+          <div>
+            <h3 className="font-bold text-foreground text-lg">Running Tab Operations</h3>
+            <p className="text-xs text-muted-foreground">High-volume, ad-hoc task entries requiring client-linked settlements</p>
           </div>
-        )}
-      </motion.div>
+
+          <div className="overflow-x-auto border border-white/5 rounded-xl">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/5 bg-white/[0.01] text-xs text-muted-foreground uppercase tracking-wider font-semibold">
+                  <th style={{ width: "40px" }} className="p-4 text-center">
+                    <input
+                      type="checkbox"
+                      className="rounded accent-cyan-400"
+                      checked={unbilledJobs.length > 0 && selectedJobIds.length === unbilledJobs.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedJobIds(unbilledJobs.map(job => job.jobId));
+                        } else {
+                          setSelectedJobIds([]);
+                        }
+                      }}
+                    />
+                  </th>
+                  <th className="p-4">Client Name</th>
+                  <th className="p-4 text-center">Date Logged</th>
+                  <th className="p-4">Task Description</th>
+                  <th className="p-4 text-right">Amount (INR)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-xs text-white/95">
+                {isLoadingJobs ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground font-semibold">
+                      LOADING LEDGER DATA...
+                    </td>
+                  </tr>
+                ) : unbilledJobs.length > 0 ? (
+                  unbilledJobs.map(job => (
+                    <tr key={job.jobId} className="hover:bg-white/[0.01] transition-colors">
+                      <td className="p-4 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedJobIds.includes(job.jobId)}
+                          className="rounded accent-cyan-400"
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedJobIds(prev => [...prev, job.jobId]);
+                            } else {
+                              setSelectedJobIds(prev => prev.filter(id => id !== job.jobId));
+                            }
+                          }}
+                        />
+                      </td>
+                      <td className="p-4 font-bold text-foreground">
+                        {job.client?.name || "Unknown Client"}
+                      </td>
+                      <td className="p-4 text-center text-muted-foreground">
+                        {new Date(job.dateLogged).toLocaleString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit"
+                        })}
+                      </td>
+                      <td className="p-4">{job.taskName}</td>
+                      <td className="p-4 text-right font-mono font-bold text-cyan-400">
+                        ₹{job.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground uppercase tracking-widest text-3xs font-semibold">
+                      NO UNBILLED MICRO-JOBS IN RUNNING TAB
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {selectedJobIds.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex justify-between items-center p-4 bg-cyan-950/20 border border-cyan-500/20 rounded-xl"
+            >
+              <div className="text-xs">
+                Selected <strong className="text-cyan-400">{selectedJobIds.length}</strong> jobs. Total Cumulative sum:{" "}
+                <strong className="text-cyan-400">
+                  ₹{unbilledJobs
+                    .filter(j => selectedJobIds.includes(j.jobId))
+                    .reduce((sum, j) => sum + j.amount, 0)
+                    .toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </strong>
+              </div>
+              <Button
+                onClick={handleGenerateCumulativeInvoice}
+                className="bg-cyan-500 hover:bg-cyan-600 text-black font-extrabold text-xs rounded-xl shadow-lg shadow-cyan-500/10 px-5"
+              >
+                ⚡ GENERATE CUMULATIVE INVOICE
+              </Button>
+            </motion.div>
+          )}
+        </motion.div>
+      )}
 
 
       {/* Edit Modal — 2-Step Wizard */}
@@ -1179,6 +1530,127 @@ export default function Projects({
                   </button>
                 </>
               )}
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Log Job Modal */}
+      <Dialog open={isQuickJobModalOpen} onOpenChange={(open) => {
+        setIsQuickJobModalOpen(open);
+        if (!open) {
+          setNewJobClientLink("");
+          setNewJobTaskName("");
+          setNewJobAmount("");
+          setNewJobDate(new Date().toISOString().split('T')[0]);
+        }
+      }}>
+        <DialogContent className="bg-[#080c18] border border-white/10 max-w-md w-full p-6 overflow-hidden flex flex-col" data-testid="dialog-quick-job-form">
+          <DialogHeader className="pb-3 border-b border-white/10 text-left">
+            <DialogTitle className="text-foreground font-black tracking-wide text-sm flex items-center gap-2">
+              <span className="text-emerald-400">⚡</span> LOG NEW MICRO-JOB
+            </DialogTitle>
+            <p className="text-3xs text-muted-foreground uppercase tracking-widest mt-0.5">Record high-volume, ad-hoc running tab work</p>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateJob} className="space-y-4 pt-3 text-left">
+            {/* Client Dropdown Selector */}
+            <div className="space-y-1.5">
+              <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Client Visionary *</label>
+              <select
+                className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-semibold uppercase transition-all"
+                value={newJobClientLink}
+                onChange={(e) => setNewJobClientLink(Number(e.target.value) || "")}
+                required
+              >
+                <option value="">-- SELECT CLIENT VISIONARY --</option>
+                {clients.map(client => (
+                  <option key={client.id} value={client.id}>
+                    {client.name.toUpperCase()} ({client.phone})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Task Name Input & Quick Selectors */}
+            <div className="space-y-1.5">
+              <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Task Name / Service *</label>
+              
+              {/* Quick selectors */}
+              <div className="flex gap-2 flex-wrap pb-1.5">
+                {["Printing Jobwork", "Typing Jobwork", "Scanning Jobwork", "Editing Jobwork"].map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => setNewJobTaskName(name)}
+                    className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase border transition-all ${
+                      newJobTaskName === name
+                        ? "bg-cyan-500/10 border-cyan-500/40 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.15)]"
+                        : "bg-white/5 border-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                    }`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+
+              <Input
+                value={newJobTaskName}
+                onChange={(e) => setNewJobTaskName(e.target.value)}
+                className="bg-[#0c101d] border-white/10 rounded-xl focus:border-cyan-400 text-xs"
+                placeholder="Enter custom task description..."
+                required
+              />
+            </div>
+
+            {/* Date input */}
+            <div className="space-y-1.5">
+              <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Date Logged *</label>
+              <Input
+                type="date"
+                value={newJobDate}
+                onChange={(e) => setNewJobDate(e.target.value)}
+                className="bg-[#0c101d] border-white/10 rounded-xl focus:border-cyan-400 text-xs text-foreground font-semibold"
+                required
+              />
+            </div>
+
+            {/* Amount input */}
+            <div className="space-y-1.5">
+              <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Amount (₹ INR) *</label>
+              <Input
+                type="number"
+                min={0}
+                value={newJobAmount}
+                onChange={(e) => setNewJobAmount(e.target.value === "" ? "" : parseFloat(e.target.value) || 0)}
+                className="bg-[#0c101d] border-white/10 rounded-xl focus:border-cyan-400 text-xs text-cyan-300 font-bold"
+                placeholder="0.00"
+                required
+              />
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex gap-3 pt-3">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setNewJobClientLink("");
+                  setNewJobTaskName("");
+                  setNewJobAmount("");
+                  setNewJobDate(new Date().toISOString().split('T')[0]);
+                  setIsQuickJobModalOpen(false);
+                }}
+                className="flex-1 border border-white/10 text-muted-foreground text-xs font-semibold hover:bg-white/5 hover:text-foreground h-10 rounded-xl"
+              >
+                ✕ CANCEL
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold text-xs h-10 rounded-xl shadow-lg shadow-emerald-500/10 border-none cursor-pointer"
+              >
+                ✓ LOG JOB
+              </Button>
             </div>
           </form>
         </DialogContent>
