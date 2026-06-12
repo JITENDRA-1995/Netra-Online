@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -16,7 +16,9 @@ import {
   Receipt, 
   UserCircle,
   LogOut,
-  Hexagon
+  Hexagon,
+  Sun,
+  Moon
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 
@@ -32,8 +34,11 @@ export function ClientVaultLayout({
   activeTab, 
   onTabChange, 
   onLogout, 
+  theme,
+  setTheme,
   children 
 }) {
+
   const isTabActive = (itemTab) => {
     if (itemTab === "PROJECTS") {
       return ["PROJECTS", "PROJECT_DETAIL", "MESSAGES", "ASSETS"].includes(activeTab);
@@ -46,14 +51,14 @@ export function ClientVaultLayout({
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-background text-foreground client-vault-theme">
+      <div className={`flex min-h-screen w-full bg-background text-foreground client-vault-theme ${theme === 'dark' ? 'dark' : ''}`}>
         <Sidebar className="border-r border-border bg-card">
           <SidebarHeader className="p-6">
             <div className="flex items-center gap-3 font-serif">
-              <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-primary text-primary-foreground">
-                <Hexagon className="h-5 w-5" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 border border-primary/20">
+                <img src="/logo.png" alt="Netra Logo" className="h-5 w-5 object-contain" />
               </div>
-              <span className="text-xl font-medium tracking-tight">Studio.</span>
+              <span className="text-xs font-black tracking-widest text-foreground uppercase" style={{ letterSpacing: '0.1em' }}>NETRA GRAPHICS</span>
             </div>
           </SidebarHeader>
           <SidebarContent className="px-4 py-2">
@@ -95,13 +100,22 @@ export function ClientVaultLayout({
                   </span>
                 </div>
               </div>
-              <button 
-                onClick={onLogout}
-                className="text-muted-foreground hover:text-foreground p-2 rounded-md hover:bg-secondary transition-colors"
-                title="Log out"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button 
+                  onClick={() => setTheme(prev => prev === "light" ? "dark" : "light")}
+                  className="text-muted-foreground hover:text-foreground p-2 rounded-md hover:bg-secondary transition-colors"
+                  title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+                >
+                  {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                </button>
+                <button 
+                  onClick={onLogout}
+                  className="text-muted-foreground hover:text-foreground p-2 rounded-md hover:bg-secondary transition-colors"
+                  title="Log out"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </SidebarFooter>
         </Sidebar>

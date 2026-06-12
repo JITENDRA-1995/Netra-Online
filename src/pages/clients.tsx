@@ -110,8 +110,10 @@ export default function Clients({
             <motion.div
               key={client.id}
               variants={itemVariants}
-              className="group relative rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 hover:border-white/10 transition-all flex flex-col justify-between"
-              style={{ background: `linear-gradient(135deg, ${color}03 0%, transparent 100%)` }}
+              className={`group relative rounded-2xl border bg-card/40 backdrop-blur-sm p-5 hover:border-white/10 transition-all flex flex-col justify-between ${
+                client.status === 'Suspended' ? 'border-red-500/20 opacity-60' : 'border-white/5'
+              }`}
+              style={{ background: client.status === 'Suspended' ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.03) 0%, transparent 100%)' : `linear-gradient(135deg, ${color}03 0%, transparent 100%)` }}
               data-testid={`card-client-${client.id}`}
             >
               <div>
@@ -119,12 +121,23 @@ export default function Clients({
                   <div className="flex items-center gap-3">
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
-                      style={{ background: `${color}15`, border: `1px solid ${color}30`, color }}
+                      style={{ 
+                        background: client.status === 'Suspended' ? 'rgba(239, 68, 68, 0.15)' : `${color}15`, 
+                        border: client.status === 'Suspended' ? '1px solid rgba(239, 68, 68, 0.3)' : `1px solid ${color}30`, 
+                        color: client.status === 'Suspended' ? '#f87171' : color 
+                      }}
                     >
                       {initials}
                     </div>
                     <div>
-                      <p className="font-bold text-foreground text-sm">{client.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-foreground text-sm">{client.name}</p>
+                        {client.status === 'Suspended' && (
+                          <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold rounded bg-red-500/15 text-red-400 border border-red-500/20 uppercase tracking-widest">
+                            SUSPENDED
+                          </span>
+                        )}
+                      </div>
                       <p className="text-2xs text-muted-foreground flex items-center gap-1 mt-0.5">
                         <Building2 className="w-3 h-3 text-cyan-400" />
                         <span className="truncate max-w-[150px]">{client.address || "No Address"}</span>

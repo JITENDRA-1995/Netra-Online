@@ -59,8 +59,12 @@ export function ClientDashboard({ currentClient, onTabChange, setSelectedProject
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-serif font-medium tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Overview of your creative projects and activity.</p>
+        <h1 className="text-3xl font-serif font-medium tracking-tight">
+          Welcome back, {currentClient?.name || "Visionary"}!
+        </h1>
+        <p className="text-muted-foreground">
+          Your hub for everything creative. Track your active projects, view design concepts, and manage your invoices below.
+        </p>
       </div>
 
       {/* Stats Grid */}

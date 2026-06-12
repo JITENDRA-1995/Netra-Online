@@ -1140,8 +1140,21 @@ function App() {
     }
     return null;
   });
+
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem("netra_client_theme") || "light";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("netra_client_theme", theme);
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [theme]);
   const [isIgnitionModalOpen, setIsIgnitionModalOpen] = useState(false);
-  const [ignitionQty, setIgnitionQty] = useState(1);
+  const [ignitionQty, setIgnitionQty] = useState("");
   const [ignitionRate, setIgnitionRate] = useState("");
   const [ignitionQuote, setIgnitionQuote] = useState("");
   const [ignitionLastCalculatedBy, setIgnitionLastCalculatedBy] = useState("rate");
@@ -1304,6 +1317,20 @@ function App() {
       localStorage.removeItem('netra_client_session');
     }
   }, [currentClient]);
+
+  useEffect(() => {
+    if (currentClient && clients.length > 0) {
+      const match = clients.find(c => c.id === currentClient.id);
+      if (match && match.status === 'Suspended') {
+        localStorage.removeItem('netra_client_session');
+        localStorage.removeItem('netra_saved_client_key');
+        localStorage.removeItem('netra_saved_client_pass');
+        setCurrentClient(null);
+        setIsClientVaultActive(false);
+        setLoginError("ACCESS DENIED: This account has been suspended by the administrator.");
+      }
+    }
+  }, [clients, currentClient]);
 
   useEffect(() => {
     localStorage.setItem('netra_active_admin_module', activeAdminModule);
@@ -2860,6 +2887,11 @@ function App() {
           const clientData = await verifyClientVaultKey(accessKey.trim(), passphrase.trim());
 
           if (clientData) {
+            if (clientData.status === 'Suspended') {
+              setLoginError("ACCESS DENIED: This account has been suspended by the administrator.");
+              return;
+            }
+
             if (saveLoginInfo) {
               localStorage.setItem('netra_saved_client_key', accessKey);
               localStorage.setItem('netra_saved_client_pass', passphrase);
@@ -3662,6 +3694,7 @@ function App() {
       const rawAddress = formData.get('address')?.trim();
       const gst = formData.get('gst') || '';
       const rawAccessKey = formData.get('accessKey')?.trim().toUpperCase();
+      const rawStatus = formData.get('status') || 'Active';
 
       if (!rawName) {
         alert("Please enter a valid client name.");
@@ -3686,7 +3719,7 @@ function App() {
           phone: rawPhone,
           address: rawAddress,
           gst: gst,
-          status: selectedClient.status || 'Active',
+          status: rawStatus,
           accessKey: passcodeVal
         };
 
@@ -3696,7 +3729,8 @@ function App() {
           const next = prev.map(c => c.id === selectedClient.id ? {
             ...updatedClient,
             joinedDate: updatedClient.joined_date || updatedClient.joinedDate,
-            accessKey: updatedClient.access_key || updatedClient.accessKey
+            accessKey: updatedClient.access_key || updatedClient.accessKey,
+            status: updatedClient.status || updatedClient.status
           } : c);
           localStorage.setItem("netra_clients", JSON.stringify(next));
           return next;
@@ -4018,7 +4052,7 @@ function App() {
             <option key={s.id} value={s.title} />
           ))}
         </datalist>
-        <div className={`app-container ${isVaultActive ? 'vault-active' : ''}`} ref={containerRef}>
+        <div className={`app-container ${isVaultActive ? 'vault-active' : ''} ${theme === 'dark' ? 'dark' : ''}`} ref={containerRef}>
           {/* Side-aligned Sidebar (Only shown when a module is open) */}
           {isCommandCenterActive && isAdminGridActive && (
             <>
@@ -4740,6 +4774,15 @@ function App() {
                           try {
                             const clientData = await verifyClientVaultKey(k.trim(), p.trim());
                             if (clientData) {
+                              if (clientData.status === 'Suspended') {
+                                setLoginError("ACCESS DENIED: This account has been suspended by the administrator.");
+                                localStorage.removeItem('netra_saved_client_key');
+                                localStorage.removeItem('netra_saved_client_pass');
+                                localStorage.removeItem('netra_client_session');
+                                setAccessKey("");
+                                setPassphrase("");
+                                return;
+                              }
                               setCurrentClient({
                                 ...clientData,
                                 joinedDate: clientData.joined_date || clientData.joinedDate,
@@ -5344,11 +5387,11 @@ function App() {
                                       name="qty"
                                       min="1"
                                       value={ignitionQty}
+                                      placeholder="1"
                                       onChange={(e) => {
-                                        setIgnitionQty(parseInt(e.target.value) || 1);
+                                        setIgnitionQty(e.target.value === "" ? "" : parseInt(e.target.value) || "");
                                         setIgnitionLastCalculatedBy("qty");
                                       }}
-                                      required
                                     />
                                   </div>
                                   <div className="input-group">
@@ -5464,6 +5507,33 @@ function App() {
                                     <input type="text" name="gst" defaultValue={selectedClient?.gst} placeholder="22AAAAA0000A1Z5" />
                                   </div>
                                 </div>
+
+                                {selectedClient && (
+                                  <div className="form-row">
+                                    <div className="input-group" style={{ width: '100%' }}>
+                                      <label>Account Status</label>
+                                      <select 
+                                        name="status" 
+                                        defaultValue={selectedClient?.status || 'Active'} 
+                                        className="ignition-input"
+                                        style={{ 
+                                          width: '100%', 
+                                          padding: '0 0.8rem', 
+                                          background: 'rgba(255,255,255,0.05)', 
+                                          border: '1px solid rgba(255,255,255,0.1)', 
+                                          color: '#fff', 
+                                          borderRadius: '4px', 
+                                          outline: 'none', 
+                                          height: '42px',
+                                          marginBottom: '1rem' 
+                                        }}
+                                      >
+                                        <option value="Active" style={{ background: '#0a0f1e', color: '#fff' }}>Active</option>
+                                        <option value="Suspended" style={{ background: '#0a0f1e', color: '#fff' }}>Suspended</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                )}
 
                                 <div className="form-row">
                                   <div className="input-group" style={{ width: '100%' }}>
@@ -5967,6 +6037,8 @@ function App() {
                 activeTab={activeClientTab}
                 onTabChange={setActiveClientTab}
                 onLogout={handleLogout}
+                theme={theme}
+                setTheme={setTheme}
               >
                 {activeClientTab === 'DASHBOARD' && (
                   <ClientDashboard
