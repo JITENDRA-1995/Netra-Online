@@ -439,3 +439,68 @@ export const updateMicroJob = async (jobId, jobData) => {
 };
 
 
+/**
+ * Delete a single micro-job entry by jobId
+ */
+export const deleteMicroJob = async (jobId) => {
+  if (!useLocalFallback) {
+    try {
+      const { error } = await supabase
+        .from('micro_jobs_ledger')
+        .delete()
+        .eq('job_id', jobId);
+
+      if (error) {
+        if (error.code === 'PGRST205' || error.message?.includes('micro_jobs_ledger')) {
+          setLocalFallback(true);
+        } else {
+          throw error;
+        }
+      } else {
+        return { success: true };
+      }
+    } catch (err) {
+      console.warn("Failed to delete micro job in Supabase, falling back to local:", err);
+      setLocalFallback(true);
+    }
+  }
+
+  if (useLocalFallback) {
+    const rawJobs = getLocalJobs();
+    const filteredJobs = rawJobs.filter(job => (job.job_id || job.jobId) !== jobId);
+    saveLocalJobs(filteredJobs);
+    return { success: true };
+  }
+};
+
+/**
+ * Clear ALL micro-job entries from the ledger
+ */
+export const clearAllMicroJobs = async () => {
+  if (!useLocalFallback) {
+    try {
+      const { error } = await supabase
+        .from('micro_jobs_ledger')
+        .delete()
+        .not('job_id', 'is', null);
+
+      if (error) {
+        if (error.code === 'PGRST205' || error.message?.includes('micro_jobs_ledger')) {
+          setLocalFallback(true);
+        } else {
+          throw error;
+        }
+      } else {
+        return { success: true };
+      }
+    } catch (err) {
+      console.warn("Failed to clear all micro jobs in Supabase, falling back to local:", err);
+      setLocalFallback(true);
+    }
+  }
+
+  if (useLocalFallback) {
+    saveLocalJobs([]);
+    return { success: true };
+  }
+};

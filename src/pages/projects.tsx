@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "../supabase/client";
-import { getMicroJobs, createMicroJob, linkJobsToInvoice, saveInvoice, updateMicroJob } from "../supabase/database";
+import { getMicroJobs, createMicroJob, linkJobsToInvoice, saveInvoice, updateMicroJob, deleteMicroJob, clearAllMicroJobs } from "../supabase/database";
 
 
 const STATUS_COLORS: Record<string, string> = {
@@ -177,6 +177,12 @@ export default function Projects({
   const [editJobRate, setEditJobRate] = useState<string | number>("");
   const [editJobDiscount, setEditJobDiscount] = useState<number | "">(0);
   const [editJobLastCalculatedBy, setEditJobLastCalculatedBy] = useState<"rate" | "total">("rate");
+
+  // Delete micro-job state
+  const [jobToDelete, setJobToDelete] = useState<any | null>(null);
+  const [isDeleteJobModalOpen, setIsDeleteJobModalOpen] = useState(false);
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
+  const [isClearingAll, setIsClearingAll] = useState(false);
 
   useEffect(() => {
     if (editJobLastCalculatedBy !== "total" && isEditJobModalOpen) {
@@ -518,6 +524,71 @@ export default function Projects({
         description: err.message || "Failed to log micro-job in database.",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleDeleteMicroJob = async () => {
+    if (!jobToDelete) return;
+    try {
+      await deleteMicroJob(jobToDelete.jobId);
+      setMicroJobs(prev => prev.filter(j => j.jobId !== jobToDelete.jobId));
+      setSelectedJobIds(prev => prev.filter(id => id !== jobToDelete.jobId));
+      toast({ title: "Micro-Job Deleted", description: `"${jobToDelete.taskName}" has been removed from the ledger.` });
+    } catch (err: any) {
+      toast({ title: "Delete Failed", description: err.message || "Could not delete the micro-job.", variant: "destructive" });
+    } finally {
+      setJobToDelete(null);
+      setIsDeleteJobModalOpen(false);
+    }
+  };
+
+  const handleClearAllMicroJobs = async () => {
+    setIsClearingAll(true);
+    try {
+      // 1. Get all CMS invoices from supabase and delete them
+      const microJobInvoices = invoices.filter(inv =>
+        (inv.invoiceNo && inv.invoiceNo.startsWith('CMS')) ||
+        (inv.microJobIds && inv.microJobIds.length > 0)
+      );
+      for (const inv of microJobInvoices) {
+        try {
+          await supabase.from('invoices').delete().eq('id', inv.id);
+        } catch (e) { /* continue */ }
+      }
+
+      // 2. Clear all cashbook entries linked to micro-job invoices
+      if (setCashbookEntries) {
+        const invIds = new Set(microJobInvoices.map(i => i.id));
+        const invNos = new Set(microJobInvoices.map(i => i.invoiceNo));
+        setCashbookEntries(prev => prev.filter(entry =>
+          !invIds.has(entry.invoiceId) &&
+          !invNos.has(entry.invoiceNo) &&
+          !microJobInvoices.some(inv => entry.desc && entry.desc.includes(inv.invoiceNo))
+        ));
+      }
+
+      // 3. Remove from invoices state
+      if (setInvoices) {
+        setInvoices(prev => prev.filter(inv =>
+          !(inv.invoiceNo && inv.invoiceNo.startsWith('CMS')) &&
+          !(inv.microJobIds && inv.microJobIds.length > 0)
+        ));
+      }
+
+      // 4. Clear all micro-job ledger entries
+      await clearAllMicroJobs();
+      setMicroJobs([]);
+      setSelectedJobIds([]);
+
+      toast({
+        title: "Micro-Job Ledger Cleared",
+        description: "All micro-jobs, their invoices, and related financial entries have been purged."
+      });
+    } catch (err: any) {
+      toast({ title: "Clear Failed", description: err.message || "An error occurred while clearing micro-jobs.", variant: "destructive" });
+    } finally {
+      setIsClearingAll(false);
+      setIsClearAllModalOpen(false);
     }
   };
 
@@ -968,14 +1039,26 @@ export default function Projects({
             START NEW IGNITION
           </Button>
         ) : (
-          <Button
-            onClick={() => setIsQuickJobModalOpen(true)}
-            className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 gap-2 font-bold text-xs rounded-xl"
-            data-testid="button-log-microjob"
-          >
-            <Plus className="w-4 h-4" />
-            LOG NEW JOB
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setIsQuickJobModalOpen(true)}
+              className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 gap-2 font-bold text-xs rounded-xl"
+              data-testid="button-log-microjob"
+            >
+              <Plus className="w-4 h-4" />
+              LOG NEW JOB
+            </Button>
+            {microJobs.length > 0 && (
+              <Button
+                onClick={() => setIsClearAllModalOpen(true)}
+                className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 gap-2 font-bold text-xs rounded-xl"
+                title="Purge all micro-jobs, invoices and financial entries"
+              >
+                <Trash2 className="w-4 h-4" />
+                CLEAR ALL
+              </Button>
+            )}
+          </div>
         )}
       </motion.div>
 
@@ -1532,17 +1615,31 @@ export default function Projects({
                           ₹{job.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </td>
                         <td className="p-4 text-right">
-                          {!settled && (
+                          <div className="flex items-center justify-end gap-1">
+                            {!settled && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="w-7 h-7 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-400 border border-white/5"
+                                onClick={() => openEditMicroJob(job)}
+                                title="Edit Micro-Job"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="w-7 h-7 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-400 border border-white/5"
-                              onClick={() => openEditMicroJob(job)}
-                              title="Edit Micro-Job"
+                              className="w-7 h-7 rounded-lg hover:bg-red-500/10 hover:text-red-400 border border-white/5"
+                              onClick={() => {
+                                setJobToDelete(job);
+                                setIsDeleteJobModalOpen(true);
+                              }}
+                              title="Delete Micro-Job"
                             >
-                              <Pencil className="w-3.5 h-3.5" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </Button>
-                          )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -2400,6 +2497,99 @@ export default function Projects({
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* ── Delete Single Micro-Job Confirmation Modal ── */}
+      <AnimatePresence>
+        {isDeleteJobModalOpen && jobToDelete && (
+          <div className="fixed inset-0 z-[10060] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}>
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              className="bg-[#080c18] border border-red-500/30 rounded-2xl p-6 max-w-sm w-[90vw] shadow-2xl"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                  <Trash2 className="w-4 h-4 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-red-400 text-sm">DELETE MICRO-JOB</h3>
+                  <p className="text-3xs text-muted-foreground uppercase tracking-wider">This action cannot be undone</p>
+                </div>
+              </div>
+              <p className="text-xs text-white/70 mb-5">
+                Are you sure you want to permanently delete{' '}
+                <span className="text-white font-bold">"{jobToDelete.taskName}"</span>?
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="ghost"
+                  className="flex-1 border border-white/10 text-muted-foreground text-xs font-semibold hover:bg-white/5 h-9 rounded-xl"
+                  onClick={() => { setIsDeleteJobModalOpen(false); setJobToDelete(null); }}
+                >
+                  CANCEL
+                </Button>
+                <Button
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white font-extrabold text-xs h-9 rounded-xl border-none"
+                  onClick={handleDeleteMicroJob}
+                >
+                  DELETE
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Clear ALL Micro-Jobs Confirmation Modal ── */}
+      <AnimatePresence>
+        {isClearAllModalOpen && (
+          <div className="fixed inset-0 z-[10060] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}>
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              className="bg-[#080c18] border border-red-500/40 rounded-2xl p-6 max-w-md w-[90vw] shadow-2xl"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-red-400 text-base">CLEAR ALL MICRO-JOBS</h3>
+                  <p className="text-3xs text-muted-foreground uppercase tracking-wider">Irreversible purge operation</p>
+                </div>
+              </div>
+              <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4 mb-5 space-y-1.5">
+                <p className="text-xs text-white/80 font-semibold">This will permanently delete:</p>
+                <ul className="text-xs text-white/60 space-y-1 list-disc list-inside">
+                  <li>All micro-job ledger entries</li>
+                  <li>All micro-job (CMS) invoices</li>
+                  <li>All financial / cashbook entries linked to those invoices</li>
+                </ul>
+                <p className="text-3xs text-red-400 font-bold mt-2 uppercase tracking-wider">⚠ Regular project invoices are NOT affected</p>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  variant="ghost"
+                  className="flex-1 border border-white/10 text-muted-foreground text-xs font-semibold hover:bg-white/5 h-10 rounded-xl"
+                  onClick={() => setIsClearAllModalOpen(false)}
+                  disabled={isClearingAll}
+                >
+                  CANCEL
+                </Button>
+                <Button
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs h-10 rounded-xl border-none"
+                  onClick={handleClearAllMicroJobs}
+                  disabled={isClearingAll}
+                >
+                  {isClearingAll ? "PURGING..." : "PURGE ALL MICRO-JOBS"}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </motion.div>
   );
