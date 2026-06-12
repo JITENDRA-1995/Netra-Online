@@ -162,7 +162,63 @@ export default function Financials({
   const [expClient, setExpClient] = useState("all");
   const [expCategory, setExpCategory] = useState("all");
 
-  // Derived lists for dropdowns
+
+  const upToDateQueue = useMemo(() => {
+    return (ignitionQueue || []).map((p: any) => {
+      let clientName = p.clientName || p.name;
+      const liveClient = p.client 
+        ? clients.find(c => 
+            (p.client.id && String(c.id) === String(p.client.id)) ||
+            (p.client.email && c.email && c.email.toLowerCase() === p.client.email.toLowerCase()) ||
+            (p.client.phone && c.phone && c.phone === p.client.phone)
+          )
+        : null;
+      if (liveClient) {
+        clientName = liveClient.name;
+      }
+      return {
+        ...p,
+        clientName
+      };
+    });
+  }, [ignitionQueue, clients]);
+
+  const upToDateCashbookEntries = useMemo(() => {
+    return (cashbookEntries || []).map((entry: any) => {
+      let desc = entry.desc;
+      if (entry.invoiceId) {
+        const inv = invoices.find((i: any) => String(i.id) === String(entry.invoiceId));
+        if (inv) {
+          const oldClientName = inv.clientName;
+          const liveClientName = clients.find(c => String(c.id) === String(inv.clientLink))?.name || inv.clientName;
+          if (oldClientName && liveClientName && oldClientName !== liveClientName) {
+            desc = desc.replace(oldClientName, liveClientName);
+          }
+        }
+      } else if (entry.projectId) {
+        const currentProj = (ignitionQueue || []).find((p: any) => String(p.id) === String(entry.projectId));
+        if (currentProj) {
+          const oldClientName = currentProj.name;
+          const liveClient = currentProj.client 
+            ? clients.find(c => 
+                (currentProj.client.id && String(c.id) === String(currentProj.client.id)) ||
+                (currentProj.client.email && c.email && c.email.toLowerCase() === currentProj.client.email.toLowerCase()) ||
+                (currentProj.client.phone && c.phone && c.phone === currentProj.client.phone)
+              )
+            : null;
+          const liveClientName = liveClient?.name || currentProj.client?.name || currentProj.clientName || currentProj.name;
+          if (oldClientName && liveClientName && oldClientName !== liveClientName) {
+            desc = desc.replace(oldClientName, liveClientName);
+          }
+        }
+      }
+      return {
+        ...entry,
+        desc
+      };
+    });
+  }, [cashbookEntries, invoices, clients, ignitionQueue]);
+
   const availableClients = useMemo(() => {
     const names = new Set<string>();
     if (clients && Array.isArray(clients)) {
@@ -172,63 +228,63 @@ export default function Financials({
         }
       });
     }
-    if (ignitionQueue && Array.isArray(ignitionQueue)) {
-      ignitionQueue.forEach(p => {
-        if (p && p.name) names.add(p.name);
+    if (upToDateQueue && Array.isArray(upToDateQueue)) {
+      upToDateQueue.forEach(p => {
+        if (p && p.clientName) names.add(p.clientName);
       });
     }
     return Array.from(names).sort();
-  }, [clients, ignitionQueue]);
+  }, [clients, upToDateQueue]);
 
   const availableServices = useMemo(() => {
     const services = new Set<string>();
-    if (ignitionQueue && Array.isArray(ignitionQueue)) {
-      ignitionQueue.forEach(p => {
+    if (upToDateQueue && Array.isArray(upToDateQueue)) {
+      upToDateQueue.forEach(p => {
         if (p && p.service) services.add(p.service);
       });
     }
     return Array.from(services).sort();
-  }, [ignitionQueue]);
+  }, [upToDateQueue]);
 
   const availableIncomeCategories = useMemo(() => {
     const categories = new Set<string>();
-    if (cashbookEntries && Array.isArray(cashbookEntries)) {
-      cashbookEntries.forEach(entry => {
+    if (upToDateCashbookEntries && Array.isArray(upToDateCashbookEntries)) {
+      upToDateCashbookEntries.forEach(entry => {
         if (entry && entry.type === "INCOME" && entry.category) {
           categories.add(entry.category);
         }
       });
     }
     return Array.from(categories).sort();
-  }, [cashbookEntries]);
+  }, [upToDateCashbookEntries]);
 
   const availableExpenseCategories = useMemo(() => {
     const categories = new Set<string>();
-    if (cashbookEntries && Array.isArray(cashbookEntries)) {
-      cashbookEntries.forEach(entry => {
+    if (upToDateCashbookEntries && Array.isArray(upToDateCashbookEntries)) {
+      upToDateCashbookEntries.forEach(entry => {
         if (entry && entry.type === "EXPENSE" && entry.category) {
           categories.add(entry.category);
         }
       });
     }
     return Array.from(categories).sort();
-  }, [cashbookEntries]);
+  }, [upToDateCashbookEntries]);
 
   // Filter logic
   const filteredProjects = useMemo(() => {
-    return ignitionQueue.filter(p => {
+    return upToDateQueue.filter(p => {
       // 1. Global text search
       if (currentSearch) {
         const query = currentSearch.toLowerCase();
         const matchesQuery =
-          p.name.toLowerCase().includes(query) ||
+          p.clientName.toLowerCase().includes(query) ||
           p.service.toLowerCase().includes(query);
         if (!matchesQuery) return false;
       }
 
       // 2. Client dropdown filter
       if (projClient !== "all") {
-        if (p.name.toLowerCase() !== projClient.toLowerCase()) return false;
+        if (p.clientName.toLowerCase() !== projClient.toLowerCase()) return false;
       }
 
       // 3. Service dropdown filter
@@ -238,10 +294,10 @@ export default function Financials({
 
       return true;
     });
-  }, [ignitionQueue, currentSearch, projClient, projService]);
+  }, [upToDateQueue, currentSearch, projClient, projService]);
 
   const filteredIncomeEntries = useMemo(() => {
-    return cashbookEntries.filter(entry => {
+    return upToDateCashbookEntries.filter(entry => {
       if (entry.type !== "INCOME") return false;
 
       // 1. Search text
@@ -267,10 +323,10 @@ export default function Financials({
 
       return true;
     });
-  }, [cashbookEntries, incSearch, incClient, incCategory]);
+  }, [upToDateCashbookEntries, incSearch, incClient, incCategory]);
 
   const filteredExpenseEntries = useMemo(() => {
-    return cashbookEntries.filter(entry => {
+    return upToDateCashbookEntries.filter(entry => {
       if (entry.type !== "EXPENSE") return false;
 
       // 1. Search text
@@ -296,7 +352,7 @@ export default function Financials({
 
       return true;
     });
-  }, [cashbookEntries, expSearch, expClient, expCategory]);
+  }, [upToDateCashbookEntries, expSearch, expClient, expCategory]);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [modalEntryType, setModalEntryType] = useState<"INCOME" | "EXPENSE">("INCOME");
@@ -815,7 +871,7 @@ export default function Financials({
                           <td className="p-4">
                             <div className="flex flex-col">
                               <span className="font-bold text-foreground">{p.service}</span>
-                              <span className="text-xs text-muted-foreground mt-0.5">{p.name}</span>
+                              <span className="text-xs text-muted-foreground mt-0.5">{p.clientName || p.name}</span>
                             </div>
                           </td>
                           <td className="p-4 text-left">

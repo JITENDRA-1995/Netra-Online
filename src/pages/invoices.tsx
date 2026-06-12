@@ -302,7 +302,7 @@ export default function InvoicesPage({
   const getUpToDateInvoice = (inv: any) => {
     let clientName = inv.clientName;
     if (inv.clientLink) {
-      const currentClient = clients.find(c => c.id === inv.clientLink);
+      const currentClient = clients.find(c => String(c.id) === String(inv.clientLink));
       if (currentClient) {
         clientName = currentClient.name;
       }
@@ -314,16 +314,24 @@ export default function InvoicesPage({
         clientName
       };
     }
-    const currentProj = projects.find(p => p.id === inv.rawProject.id);
+    const currentProj = projects.find(p => String(p.id) === String(inv.rawProject.id));
     if (!currentProj) {
       return {
         ...inv,
         clientName
       };
     }
+    const liveClient = currentProj.client 
+      ? clients.find(c => 
+          (currentProj.client.id && String(c.id) === String(currentProj.client.id)) ||
+          (currentProj.client.email && c.email && c.email.toLowerCase() === currentProj.client.email.toLowerCase()) ||
+          (currentProj.client.phone && c.phone && c.phone === currentProj.client.phone)
+        )
+      : null;
+    const projClientName = liveClient ? liveClient.name : (currentProj.client?.name || currentProj.name || clientName);
     return {
       ...inv,
-      clientName: currentProj.client?.name || currentProj.name || clientName,
+      clientName: projClientName,
       projectService: currentProj.service || inv.projectService,
       rawProject: currentProj
     };
@@ -1870,7 +1878,7 @@ export default function InvoicesPage({
                             title="View Invoice Document"
                             onClick={() => {
                               if (!inv.rawProject) {
-                                const clientObj = clients.find(c => (inv.clientLink && c.id === inv.clientLink) || c.name.toLowerCase() === inv.clientName.toLowerCase());
+                                const clientObj = clients.find(c => (inv.clientLink && String(c.id) === String(inv.clientLink)) || c.name.toLowerCase() === inv.clientName.toLowerCase());
                                 const resolvedItems = (inv.microJobIds && inv.microJobIds.length > 0)
                                   ? inv.microJobIds.map(id => {
                                       const job = microJobs.find(mj => String(mj.jobId) === String(id));

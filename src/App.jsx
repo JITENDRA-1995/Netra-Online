@@ -3175,7 +3175,7 @@ function App() {
         description: prefillData?.description || '',
         deadline: formData.get('deadline'),
         isManual: true,
-        client: clientInfo,
+        client: { ...clientInfo, id: clientDbId },
         milestones: milestoneNames.map((name, idx) => ({ name, completed: name === "Discovery" })),
         qty: qtyVal,
         rate: rateVal,

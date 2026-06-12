@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Search, Pencil, Trash2, FileText, SlidersHorizontal } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, FileText, SlidersHorizontal, Grid, List, Eye } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -597,6 +597,9 @@ export default function Projects({
 
   const [filterStatus, setFilterStatus] = useState("all");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [layoutMode, setLayoutMode] = useState<"grid" | "list">("grid");
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [viewingProject, setViewingProject] = useState<any | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<any | null>(null);
   
@@ -1170,6 +1173,34 @@ export default function Projects({
 
         {/* Dynamic Matched Count */}
         <div className="flex items-center gap-2 ml-auto">
+          {activeTab === "Missions" && (
+            <div className="flex bg-white/5 border border-white/10 rounded-xl p-0.5 mr-1 h-9 items-center">
+              <button
+                type="button"
+                onClick={() => setLayoutMode("grid")}
+                className={`p-1 rounded-lg text-3xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 w-7 h-7 bg-transparent border outline-none ${
+                  layoutMode === "grid"
+                    ? "bg-cyan-500/20 text-cyan-400 border-cyan-500/20 shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/5 border-transparent"
+                }`}
+                title="Grid View"
+              >
+                <Grid className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setLayoutMode("list")}
+                className={`p-1 rounded-lg text-3xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 w-7 h-7 bg-transparent border outline-none ${
+                  layoutMode === "list"
+                    ? "bg-cyan-500/20 text-cyan-400 border-cyan-500/20 shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/5 border-transparent"
+                }`}
+                title="List View"
+              >
+                <List className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
           {activeTab === "MicroJobs" && selectedJobIds.length > 0 && (
             <Button
               variant="ghost"
@@ -1292,10 +1323,20 @@ export default function Projects({
 
       {/* Grid */}
       {activeTab === "Missions" ? (
-        <motion.div variants={containerVariants} className="space-y-4">
+        <motion.div
+          variants={containerVariants}
+          className={layoutMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" : "space-y-4"}
+        >
           {sortedAndFiltered.map((project) => {
             const serviceName = project.service || project.name || "Unnamed Project";
-            const clientName = project.client?.name || project.clientName || project.name || "Unknown Client";
+            const liveClient = project.client 
+              ? clients.find(c => 
+                  (project.client.id && String(c.id) === String(project.client.id)) ||
+                  (project.client.email && c.email && c.email.toLowerCase() === project.client.email.toLowerCase()) ||
+                  (project.client.phone && c.phone && c.phone === project.client.phone)
+                )
+              : null;
+            const clientName = liveClient ? liveClient.name : (project.client?.name || project.clientName || project.name || "Unknown Client");
             const budgetVal = project.budget !== undefined ? project.budget : (parseFloat(project.quote) || 0);
             const statusVal = (project.status || "active").toLowerCase().replace(" ", "_");
             const progressVal = statusVal === "completed" ? 100 : (project.progress || 20);
@@ -1331,8 +1372,14 @@ export default function Projects({
               <motion.div
                 key={project.id}
                 variants={itemVariants}
-                className={`group relative rounded-2xl border backdrop-blur-sm p-5 transition-all duration-300 flex flex-col justify-between ${theme.borderClass} ${theme.cardBg}`}
+                className={`group relative rounded-2xl border backdrop-blur-sm p-5 transition-all duration-300 flex flex-col justify-between ${theme.borderClass} ${theme.cardBg} ${layoutMode === "grid" ? "cursor-pointer hover:shadow-[0_0_25px_rgba(6,182,212,0.08)] hover:-translate-y-1" : ""}`}
                 style={{ background: isHighPriority ? `linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, transparent 100%)` : `linear-gradient(135deg, ${statusColor}03 0%, transparent 100%)` }}
+                onClick={() => {
+                  if (layoutMode === "grid") {
+                    setViewingProject(project);
+                    setIsViewOpen(true);
+                  }
+                }}
                 data-testid={`card-project-${project.id}`}
               >
                 <div className="flex items-start justify-between flex-wrap gap-4">
@@ -1370,7 +1417,7 @@ export default function Projects({
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 flex-wrap">
-                        <span>Visionary: <strong>{clientName}</strong></span>
+                        <span>Visionary: <strong className="text-black font-extrabold bg-white px-2 py-0.5 rounded-md border border-white/20 shadow-sm">{clientName}</strong></span>
                         {project.deadline && (
                           <>
                             <span>·</span>
@@ -1413,7 +1460,10 @@ export default function Projects({
                           size="icon"
                           variant="ghost"
                           className="w-7 h-7 rounded-lg hover:bg-emerald-500/10 hover:text-emerald-400 border border-white/5"
-                          onClick={() => onDownloadInvoice(project)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDownloadInvoice(project);
+                          }}
                           title="Download Invoice"
                           data-testid={`button-invoice-project-${project.id}`}
                         >
@@ -1428,6 +1478,7 @@ export default function Projects({
                             handleUpdateProjectStatusHandy(project.id, e.target.value);
                           }
                         }}
+                        onClick={(e) => e.stopPropagation()}
                         title="Quick Status Update"
                       >
                         <option value="Active">Active</option>
@@ -1439,7 +1490,23 @@ export default function Projects({
                         size="icon"
                         variant="ghost"
                         className="w-7 h-7 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-400 border border-white/5"
-                        onClick={() => openEdit(project)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setViewingProject(project);
+                          setIsViewOpen(true);
+                        }}
+                        title="View Project Details"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="w-7 h-7 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-400 border border-white/5"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEdit(project);
+                        }}
                         data-testid={`button-edit-project-${project.id}`}
                       >
                         <Pencil className="w-3.5 h-3.5" />
@@ -1448,7 +1515,10 @@ export default function Projects({
                         size="icon"
                         variant="ghost"
                         className="w-7 h-7 rounded-lg hover:bg-red-500/10 hover:text-red-400 border border-white/5"
-                        onClick={() => handleDelete(project.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(project.id);
+                        }}
                         data-testid={`button-delete-project-${project.id}`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1586,7 +1656,16 @@ export default function Projects({
                           )}
                         </td>
                         <td className="p-4 font-bold text-foreground">
-                          {job.client?.name || "Unknown Client"}
+                          {(() => {
+                            const liveClient = job.client 
+                              ? clients.find(c => 
+                                  (job.client.id && String(c.id) === String(job.client.id)) ||
+                                  (job.client.email && c.email && c.email.toLowerCase() === job.client.email.toLowerCase()) ||
+                                  (job.client.phone && c.phone && c.phone === job.client.phone)
+                                )
+                              : null;
+                            return liveClient ? liveClient.name : (job.client?.name || "Unknown Client");
+                          })()}
                         </td>
                         <td className="p-4 text-center text-muted-foreground">
                           {new Date(job.dateLogged).toLocaleString("en-IN", {
@@ -2587,6 +2666,180 @@ export default function Projects({
                   disabled={isClearingAll}
                 >
                   {isClearingAll ? "PURGING..." : "PURGE ALL MICRO-JOBS"}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── View Project Details Modal ── */}
+      <AnimatePresence>
+        {isViewOpen && viewingProject && (
+          <div className="fixed inset-0 z-[10060] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}>
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              className="bg-[#080c18] border border-white/10 rounded-2xl p-6 max-w-2xl w-[90vw] max-h-[85vh] overflow-y-auto shadow-2xl space-y-6 text-left relative"
+            >
+              <button
+                onClick={() => { setIsViewOpen(false); setViewingProject(null); }}
+                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground text-xl cursor-pointer bg-transparent border-none outline-none font-bold"
+              >
+                ×
+              </button>
+
+              {/* Title & Badges */}
+              <div className="flex items-start gap-4 border-b border-white/5 pb-4">
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-bold uppercase"
+                  style={{
+                    background: `${CATEGORY_COLORS[(viewingProject.category || "branding").toLowerCase()] || "#666"}15`,
+                    border: `1px solid ${CATEGORY_COLORS[(viewingProject.category || "branding").toLowerCase()] || "#666"}30`,
+                    color: CATEGORY_COLORS[(viewingProject.category || "branding").toLowerCase()] || "#666",
+                  }}
+                >
+                  {(viewingProject.category || "branding").slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-foreground text-lg">{viewingProject.service || viewingProject.name || "Unnamed Project"}</h3>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className="text-3xs uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">Visionary: <strong className="text-black font-extrabold bg-white px-2 py-0.5 rounded-md border border-white/20 shadow-sm normal-case">{(() => {
+                      const liveClient = viewingProject.client 
+                        ? clients.find(c => 
+                            (viewingProject.client.id && String(c.id) === String(viewingProject.client.id)) ||
+                            (viewingProject.client.email && c.email && c.email.toLowerCase() === viewingProject.client.email.toLowerCase()) ||
+                            (viewingProject.client.phone && c.phone && c.phone === viewingProject.client.phone)
+                          )
+                        : null;
+                      return liveClient ? liveClient.name : (viewingProject.client?.name || viewingProject.clientName || viewingProject.name || "Unknown Client");
+                    })()}</strong></span>
+                    <span className="text-white/20">|</span>
+                    <Badge
+                      className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5"
+                      style={{
+                        background: `${STATUS_COLORS[(viewingProject.status || "active").toLowerCase().replace(" ", "_")] || "#666"}15`,
+                        color: STATUS_COLORS[(viewingProject.status || "active").toLowerCase().replace(" ", "_")] || "#666",
+                      }}
+                    >
+                      {(viewingProject.status || "Active").toUpperCase()}
+                    </Badge>
+                    <Badge
+                      className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5"
+                      style={{
+                        background: `${CATEGORY_COLORS[(viewingProject.category || "branding").toLowerCase()] || "#666"}15`,
+                        color: CATEGORY_COLORS[(viewingProject.category || "branding").toLowerCase()] || "#666",
+                      }}
+                    >
+                      {(viewingProject.category || "Branding").toUpperCase()}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Brief Notes */}
+              <div className="space-y-1.5">
+                <h4 className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Mission Brief / Notes</h4>
+                <div className="bg-white/5 border border-white/5 rounded-xl p-4 text-xs text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                  {viewingProject.description || "No project overview or brief description provided."}
+                </div>
+              </div>
+
+              {/* Financial Segment */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-white/5 border border-white/5 rounded-xl p-3">
+                  <span className="text-3xs uppercase tracking-widest text-muted-foreground block mb-1">Target Value</span>
+                  <span className="text-sm font-bold text-foreground">₹{(viewingProject.budget !== undefined ? viewingProject.budget : (parseFloat(viewingProject.quote) || 0)).toLocaleString()}</span>
+                </div>
+                <div className="bg-white/5 border border-white/5 rounded-xl p-3">
+                  <span className="text-3xs uppercase tracking-widest text-muted-foreground block mb-1">Discount</span>
+                  <span className="text-sm font-bold text-rose-400">₹{(parseFloat(viewingProject.discount) || 0).toLocaleString()}</span>
+                </div>
+                <div className="bg-white/5 border border-white/5 rounded-xl p-3">
+                  <span className="text-3xs uppercase tracking-widest text-muted-foreground block mb-1">Advance Amount</span>
+                  <span className="text-sm font-bold text-emerald-400">₹{(parseFloat(viewingProject.advanceAmount) || 0).toLocaleString()}</span>
+                </div>
+                <div className="bg-white/5 border border-white/5 rounded-xl p-3">
+                  <span className="text-3xs uppercase tracking-widest text-muted-foreground block mb-1">Remaining Balance</span>
+                  <span className="text-sm font-bold text-cyan-400">
+                    ₹{Math.max(0, ((viewingProject.budget !== undefined ? viewingProject.budget : (parseFloat(viewingProject.quote) || 0)) - (parseFloat(viewingProject.discount) || 0) - (parseFloat(viewingProject.advanceAmount) || 0))).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress Stepper & Milestones */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                {/* Stepper info */}
+                <div className="space-y-3">
+                  <h4 className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Delivery Progress Stage</h4>
+                  <div className="bg-white/5 border border-white/5 rounded-xl p-4 space-y-3">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-bold text-cyan-400">
+                        {(() => {
+                          const prog = viewingProject.progress || 20;
+                          if (prog <= 20) return "Discover (20%)";
+                          if (prog <= 40) return "Define (40%)";
+                          if (prog <= 60) return "Design (60%)";
+                          if (prog <= 80) return "Print/Build (80%)";
+                          return "Deliver (100%)";
+                        })()}
+                      </span>
+                      {viewingProject.deadline && (
+                        <span className="text-muted-foreground">Due: {new Date(viewingProject.deadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                      )}
+                    </div>
+                    <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-cyan-400" style={{ width: `${viewingProject.progress || 20}%` }} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Milestones checklist */}
+                <div className="space-y-3">
+                  <h4 className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Billing Milestones</h4>
+                  <div className="bg-white/5 border border-white/5 rounded-xl p-4 space-y-2 max-h-[150px] overflow-y-auto">
+                    {viewingProject.milestones && viewingProject.milestones.length > 0 ? (
+                      viewingProject.milestones.map((m: any, idx: number) => (
+                        <div key={idx} className="flex items-center gap-2 text-xs">
+                          {m.completed ? (
+                            <span className="text-emerald-400 font-bold">✓</span>
+                          ) : (
+                            <span className="text-muted-foreground font-bold">○</span>
+                          )}
+                          <span className={m.completed ? "text-muted-foreground line-through" : "text-foreground"}>{m.name}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-3xs text-muted-foreground uppercase tracking-wider text-center py-4 font-bold">No Milestones Set</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Activity Log */}
+              {viewingProject.activityLog && viewingProject.activityLog.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Activity logs timeline</h4>
+                  <div className="bg-white/5 border border-white/5 rounded-xl p-4 space-y-3 max-h-[160px] overflow-y-auto">
+                    {viewingProject.activityLog.map((log: any, idx: number) => (
+                      <div key={idx} className="flex items-start justify-between gap-4 text-3xs font-mono border-b border-white/5 pb-2 last:border-b-0 last:pb-0">
+                        <span className="text-white/80 font-semibold">{log.action}</span>
+                        <span className="text-muted-foreground text-right shrink-0">{log.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 border-t border-white/5 pt-4 mt-2">
+                <Button
+                  variant="ghost"
+                  className="px-4 py-2 border border-white/10 text-muted-foreground hover:bg-white/5 text-xs font-semibold rounded-xl"
+                  onClick={() => { setIsViewOpen(false); setViewingProject(null); }}
+                >
+                  CLOSE
                 </Button>
               </div>
             </motion.div>
