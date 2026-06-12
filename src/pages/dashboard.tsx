@@ -675,7 +675,7 @@ export default function Dashboard({
             <tbody className="divide-y divide-white/5 text-xs text-foreground">
               {activeClients.length > 0 ? (
                 activeClients.map((client) => {
-                  const clientProjectsCount = projects.filter(p => p.name === client.name).length;
+                  const clientProjectsCount = projects.filter(p => (p.client?.id === client.id) || (p.name === client.name)).length;
                   return (
                     <tr key={client.id || client.email} className="hover:bg-emerald-500/5 transition-colors">
                       <td className="py-3 px-4 font-bold">{client.name}</td>

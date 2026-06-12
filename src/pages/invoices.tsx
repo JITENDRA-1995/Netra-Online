@@ -298,23 +298,6 @@ export default function InvoicesPage({
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
 
-  // Extract unique clients from current ledger list
-  const uniqueClients = Array.from(
-    new Set(invoices.map((inv) => inv.clientName || "").filter(Boolean))
-  );
-
-  // Extract unique months from current ledger list
-  const uniqueMonths = Array.from(
-    new Set(
-      invoices.map((inv) => {
-        if (!inv.issueDate) return "";
-        const date = new Date(inv.issueDate);
-        if (isNaN(date.getTime())) return "";
-        return date.toLocaleString("en-IN", { month: "long", year: "numeric" });
-      }).filter(Boolean)
-    )
-  );
-
   // Get up-to-date project info to keep status in sync dynamically
   const getUpToDateInvoice = (inv: any) => {
     let clientName = inv.clientName;
@@ -347,6 +330,23 @@ export default function InvoicesPage({
   };
 
   const upToDateInvoices = invoices.map(getUpToDateInvoice);
+
+  // Extract unique clients from current ledger list
+  const uniqueClients = Array.from(
+    new Set(upToDateInvoices.map((inv) => inv.clientName || "").filter(Boolean))
+  );
+
+  // Extract unique months from current ledger list
+  const uniqueMonths = Array.from(
+    new Set(
+      upToDateInvoices.map((inv) => {
+        if (!inv.issueDate) return "";
+        const date = new Date(inv.issueDate);
+        if (isNaN(date.getTime())) return "";
+        return date.toLocaleString("en-IN", { month: "long", year: "numeric" });
+      }).filter(Boolean)
+    )
+  );
 
   const filteredInvoices = upToDateInvoices.filter(inv => {
     // 1. Search filter
@@ -499,6 +499,33 @@ export default function InvoicesPage({
     const ids = invs.map(i => i.id);
     const nos = invs.map(i => i.invoiceNo);
     try {
+      // Revert micro jobs if specified
+      if (deleteStrategy === "revert_ledger") {
+        const allMicroJobIds = invs.reduce((acc: any[], inv) => {
+          if (inv.microJobIds && inv.microJobIds.length > 0) {
+            return [...acc, ...inv.microJobIds];
+          }
+          return acc;
+        }, []);
+
+        if (allMicroJobIds.length > 0) {
+          try {
+            await revertJobsToLedger(allMicroJobIds);
+          } catch (revertErr) {
+            console.warn("Failed to revert micro jobs in Supabase (batch):", revertErr);
+          }
+
+          if (setMicroJobs) {
+            setMicroJobs(prev => prev.map(job => {
+              if (allMicroJobIds.includes(job.jobId) || allMicroJobIds.some(id => String(id) === String(job.jobId))) {
+                return { ...job, billingStatus: "Unbilled", invoiceLink: null };
+              }
+              return job;
+            }));
+          }
+        }
+      }
+
       for (const inv of invs) {
         try {
           await deleteInvoice(inv.id);
@@ -541,6 +568,8 @@ export default function InvoicesPage({
           !nos.some(no => entry.desc && entry.desc.includes(no))
         ));
         toast({ title: "Batch Invoices & Logs Purged", description: `Successfully removed ${invs.length} invoices and reverted cashbook logs.` });
+      } else if (deleteStrategy === "revert_ledger") {
+        toast({ title: "Batch Invoices Deleted & Logs Reverted", description: `Deleted ${invs.length} invoices and associated micro-jobs sent back to ledger.` });
       } else {
         toast({ title: "Batch Invoices Deleted", description: `${invs.length} invoices removed. Cashbook entries preserved.` });
       }
@@ -549,6 +578,7 @@ export default function InvoicesPage({
       toast({ title: "Failed to delete batch", description: "An error occurred during batch deletion.", variant: "destructive" });
     } finally {
       setBatchInvoicesToDelete(null);
+      setDeleteStrategy("keep");
     }
   };
 
@@ -1334,21 +1364,27 @@ export default function InvoicesPage({
                       />
                       <span className="text-red-400 font-semibold">Purge associated Cashbook entry (Revert Cashflow)</span>
                     </label>
-                    {invoiceToDelete && 
-                     (invoiceToDelete.microJobIds?.length > 0 || (invoiceToDelete.invoiceNo && invoiceToDelete.invoiceNo.startsWith('CMS'))) &&
-                     (invoiceToDelete.paymentStatus?.toLowerCase() === 'pending' || invoiceToDelete.paymentStatus?.toLowerCase() === 'unpaid') && (
-                      <label className="flex items-center gap-2 cursor-pointer text-[11px] text-white/80 select-none">
-                        <input
-                          type="radio"
-                          name="deleteInvoiceStrategy"
-                          value="revert_ledger"
-                          checked={deleteStrategy === 'revert_ledger'}
-                          onChange={() => setDeleteStrategy('revert_ledger')}
-                          className="accent-amber-500"
-                        />
-                        <span className="text-amber-400 font-semibold">Send Back to MICRO JOB LEDGER</span>
-                      </label>
-                    )}
+                    {(() => {
+                      const targetInvoices = invoiceToDelete ? [invoiceToDelete] : (batchInvoicesToDelete || []);
+                      const hasPendingMicroJob = targetInvoices.some(inv => 
+                        (inv.microJobIds?.length > 0 || (inv.invoiceNo && inv.invoiceNo.startsWith('CMS'))) &&
+                        (inv.paymentStatus?.toLowerCase() === 'pending' || inv.paymentStatus?.toLowerCase() === 'unpaid')
+                      );
+                      if (!hasPendingMicroJob) return null;
+                      return (
+                        <label className="flex items-center gap-2 cursor-pointer text-[11px] text-white/80 select-none">
+                          <input
+                            type="radio"
+                            name="deleteInvoiceStrategy"
+                            value="revert_ledger"
+                            checked={deleteStrategy === 'revert_ledger'}
+                            onChange={() => setDeleteStrategy('revert_ledger')}
+                            className="accent-amber-500"
+                          />
+                          <span className="text-amber-400 font-semibold">Send Back to MICRO JOB LEDGER</span>
+                        </label>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

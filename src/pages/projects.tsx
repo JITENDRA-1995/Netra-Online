@@ -614,7 +614,7 @@ export default function Projects({
 
   // Extract unique client visionaries
   const uniqueClients = Array.from(
-    new Set(projects.map((p) => p.clientName || p.client?.name || p.name || "").filter(Boolean))
+    new Set(projects.map((p) => p.client?.name || p.clientName || p.name || "").filter(Boolean))
   );
 
   const unbilledJobs = useMemo(() => {
@@ -724,7 +724,7 @@ export default function Projects({
 
   const filtered = projects.filter((p) => {
     const serviceName = p.service || p.name || "";
-    const clientName = p.clientName || p.client?.name || p.name || "";
+    const clientName = p.client?.name || p.clientName || p.name || "";
     
     // 1. Search filter
     const matchSearch = 
@@ -1295,7 +1295,7 @@ export default function Projects({
         <motion.div variants={containerVariants} className="space-y-4">
           {sortedAndFiltered.map((project) => {
             const serviceName = project.service || project.name || "Unnamed Project";
-            const clientName = project.clientName || project.name || "Unknown Client";
+            const clientName = project.client?.name || project.clientName || project.name || "Unknown Client";
             const budgetVal = project.budget !== undefined ? project.budget : (parseFloat(project.quote) || 0);
             const statusVal = (project.status || "active").toLowerCase().replace(" ", "_");
             const progressVal = statusVal === "completed" ? 100 : (project.progress || 20);

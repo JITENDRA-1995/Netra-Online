@@ -1317,78 +1317,108 @@ function App() {
     localStorage.setItem('netra_save_login_info', saveLoginInfo);
   }, [saveLoginInfo]);
 
+  const refreshProjects = async () => {
+    try {
+      const dbProjects = await getProjects();
+      if (dbProjects) {
+        setIgnitionQueue(dbProjects);
+      }
+    } catch (err) {
+      console.warn("Real-time projects refresh failed:", err);
+    }
+  };
+
+  const refreshInvoices = async () => {
+    try {
+      const dbInvoices = await getInvoices();
+      if (dbInvoices) {
+        const mappedInvoices = dbInvoices.map(inv => {
+          if (inv.clientName && inv.clientName.startsWith("JSON_MOCK:")) {
+            try {
+              const parsed = JSON.parse(inv.clientName.substring(10));
+              return {
+                ...inv,
+                clientName: parsed.name,
+                projectService: parsed.service,
+                rawProject: {
+                  id: inv.id,
+                  name: parsed.name,
+                  service: parsed.service,
+                  quote: parsed.quote || (parsed.rate * parsed.qty),
+                  discount: parsed.discount || 0,
+                  advanceAmount: parsed.advanceAmount || 0,
+                  phone: parsed.phone,
+                  email: parsed.email,
+                  address: parsed.address,
+                  gst: parsed.gst,
+                  status: 'Completed',
+                  isStandalone: true,
+                  items: (parsed.items && parsed.items.length > 0) ? parsed.items : [{
+                    service: parsed.service,
+                    quote: parsed.rate * parsed.qty,
+                    discount: parsed.discount,
+                    qty: parsed.qty,
+                    rate: parsed.rate
+                  }]
+                }
+              };
+            } catch (parseErr) {
+              console.error("Failed to parse JSON_MOCK custom invoice:", parseErr);
+            }
+          }
+          return inv;
+        });
+        setInvoices(mappedInvoices);
+      }
+    } catch (err) {
+      console.warn("Real-time invoices refresh failed:", err);
+    }
+  };
+
+  const refreshClients = async () => {
+    try {
+      const dbClients = await getClients();
+      if (dbClients) {
+        const mapped = dbClients.map(c => ({
+          ...c,
+          joinedDate: c.joined_date || c.joinedDate,
+          accessKey: c.access_key || c.accessKey
+        }));
+        setClients(mapped);
+        localStorage.setItem('netra_clients', JSON.stringify(mapped));
+      }
+    } catch (err) {
+      console.warn("Real-time clients refresh failed:", err);
+    }
+  };
+
+  const refreshMicroJobs = async () => {
+    try {
+      const dbMicroJobs = await getMicroJobs();
+      if (dbMicroJobs) {
+        setMicroJobs(dbMicroJobs);
+      }
+    } catch (err) {
+      console.warn("Real-time micro jobs refresh failed:", err);
+    }
+  };
+
   useEffect(() => {
     // Clear any previous mock database states from local storage to ensure a clean launch
     localStorage.removeItem("netra_db_state");
 
     const loadSupabaseData = async () => {
       try {
-        const dbClients = await getClients();
-        if (dbClients) {
-          const mapped = dbClients.map(c => ({
-            ...c,
-            joinedDate: c.joined_date || c.joinedDate,
-            accessKey: c.access_key || c.accessKey
-          }));
-          setClients(mapped);
-          localStorage.setItem('netra_clients', JSON.stringify(mapped));
-        }
-
+        await refreshClients();
+        
         const dbInquiries = await getInquiries();
         if (dbInquiries) {
           setInquiries(dbInquiries);
         }
 
-        const dbProjects = await getProjects();
-        if (dbProjects) {
-          setIgnitionQueue(dbProjects);
-        }
-
-        const dbInvoices = await getInvoices();
-        if (dbInvoices) {
-          const mappedInvoices = dbInvoices.map(inv => {
-            if (inv.clientName && inv.clientName.startsWith("JSON_MOCK:")) {
-              try {
-                const parsed = JSON.parse(inv.clientName.substring(10));
-                return {
-                  ...inv,
-                  clientName: parsed.name,
-                  projectService: parsed.service,
-                  rawProject: {
-                    id: inv.id,
-                    name: parsed.name,
-                    service: parsed.service,
-                    quote: parsed.quote || (parsed.rate * parsed.qty),
-                    discount: parsed.discount || 0,
-                    advanceAmount: parsed.advanceAmount || 0,
-                    phone: parsed.phone,
-                    email: parsed.email,
-                    address: parsed.address,
-                    gst: parsed.gst,
-                    status: 'Completed',
-                    isStandalone: true,
-                    items: (parsed.items && parsed.items.length > 0) ? parsed.items : [{
-                      service: parsed.service,
-                      quote: parsed.rate * parsed.qty,
-                      discount: parsed.discount,
-                      qty: parsed.qty,
-                      rate: parsed.rate
-                    }]
-                  }
-                };
-              } catch (parseErr) {
-                console.error("Failed to parse JSON_MOCK custom invoice:", parseErr);
-              }
-            }
-            return inv;
-          });
-          setInvoices(mappedInvoices);
-        }
-
-        const dbMicroJobs = await getMicroJobs();
-        if (dbMicroJobs) {
-          setMicroJobs(dbMicroJobs);
-        }
+        await refreshProjects();
+        await refreshInvoices();
+        await refreshMicroJobs();
       } catch (error) {
         console.error("Failed to load data from Supabase:", error);
       }
@@ -1401,14 +1431,9 @@ function App() {
     const projectsChannel = supabase
       .channel('projects-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, async () => {
-        try {
-          const dbProjects = await getProjects();
-          if (dbProjects) {
-            setIgnitionQueue(dbProjects);
-          }
-        } catch (err) {
-          console.warn("Real-time projects refresh failed:", err);
-        }
+        // Refresh both projects and invoices since invoices contain project copy/references
+        await refreshProjects();
+        await refreshInvoices();
       })
       .subscribe();
 
@@ -1416,50 +1441,20 @@ function App() {
     const invoicesChannel = supabase
       .channel('invoices-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, async () => {
-        try {
-          const dbInvoices = await getInvoices();
-          if (dbInvoices) {
-            const mappedInvoices = dbInvoices.map(inv => {
-              if (inv.clientName && inv.clientName.startsWith("JSON_MOCK:")) {
-                try {
-                  const parsed = JSON.parse(inv.clientName.substring(10));
-                  return {
-                    ...inv,
-                    clientName: parsed.name,
-                    projectService: parsed.service,
-                    rawProject: {
-                      id: inv.id,
-                      name: parsed.name,
-                      service: parsed.service,
-                      quote: parsed.quote || (parsed.rate * parsed.qty),
-                      discount: parsed.discount || 0,
-                      advanceAmount: parsed.advanceAmount || 0,
-                      phone: parsed.phone,
-                      email: parsed.email,
-                      address: parsed.address,
-                      gst: parsed.gst,
-                      status: 'Completed',
-                      isStandalone: true,
-                      items: (parsed.items && parsed.items.length > 0) ? parsed.items : [{
-                        service: parsed.service,
-                        quote: parsed.rate * parsed.qty,
-                        discount: parsed.discount,
-                        qty: parsed.qty,
-                        rate: parsed.rate
-                      }]
-                    }
-                  };
-                } catch (parseErr) {
-                  console.error("Failed to parse JSON_MOCK custom invoice:", parseErr);
-                }
-              }
-              return inv;
-            });
-            setInvoices(mappedInvoices);
-          }
-        } catch (err) {
-          console.warn("Real-time invoices refresh failed:", err);
-        }
+        // Refresh invoices, projects (in case payment status changed), and microjobs
+        await refreshInvoices();
+        await refreshProjects();
+        await refreshMicroJobs();
+      })
+      .subscribe();
+
+    // 2b. Subscribe to micro_jobs_ledger table changes
+    const microJobsChannel = supabase
+      .channel('microjobs-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'micro_jobs_ledger' }, async () => {
+        // Refresh microjobs and invoices (to update totals/billed status)
+        await refreshMicroJobs();
+        await refreshInvoices();
       })
       .subscribe();
 
@@ -1510,19 +1505,11 @@ function App() {
             }, 100);
           }
         } else {
-          try {
-            const dbClients = await getClients();
-            if (dbClients) {
-              const mapped = dbClients.map(c => ({
-                ...c,
-                joinedDate: c.joined_date || c.joinedDate,
-                accessKey: c.access_key || c.accessKey
-              }));
-              setClients(mapped);
-            }
-          } catch (err) {
-            console.warn("Real-time clients refresh failed:", err);
-          }
+          // If any client details change, refresh clients, projects, invoices, and microjobs since they all link to client profiles
+          await refreshClients();
+          await refreshProjects();
+          await refreshInvoices();
+          await refreshMicroJobs();
         }
       })
       .subscribe();
@@ -1569,6 +1556,7 @@ function App() {
         supabase.removeChannel(invoicesChannel);
         supabase.removeChannel(clientsChannel);
         supabase.removeChannel(inquiriesChannel);
+        supabase.removeChannel(microJobsChannel);
       }
     };
   }, []);
@@ -1837,6 +1825,13 @@ function App() {
   };
 
   const getClientAddress = (name) => {
+    if (invoiceProject) {
+      const targetClientId = invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink;
+      if (targetClientId) {
+        const client = clients.find(c => c.id === targetClientId);
+        if (client) return client.address;
+      }
+    }
     if (invoiceProject && invoiceProject.name === name && invoiceProject.address) {
       return invoiceProject.address;
     }
@@ -5138,9 +5133,9 @@ function App() {
                                  invoiceNo: inv.invoiceNo,
                                  name: inv.rawProject?.name || inv.clientName || "",
                                  address: inv.rawProject?.address || getClientAddress(inv.clientName) || "",
-                                 phone: inv.rawProject?.phone || clients.find(c => c.name.toLowerCase() === (inv.rawProject?.name || inv.clientName || "").toLowerCase())?.phone || "",
-                                 email: inv.rawProject?.email || clients.find(c => c.name.toLowerCase() === (inv.rawProject?.name || inv.clientName || "").toLowerCase())?.email || "",
-                                 gst: inv.rawProject?.gst || clients.find(c => c.name.toLowerCase() === (inv.rawProject?.name || inv.clientName || "").toLowerCase())?.gst || "",
+                                 phone: inv.rawProject?.phone || ((inv.clientLink || inv.rawProject?.client?.id) ? clients.find(c => c.id === (inv.clientLink || inv.rawProject?.client?.id)) : clients.find(c => c.name.toLowerCase() === (inv.rawProject?.name || inv.clientName || "").toLowerCase()))?.phone || "",
+                                 email: inv.rawProject?.email || ((inv.clientLink || inv.rawProject?.client?.id) ? clients.find(c => c.id === (inv.clientLink || inv.rawProject?.client?.id)) : clients.find(c => c.name.toLowerCase() === (inv.rawProject?.name || inv.clientName || "").toLowerCase()))?.email || "",
+                                 gst: inv.rawProject?.gst || ((inv.clientLink || inv.rawProject?.client?.id) ? clients.find(c => c.id === (inv.clientLink || inv.rawProject?.client?.id)) : clients.find(c => c.name.toLowerCase() === (inv.rawProject?.name || inv.clientName || "").toLowerCase()))?.gst || "",
                                  service: inv.projectService || inv.rawProject?.service || "",
                                  quote: inv.rawProject?.quote || inv.grandTotal || 0,
                                  discount: inv.rawProject?.discount || 0,
@@ -6666,7 +6661,8 @@ function App() {
                               <h3 style={{ margin: '5px 0 0 0', fontSize: '1.2rem', fontWeight: '900' }}>{invoiceProject.name.toUpperCase()}</h3>
                               <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#555', maxWidth: '350px' }}>AT {getClientAddress(invoiceProject.name)}</p>
                               {(() => {
-                                const clientObj = clients.find(c => c.name.trim().toLowerCase() === invoiceProject.name.trim().toLowerCase()) || invoiceProject.client;
+                                const targetClientId = invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink;
+                                const clientObj = (targetClientId ? clients.find(c => c.id === targetClientId) : null) || clients.find(c => c.name.trim().toLowerCase() === invoiceProject.name.trim().toLowerCase()) || invoiceProject.client;
                                 const phone = invoiceProject.phone || clientObj?.phone;
                                 const email = invoiceProject.email || clientObj?.email;
                                 return (
@@ -6943,7 +6939,8 @@ function App() {
 
                               // Look up client phone robustly
                               const rawPhone = invoiceProject.phone || (invoiceProject.client && invoiceProject.client.phone) || (() => {
-                                const c = clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase());
+                                const targetClientId = invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink;
+                                const c = targetClientId ? clients.find(c => c.id === targetClientId) : clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase());
                                 return c ? c.phone : '';
                               })();
 
@@ -6968,9 +6965,9 @@ function App() {
                                  invoiceNo: stableInvoiceNo,
                                  name: invoiceProject.name,
                                  address: getClientAddress(invoiceProject.name),
-                                 phone: invoiceProject.phone || clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase())?.phone || "",
-                                 email: invoiceProject.email || clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase())?.email || "",
-                                 gst: invoiceProject.gst || clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase())?.gst || "",
+                                 phone: invoiceProject.phone || ((invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink) ? clients.find(c => c.id === (invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink)) : clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase()))?.phone || "",
+                                 email: invoiceProject.email || ((invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink) ? clients.find(c => c.id === (invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink)) : clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase()))?.email || "",
+                                 gst: invoiceProject.gst || ((invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink) ? clients.find(c => c.id === (invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink)) : clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase()))?.gst || "",
                                  service: invoiceProject.service,
                                  quote: invoiceProject.quote,
                                  discount: invoiceProject.discount || 0,

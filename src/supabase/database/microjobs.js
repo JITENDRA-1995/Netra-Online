@@ -1,15 +1,10 @@
 import { supabase } from '../client';
 
-// Track if we need to use local fallback
-let useLocalFallback = localStorage.getItem('netra_use_local_fallback') === 'true';
+// Track if we need to use local fallback (in-memory only to allow auto-recovery on reload)
+let useLocalFallback = false;
 
 const setLocalFallback = (value) => {
   useLocalFallback = value;
-  try {
-    localStorage.setItem('netra_use_local_fallback', value ? 'true' : 'false');
-  } catch (e) {
-    console.error("Failed to save local fallback status:", e);
-  }
 };
 
 const getLocalJobs = () => {
