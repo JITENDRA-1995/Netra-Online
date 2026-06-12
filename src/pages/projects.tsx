@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Search, Pencil, Trash2, FileText, SlidersHorizontal } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "../supabase/client";
-import { getMicroJobs, createMicroJob, linkJobsToInvoice, saveInvoice } from "../supabase/database";
+import { getMicroJobs, createMicroJob, linkJobsToInvoice, saveInvoice, updateMicroJob } from "../supabase/database";
 
 
 const STATUS_COLORS: Record<string, string> = {
@@ -117,6 +117,13 @@ interface ProjectsProps {
   onDeleteProject?: (id: number) => void;
   invoices?: any[];
   setInvoices?: React.Dispatch<React.SetStateAction<any[]>>;
+  redirectBackToMicroJob?: number | boolean;
+  setRedirectBackToMicroJob?: (val: number | boolean) => void;
+  onTriggerAddClientFromMicroJob?: () => void;
+  microJobs?: any[];
+  setMicroJobs?: React.Dispatch<React.SetStateAction<any[]>>;
+  setInvoiceDefaultTab?: (tab: "SAVED" | "DRAFT" | "CUSTOM" | "MICRO_JOB" | null) => void;
+  setActiveAdminModule?: (module: string) => void;
 }
 
 const containerVariants = {
@@ -141,15 +148,117 @@ export default function Projects({
   initialSearch = "",
   onDeleteProject,
   invoices = [],
-  setInvoices = () => {}
+  setInvoices = () => {},
+  redirectBackToMicroJob = false,
+  setRedirectBackToMicroJob,
+  onTriggerAddClientFromMicroJob,
+  microJobs = [],
+  setMicroJobs = () => {},
+  setInvoiceDefaultTab,
+  setActiveAdminModule
 }: ProjectsProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"Missions" | "MicroJobs">("Missions");
-  const [microJobs, setMicroJobs] = useState<any[]>([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
   const [isQuickJobModalOpen, setIsQuickJobModalOpen] = useState(false);
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
+
+  const [isEditJobModalOpen, setIsEditJobModalOpen] = useState(false);
+  const [editingJob, setEditingJob] = useState<any | null>(null);
+  const [editJobClientLink, setEditJobClientLink] = useState<number | "">("");
+  const [editJobTaskName, setEditJobTaskName] = useState("");
+  const [editJobAmount, setEditJobAmount] = useState<number | "">("");
+  const [editJobDate, setEditJobDate] = useState("");
+  const [editJobClientSearchQuery, setEditJobClientSearchQuery] = useState("");
+  const [isEditJobClientDropdownOpen, setIsEditJobClientDropdownOpen] = useState(false);
+  const [editJobQty, setEditJobQty] = useState<number | "">("");
+  const [editJobRate, setEditJobRate] = useState<string | number>("");
+  const [editJobDiscount, setEditJobDiscount] = useState<number | "">(0);
+  const [editJobLastCalculatedBy, setEditJobLastCalculatedBy] = useState<"rate" | "total">("rate");
+
+  useEffect(() => {
+    if (editJobLastCalculatedBy !== "total" && isEditJobModalOpen) {
+      const q = Number(editJobQty) || 1;
+      const r = Number(editJobRate) || 0;
+      const d = Number(editJobDiscount) || 0;
+      const gross = q * r;
+      setEditJobAmount(Math.max(0, gross - d));
+    }
+  }, [editJobQty, editJobRate, editJobDiscount, editJobLastCalculatedBy, isEditJobModalOpen]);
+
+  useEffect(() => {
+    if (editJobLastCalculatedBy === "total" && isEditJobModalOpen) {
+      const amt = Number(editJobAmount) || 0;
+      const d = Number(editJobDiscount) || 0;
+      const gross = amt + d;
+      const q = Number(editJobQty) || 1;
+      setEditJobRate(parseFloat((gross / q).toFixed(2)));
+    }
+  }, [editJobAmount, editJobQty, editJobDiscount, editJobLastCalculatedBy, isEditJobModalOpen]);
+
+  const openEditMicroJob = (job: any) => {
+    setEditingJob(job);
+    setEditJobClientLink(job.clientLink || job.client_link || "");
+    setEditJobTaskName(job.taskName || job.task_name || "");
+    setEditJobAmount(job.amount || "");
+    setEditJobDate(job.dateLogged ? job.dateLogged.split('T')[0] : new Date().toISOString().split('T')[0]);
+    setEditJobClientSearchQuery("");
+    setIsEditJobClientDropdownOpen(false);
+    setEditJobQty(job.qty && job.qty !== 1 ? job.qty : "");
+    setEditJobRate(job.rate !== undefined ? job.rate : job.amount || "");
+    setEditJobDiscount(job.discount !== undefined ? job.discount : 0);
+    setEditJobLastCalculatedBy("rate");
+    setIsEditJobModalOpen(true);
+  };
+
+  const handleSaveMicroJob = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingJob) return;
+    if (!editJobClientLink || !editJobTaskName || !editJobAmount) {
+      toast({
+        title: "Missing fields",
+        description: "All fields are required.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      await updateMicroJob(editingJob.jobId, {
+        clientLink: Number(editJobClientLink),
+        taskName: editJobTaskName,
+        qty: Number(editJobQty) || 1,
+        rate: Number(editJobRate) || 0,
+        discount: Number(editJobDiscount) || 0,
+        amount: Number(editJobAmount),
+        dateLogged: editJobDate ? new Date(editJobDate).toISOString() : undefined,
+        billingStatus: editingJob.billingStatus,
+        invoiceLink: editingJob.invoiceLink
+      });
+      
+      toast({
+        title: "Job Updated Successfully",
+        description: `Updated "${editJobTaskName}" successfully.`
+      });
+      
+      setIsEditJobModalOpen(false);
+      setEditingJob(null);
+      setEditJobQty("");
+      setEditJobRate("");
+      setEditJobDiscount(0);
+      setEditJobLastCalculatedBy("rate");
+      await fetchJobs();
+    } catch (err: any) {
+      console.error("Failed to update micro job:", err);
+      toast({
+        title: "Update Failed",
+        description: err.message || "Failed to update micro-job in database.",
+        variant: "destructive"
+      });
+    }
+  };
 
   const fetchJobs = async () => {
     setIsLoadingJobs(true);
@@ -183,6 +292,57 @@ export default function Projects({
   const [newJobTaskName, setNewJobTaskName] = useState("");
   const [newJobAmount, setNewJobAmount] = useState<number | "">("");
   const [newJobDate, setNewJobDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [clientSearchQuery, setClientSearchQuery] = useState("");
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
+  const [newJobQty, setNewJobQty] = useState<number | "">("");
+  const [newJobRate, setNewJobRate] = useState<string | number>("");
+  const [newJobDiscount, setNewJobDiscount] = useState<number | "">(0);
+  const [newJobLastCalculatedBy, setNewJobLastCalculatedBy] = useState<"rate" | "total">("rate");
+
+  useEffect(() => {
+    if (newJobLastCalculatedBy !== "total" && isQuickJobModalOpen) {
+      const q = Number(newJobQty) || 1;
+      const r = Number(newJobRate) || 0;
+      const d = Number(newJobDiscount) || 0;
+      const gross = q * r;
+      setNewJobAmount(Math.max(0, gross - d));
+    }
+  }, [newJobQty, newJobRate, newJobDiscount, newJobLastCalculatedBy, isQuickJobModalOpen]);
+
+  useEffect(() => {
+    if (newJobLastCalculatedBy === "total" && isQuickJobModalOpen) {
+      const amt = Number(newJobAmount) || 0;
+      const d = Number(newJobDiscount) || 0;
+      const gross = amt + d;
+      const q = Number(newJobQty) || 1;
+      setNewJobRate(parseFloat((gross / q).toFixed(2)));
+    }
+  }, [newJobAmount, newJobQty, newJobDiscount, newJobLastCalculatedBy, isQuickJobModalOpen]);
+
+  const filteredClientsForJob = useMemo(() => {
+    // Exclude system settings client row
+    const actualClients = clients.filter(
+      (c) => c.email !== "settings@netra.graphics" && c.phone !== "SYSTEM"
+    );
+    if (!clientSearchQuery.trim()) return actualClients;
+    const q = clientSearchQuery.toLowerCase();
+    return actualClients.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.phone.toLowerCase().includes(q)
+    );
+  }, [clients, clientSearchQuery]);
+
+  useEffect(() => {
+    if (redirectBackToMicroJob && typeof redirectBackToMicroJob === "number") {
+      setIsQuickJobModalOpen(true);
+      setNewJobClientLink(redirectBackToMicroJob);
+      if (setRedirectBackToMicroJob) {
+        setRedirectBackToMicroJob(false);
+      }
+    }
+  }, [redirectBackToMicroJob, setRedirectBackToMicroJob]);
+
 
   const getUniqueInvoiceNumber = () => {
     const date = new Date();
@@ -195,6 +355,25 @@ export default function Projects({
     while (invoices.some(i => i.invoiceNo === invNo)) {
       serial++;
       invNo = `NG/${dateStr}/${String(serial).padStart(4, '0')}`;
+    }
+    return invNo;
+  };
+
+  const getUniqueMicroJobInvoiceNumber = () => {
+    const cmsInvoices = invoices.filter(i => i.invoiceNo && i.invoiceNo.startsWith('CMS'));
+    let serial = 1;
+    const serialNumbers = cmsInvoices.map(i => {
+      const numStr = i.invoiceNo.substring(3); // skip 'CMS'
+      const num = parseInt(numStr, 10);
+      return isNaN(num) ? 0 : num;
+    });
+    if (serialNumbers.length > 0) {
+      serial = Math.max(...serialNumbers) + 1;
+    }
+    let invNo = `CMS${String(serial).padStart(4, '0')}`;
+    while (invoices.some(i => i.invoiceNo === invNo)) {
+      serial++;
+      invNo = `CMS${String(serial).padStart(4, '0')}`;
     }
     return invNo;
   };
@@ -228,8 +407,9 @@ export default function Projects({
     const clientName = firstJob.client?.name || "Unknown Client";
     const totalAmount = selectedJobs.reduce((sum, job) => sum + job.amount, 0);
     const servicesDesc = `Cumulative Micro-Jobs: ${selectedJobs.map(job => job.taskName).join(', ')}`;
-    const invoiceNo = getUniqueInvoiceNumber();
+    const invoiceNo = getUniqueMicroJobInvoiceNumber();
     
+    setIsGeneratingInvoice(true);
     try {
       // 1. Save invoice to Supabase
       const dbInvoice = await saveInvoice({
@@ -272,6 +452,13 @@ export default function Projects({
         title: "Invoice Ignited",
         description: `Cumulative invoice ${invoiceNo} generated successfully for ${clientName}.`
       });
+
+      if (setActiveAdminModule) {
+        setActiveAdminModule("INVOICES");
+      }
+      if (setInvoiceDefaultTab) {
+        setInvoiceDefaultTab("MICRO_JOB");
+      }
     } catch (err: any) {
       console.error("Failed to generate cumulative invoice:", err);
       toast({
@@ -279,6 +466,8 @@ export default function Projects({
         description: err.message || "An error occurred during invoice creation.",
         variant: "destructive"
       });
+    } finally {
+      setIsGeneratingInvoice(false);
     }
   };
 
@@ -297,6 +486,9 @@ export default function Projects({
       await createMicroJob({
         clientLink: Number(newJobClientLink),
         taskName: newJobTaskName,
+        qty: Number(newJobQty) || 1,
+        rate: Number(newJobRate) || 0,
+        discount: Number(newJobDiscount) || 0,
         amount: Number(newJobAmount),
         dateLogged: newJobDate ? new Date(newJobDate).toISOString() : undefined
       });
@@ -310,6 +502,10 @@ export default function Projects({
       setNewJobClientLink("");
       setNewJobTaskName("");
       setNewJobAmount("");
+      setNewJobQty("");
+      setNewJobRate("");
+      setNewJobDiscount(0);
+      setNewJobLastCalculatedBy("rate");
       setNewJobDate(new Date().toISOString().split('T')[0]);
       setIsQuickJobModalOpen(false);
       
@@ -334,6 +530,7 @@ export default function Projects({
   const [showCompletedTab, setShowCompletedTab] = useState(false);
   const [sortBy, setSortBy] = useState("date_desc");
   const [formPriority, setFormPriority] = useState("Normal");
+  const [formAlertMeDays, setFormAlertMeDays] = useState<number | "">("");
 
   // Layered filter states
   const [filterClient, setFilterClient] = useState("all");
@@ -349,6 +546,37 @@ export default function Projects({
   const unbilledJobs = useMemo(() => {
     return microJobs.filter(job => job.billingStatus === "Unbilled");
   }, [microJobs]);
+
+  const isJobSettled = useCallback((job: any) => {
+    if (!job.invoiceLink) return false;
+    const inv = invoices.find((i: any) => i.id === job.invoiceLink);
+    return inv ? inv.paymentStatus?.toLowerCase() === 'paid' : false;
+  }, [invoices]);
+
+  const selectedClientLink = useMemo(() => {
+    if (selectedJobIds.length === 0) return null;
+    const selectedJob = microJobs.find(job => selectedJobIds.includes(job.jobId));
+    return selectedJob ? selectedJob.clientLink : null;
+  }, [microJobs, selectedJobIds]);
+
+  const displayedJobs = useMemo(() => {
+    const unbilled = microJobs.filter(job => job.billingStatus === "Unbilled");
+    if (selectedClientLink !== null) {
+      return unbilled.filter(job => job.clientLink === selectedClientLink);
+    }
+    return unbilled;
+  }, [microJobs, selectedClientLink]);
+
+  const unbilledDisplayedJobs = useMemo(() => {
+    return displayedJobs;
+  }, [displayedJobs]);
+
+  const unbilledCount = useMemo(() => {
+    if (selectedClientLink !== null) {
+      return microJobs.filter(job => job.clientLink === selectedClientLink && job.billingStatus === "Unbilled").length;
+    }
+    return unbilledJobs.length;
+  }, [microJobs, unbilledJobs, selectedClientLink]);
 
 
   // Extract unique project creation months
@@ -520,6 +748,7 @@ export default function Projects({
     setFormBudget(grossQuote);
     setFormProgress(project.progress || 0);
     setFormPriority(project.priority || "Normal");
+    setFormAlertMeDays(project.alertMeDays !== undefined ? project.alertMeDays : "");
     setFormDeadline(project.deadline ? project.deadline.split('T')[0] : "");
     setFormDiscountValue(loadedDiscount);
     setFormDiscountType(project.discountType || 'rs');
@@ -566,7 +795,8 @@ export default function Projects({
         rate: rateVal,
         description: formDescription,
         priority: formPriority,
-        acknowledgedDeadline: editingProject?.acknowledgedDeadline || ''
+        acknowledgedDeadline: editingProject?.acknowledgedDeadline || '',
+        alertMeDays: formAlertMeDays
       })}`;
 
       const updatedProject = {
@@ -583,6 +813,7 @@ export default function Projects({
         deadline: formDeadline,
         progress: typeof formProgress === "number" ? formProgress : 0,
         priority: formPriority,
+        alertMeDays: formAlertMeDays,
         discount: discountAmt,
         discountValue: discountInput.toString(),
         discountType: formDiscountType,
@@ -721,7 +952,7 @@ export default function Projects({
           </h1>
           <p className="text-muted-foreground text-sm mt-1 tracking-widest uppercase">
             {activeTab === "MicroJobs"
-              ? `${unbilledJobs.length} unbilled micro jobs`
+              ? `${unbilledCount} unbilled micro jobs`
               : filterStatus !== "all"
               ? `${filtered.length} ${filterStatus.replace("_", " ")} projects`
               : `${projects.length} total projects`}
@@ -782,7 +1013,7 @@ export default function Projects({
             <option value="active">ACTIVE</option>
             <option value="on_hold">ON HOLD</option>
             <option value="cancelled">CANCELLED</option>
-            {activeTab === "MicroJobs" && <option value="microjobs">MICRO-JOBS LEDGER</option>}
+            <option value="microjobs">MICRO-JOBS LEDGER</option>
           </select>
         )}
 
@@ -852,13 +1083,24 @@ export default function Projects({
         )}
 
         {/* Dynamic Matched Count */}
-        <div className="flex items-center gap-2 text-3xs font-mono font-bold tracking-widest text-muted-foreground bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl uppercase ml-auto">
-          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-          <span>
-            {activeTab === "MicroJobs"
-              ? `UNBILLED: ${unbilledJobs.length}`
-              : `MATCHED: ${filtered.length}`}
-          </span>
+        <div className="flex items-center gap-2 ml-auto">
+          {activeTab === "MicroJobs" && selectedJobIds.length > 0 && (
+            <Button
+              variant="ghost"
+              onClick={() => setSelectedJobIds([])}
+              className="h-7 px-3 text-3xs font-black tracking-widest text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-rose-500/20 rounded-xl uppercase transition-all duration-200 mr-2"
+            >
+              CLEAR SELECTION
+            </Button>
+          )}
+          <div className="flex items-center gap-2 text-3xs font-mono font-bold tracking-widest text-muted-foreground bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl uppercase">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            <span>
+              {activeTab === "MicroJobs"
+                ? `UNBILLED: ${unbilledCount}`
+                : `MATCHED: ${filtered.length}`}
+            </span>
+          </div>
         </div>
       </motion.div>
 
@@ -1210,10 +1452,10 @@ export default function Projects({
                     <input
                       type="checkbox"
                       className="rounded accent-cyan-400"
-                      checked={unbilledJobs.length > 0 && selectedJobIds.length === unbilledJobs.length}
+                      checked={unbilledDisplayedJobs.length > 0 && unbilledDisplayedJobs.every(job => selectedJobIds.includes(job.jobId))}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setSelectedJobIds(unbilledJobs.map(job => job.jobId));
+                          setSelectedJobIds(unbilledDisplayedJobs.map(job => job.jobId));
                         } else {
                           setSelectedJobIds([]);
                         }
@@ -1224,53 +1466,90 @@ export default function Projects({
                   <th className="p-4 text-center">Date Logged</th>
                   <th className="p-4">Task Description</th>
                   <th className="p-4 text-right">Amount (INR)</th>
+                  <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 text-xs text-white/95">
                 {isLoadingJobs ? (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-muted-foreground font-semibold">
+                    <td colSpan={6} className="p-8 text-center text-muted-foreground font-semibold">
                       LOADING LEDGER DATA...
                     </td>
                   </tr>
-                ) : unbilledJobs.length > 0 ? (
-                  unbilledJobs.map(job => (
-                    <tr key={job.jobId} className="hover:bg-white/[0.01] transition-colors">
-                      <td className="p-4 text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedJobIds.includes(job.jobId)}
-                          className="rounded accent-cyan-400"
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedJobIds(prev => [...prev, job.jobId]);
-                            } else {
-                              setSelectedJobIds(prev => prev.filter(id => id !== job.jobId));
-                            }
-                          }}
-                        />
-                      </td>
-                      <td className="p-4 font-bold text-foreground">
-                        {job.client?.name || "Unknown Client"}
-                      </td>
-                      <td className="p-4 text-center text-muted-foreground">
-                        {new Date(job.dateLogged).toLocaleString("en-IN", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit"
-                        })}
-                      </td>
-                      <td className="p-4">{job.taskName}</td>
-                      <td className="p-4 text-right font-mono font-bold text-cyan-400">
-                        ₹{job.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  ))
+                ) : displayedJobs.length > 0 ? (
+                  displayedJobs.map(job => {
+                    const isBilled = job.billingStatus === 'Billed';
+                    const settled = isJobSettled(job);
+                    
+                    return (
+                      <tr key={job.jobId} className="hover:bg-white/[0.01] transition-colors">
+                        <td className="p-4 text-center">
+                          {!isBilled && (
+                            <input
+                              type="checkbox"
+                              checked={selectedJobIds.includes(job.jobId)}
+                              className="rounded accent-cyan-400"
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedJobIds(prev => [...prev, job.jobId]);
+                                } else {
+                                  setSelectedJobIds(prev => prev.filter(id => id !== job.jobId));
+                                }
+                              }}
+                            />
+                          )}
+                        </td>
+                        <td className="p-4 font-bold text-foreground">
+                          {job.client?.name || "Unknown Client"}
+                        </td>
+                        <td className="p-4 text-center text-muted-foreground">
+                          {new Date(job.dateLogged).toLocaleString("en-IN", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit"
+                          })}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <span>{job.taskName}</span>
+                            {settled ? (
+                              <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] px-1.5 py-0.5 rounded font-bold">SETTLED</Badge>
+                            ) : isBilled ? (
+                              <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] px-1.5 py-0.5 rounded font-bold">BILLED</Badge>
+                            ) : null}
+                          </div>
+                          {(job.qty > 1 || job.discount > 0) && (
+                            <div className="text-[10px] text-muted-foreground/80 mt-0.5 font-mono">
+                              {job.qty > 1 && `Qty: ${job.qty} × ₹${job.rate}`}
+                              {job.qty > 1 && job.discount > 0 && " | "}
+                              {job.discount > 0 && `Discount: ₹${job.discount}`}
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-4 text-right font-mono font-bold text-cyan-400">
+                          ₹{job.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-4 text-right">
+                          {!settled && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="w-7 h-7 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-400 border border-white/5"
+                              onClick={() => openEditMicroJob(job)}
+                              title="Edit Micro-Job"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-muted-foreground uppercase tracking-widest text-3xs font-semibold">
+                    <td colSpan={6} className="p-8 text-center text-muted-foreground uppercase tracking-widest text-3xs font-semibold">
                       NO UNBILLED MICRO-JOBS IN RUNNING TAB
                     </td>
                   </tr>
@@ -1296,9 +1575,19 @@ export default function Projects({
               </div>
               <Button
                 onClick={handleGenerateCumulativeInvoice}
-                className="bg-cyan-500 hover:bg-cyan-600 text-black font-extrabold text-xs rounded-xl shadow-lg shadow-cyan-500/10 px-5"
+                disabled={isGeneratingInvoice}
+                className="bg-cyan-500 hover:bg-cyan-600 text-black font-extrabold text-xs rounded-xl shadow-lg shadow-cyan-500/10 px-5 flex items-center gap-2"
               >
-                ⚡ GENERATE CUMULATIVE INVOICE
+                {isGeneratingInvoice ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                    GENERATING INVOICE...
+                  </>
+                ) : (
+                  <>
+                    ⚡ GENERATE CUMULATIVE INVOICE
+                  </>
+                )}
               </Button>
             </motion.div>
           )}
@@ -1384,13 +1673,21 @@ export default function Projects({
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1.5 col-span-1">
                     <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Deadline</label>
                     <Input type="date" value={formDeadline} onChange={(e) => setFormDeadline(e.target.value)}
                       className="bg-white/5 border-white/10 rounded-xl text-xs focus:border-cyan-400" />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 col-span-1">
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Alert Me (Days)</label>
+                    <Input type="number" min="0" value={formAlertMeDays} onChange={(e) => {
+                      const val = e.target.value;
+                      setFormAlertMeDays(val === "" ? "" : parseInt(val));
+                    }}
+                      className="bg-white/5 border-white/10 rounded-xl text-xs focus:border-cyan-400" placeholder="Default: 1" />
+                  </div>
+                  <div className="space-y-1.5 col-span-1">
                     <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Project Stage</label>
                     <select
                       className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-bold"
@@ -1542,35 +1839,124 @@ export default function Projects({
           setNewJobClientLink("");
           setNewJobTaskName("");
           setNewJobAmount("");
+          setNewJobQty("");
+          setNewJobRate("");
+          setNewJobDiscount(0);
+          setNewJobLastCalculatedBy("rate");
           setNewJobDate(new Date().toISOString().split('T')[0]);
+          setClientSearchQuery("");
+          setIsClientDropdownOpen(false);
         }
       }}>
-        <DialogContent className="bg-[#080c18] border border-white/10 max-w-md w-full p-6 overflow-hidden flex flex-col" data-testid="dialog-quick-job-form">
-          <DialogHeader className="pb-3 border-b border-white/10 text-left">
+        <DialogContent className="bg-[#080c18] border border-white/10 max-w-md w-full p-0 overflow-hidden flex flex-col max-h-[90vh]" data-testid="dialog-quick-job-form">
+          <div className="px-6 pt-5 pb-3 border-b border-white/10 text-left flex-shrink-0">
             <DialogTitle className="text-foreground font-black tracking-wide text-sm flex items-center gap-2">
               <span className="text-emerald-400">⚡</span> LOG NEW MICRO-JOB
             </DialogTitle>
             <p className="text-3xs text-muted-foreground uppercase tracking-widest mt-0.5">Record high-volume, ad-hoc running tab work</p>
-          </DialogHeader>
+          </div>
 
-          <form onSubmit={handleCreateJob} className="space-y-4 pt-3 text-left">
-            {/* Client Dropdown Selector */}
-            <div className="space-y-1.5">
+          <form onSubmit={handleCreateJob} className="flex-1 flex flex-col min-h-0 text-left">
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            {/* Integrated Searchable Client Dropdown */}
+            <div className="space-y-1.5 relative">
               <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Client Visionary *</label>
-              <select
-                className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 cursor-pointer font-semibold uppercase transition-all"
-                value={newJobClientLink}
-                onChange={(e) => setNewJobClientLink(Number(e.target.value) || "")}
-                required
-              >
-                <option value="">-- SELECT CLIENT VISIONARY --</option>
-                {clients.map(client => (
-                  <option key={client.id} value={client.id}>
-                    {client.name.toUpperCase()} ({client.phone})
-                  </option>
-                ))}
-              </select>
+              
+              <div className="relative">
+                {/* Select Trigger / Search Input */}
+                <div 
+                  className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl flex items-center justify-between cursor-pointer font-semibold uppercase text-xs transition-all focus-within:border-cyan-400 select-none"
+                  onClick={() => setIsClientDropdownOpen(prev => !prev)}
+                >
+                  {isClientDropdownOpen ? (
+                    <div className="flex items-center gap-2 w-full" onClick={(e) => e.stopPropagation()}>
+                      <Search className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="Type client name or phone..."
+                        value={clientSearchQuery}
+                        onChange={(e) => setClientSearchQuery(e.target.value)}
+                        className="bg-transparent border-none outline-none text-xs text-foreground w-full uppercase placeholder:normal-case placeholder:text-muted-foreground/40"
+                        autoFocus
+                      />
+                    </div>
+                  ) : (
+                    <span className={`truncate ${newJobClientLink ? "text-foreground font-bold" : "text-muted-foreground/50"}`}>
+                      {newJobClientLink 
+                        ? (() => {
+                            const selected = clients.find(c => c.id === newJobClientLink);
+                            return selected ? `${selected.name} (${selected.phone})` : "-- SELECT CLIENT VISIONARY --";
+                          })()
+                        : "-- SELECT CLIENT VISIONARY --"}
+                    </span>
+                  )}
+                  <span className="text-muted-foreground/80 text-[10px] ml-2 flex-shrink-0">
+                    {isClientDropdownOpen ? "▲" : "▼"}
+                  </span>
+                </div>
+
+                {/* Dropdown Options List */}
+                {isClientDropdownOpen && (
+                  <>
+                    {/* Invisible overlay to close dropdown when clicking outside */}
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsClientDropdownOpen(false);
+                      }} 
+                    />
+                    
+                    <div className="absolute top-[calc(100%+4px)] left-0 right-0 max-h-56 overflow-y-auto bg-[#080c18] border border-white/10 rounded-xl shadow-2xl z-50 divide-y divide-white/5 scrollbar-thin scrollbar-thumb-white/10">
+                      {filteredClientsForJob.length === 0 ? (
+                        <div className="p-4 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+                          <span>-- NO MATCHING CLIENTS --</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsClientDropdownOpen(false);
+                              setIsQuickJobModalOpen(false);
+                              if (onTriggerAddClientFromMicroJob) {
+                                onTriggerAddClientFromMicroJob();
+                              }
+                            }}
+                            className="mt-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold text-2xs rounded-lg uppercase tracking-wider transition-colors cursor-pointer"
+                          >
+                            + Add New Client
+                          </button>
+                        </div>
+                      ) : (
+                        filteredClientsForJob.map(client => {
+                          const isSelected = client.id === newJobClientLink;
+                          return (
+                            <div
+                              key={client.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setNewJobClientLink(client.id);
+                                setIsClientDropdownOpen(false);
+                              }}
+                              className={`p-3 text-xs uppercase cursor-pointer transition-colors flex items-center justify-between hover:bg-cyan-500/10 hover:text-cyan-400 ${
+                                isSelected 
+                                  ? "bg-cyan-500/15 text-cyan-400 font-black" 
+                                  : "text-foreground/90"
+                              }`}
+                            >
+                              <span className="font-bold">{client.name}</span>
+                              <span className="text-[10px] text-muted-foreground font-mono font-normal normal-case ml-2">
+                                {client.phone}
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
+
 
             {/* Task Name Input & Quick Selectors */}
             <div className="space-y-1.5">
@@ -1615,22 +2001,97 @@ export default function Projects({
               />
             </div>
 
-            {/* Amount input */}
-            <div className="space-y-1.5">
-              <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Amount (₹ INR) *</label>
-              <Input
-                type="number"
-                min={0}
-                value={newJobAmount}
-                onChange={(e) => setNewJobAmount(e.target.value === "" ? "" : parseFloat(e.target.value) || 0)}
-                className="bg-[#0c101d] border-white/10 rounded-xl focus:border-cyan-400 text-xs text-cyan-300 font-bold"
-                placeholder="0.00"
-                required
-              />
+            {/* Pricing details */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Quantity</label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={newJobQty}
+                  onChange={(e) => {
+                    setNewJobLastCalculatedBy("rate");
+                    setNewJobQty(e.target.value === "" ? "" : parseInt(e.target.value) || 1);
+                  }}
+                  className="bg-[#0c101d] border-white/10 rounded-xl focus:border-cyan-400 text-xs"
+                  placeholder="1"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Rate (₹) per unit *</label>
+                <Input
+                  type="number"
+                  step="any"
+                  min={0}
+                  value={newJobRate}
+                  onChange={(e) => {
+                    setNewJobLastCalculatedBy("rate");
+                    setNewJobRate(e.target.value);
+                  }}
+                  onFocus={() => { if (Number(newJobRate) === 0) setNewJobRate(""); }}
+                  className="bg-[#0c101d] border-white/10 rounded-xl focus:border-cyan-400 text-xs"
+                  placeholder="Rate per unit"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 border border-white/10">
+              <span className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold flex-1">Gross Quote (Qty × Rate)</span>
+              <span className="font-black text-sm text-foreground">₹{(Number(newJobQty) * Number(newJobRate) || 0).toLocaleString('en-IN')}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Special Discount (₹)</label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={newJobDiscount}
+                  onChange={(e) => {
+                    setNewJobLastCalculatedBy("rate");
+                    setNewJobDiscount(e.target.value === "" ? "" : parseFloat(e.target.value) || 0);
+                  }}
+                  onFocus={() => { if (newJobDiscount === 0) setNewJobDiscount(""); }}
+                  className="bg-[#0c101d] border-white/10 rounded-xl focus:border-cyan-400 text-xs"
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Estimated Quote (₹) *</label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={newJobAmount}
+                  onChange={(e) => {
+                    setNewJobLastCalculatedBy("total");
+                    setNewJobAmount(e.target.value === "" ? "" : parseFloat(e.target.value) || 0);
+                  }}
+                  onFocus={() => { if (newJobAmount === 0) setNewJobAmount(""); }}
+                  className="bg-[#0c101d] border-cyan-500/30 rounded-xl focus:border-cyan-400 text-xs text-cyan-300 font-bold"
+                  placeholder="Auto-calculated"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 rounded-xl border border-white/10 overflow-hidden">
+              {[
+                { label: 'Gross', val: `₹${(Number(newJobQty) * Number(newJobRate) || 0).toLocaleString('en-IN')}`, color: 'text-foreground' },
+                { label: 'Discount', val: `-₹${(typeof newJobDiscount === 'number' ? newJobDiscount : 0).toLocaleString('en-IN')}`, color: 'text-amber-400' },
+                { label: 'Net Payable', val: `₹${(typeof newJobAmount === 'number' ? newJobAmount : 0).toLocaleString('en-IN')}`, color: 'text-cyan-400' },
+              ].map(({ label, val, color }) => (
+                <div key={label} className="flex flex-col items-center py-2.5 bg-white/5">
+                  <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">{label}</span>
+                  <span className={`font-black text-xs mt-0.5 ${color}`}>{val}</span>
+                </div>
+              ))}
+            </div>
+
             </div>
 
             {/* Footer Buttons */}
-            <div className="flex gap-3 pt-3">
+            <div className="flex gap-3 px-6 py-4 border-t border-white/10 bg-[#080c18] flex-shrink-0">
               <Button
                 type="button"
                 variant="ghost"
@@ -1638,18 +2099,302 @@ export default function Projects({
                   setNewJobClientLink("");
                   setNewJobTaskName("");
                   setNewJobAmount("");
+                  setNewJobQty("");
+                  setNewJobRate("");
+                  setNewJobDiscount(0);
+                  setNewJobLastCalculatedBy("rate");
                   setNewJobDate(new Date().toISOString().split('T')[0]);
+                  setClientSearchQuery("");
                   setIsQuickJobModalOpen(false);
                 }}
                 className="flex-1 border border-white/10 text-muted-foreground text-xs font-semibold hover:bg-white/5 hover:text-foreground h-10 rounded-xl"
               >
                 ✕ CANCEL
               </Button>
+
               <Button
                 type="submit"
                 className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold text-xs h-10 rounded-xl shadow-lg shadow-emerald-500/10 border-none cursor-pointer"
               >
                 ✓ LOG JOB
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Micro-Job Modal */}
+      <Dialog open={isEditJobModalOpen} onOpenChange={(open) => {
+        setIsEditJobModalOpen(open);
+        if (!open) {
+          setEditingJob(null);
+          setEditJobClientLink("");
+          setEditJobTaskName("");
+          setEditJobAmount("");
+          setEditJobDate("");
+          setEditJobClientSearchQuery("");
+          setIsEditJobClientDropdownOpen(false);
+          setEditJobQty("");
+          setEditJobRate("");
+          setEditJobDiscount(0);
+          setEditJobLastCalculatedBy("rate");
+        }
+      }}>
+        <DialogContent className="bg-[#080c18] border border-white/10 max-w-md w-full p-0 overflow-hidden flex flex-col max-h-[90vh]" data-testid="dialog-edit-job-form">
+          <div className="px-6 pt-5 pb-3 border-b border-white/10 text-left flex-shrink-0">
+            <DialogTitle className="text-foreground font-black tracking-wide text-sm flex items-center gap-2">
+              <span className="text-cyan-400">✏️</span> EDIT MICRO-JOB
+            </DialogTitle>
+            <p className="text-3xs text-muted-foreground uppercase tracking-widest mt-0.5">Modify logged running tab work</p>
+          </div>
+
+          <form onSubmit={handleSaveMicroJob} className="flex-1 flex flex-col min-h-0 text-left">
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            {/* Integrated Searchable Client Dropdown */}
+            <div className="space-y-1.5 relative">
+              <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Client Visionary *</label>
+              
+              <div className="relative">
+                {/* Select Trigger / Search Input */}
+                <div 
+                  className="w-full h-10 px-3 bg-[#0c101d] border border-white/10 rounded-xl flex items-center justify-between cursor-pointer font-semibold uppercase text-xs transition-all focus-within:border-cyan-400 select-none"
+                  onClick={() => setIsEditJobClientDropdownOpen(prev => !prev)}
+                >
+                  {isEditJobClientDropdownOpen ? (
+                    <div className="flex items-center gap-2 w-full" onClick={(e) => e.stopPropagation()}>
+                      <Search className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="Type client name or phone..."
+                        value={editJobClientSearchQuery}
+                        onChange={(e) => setEditJobClientSearchQuery(e.target.value)}
+                        className="bg-transparent border-none outline-none text-xs text-foreground w-full uppercase placeholder:normal-case placeholder:text-muted-foreground/40"
+                        autoFocus
+                      />
+                    </div>
+                  ) : (
+                    <span className={`truncate ${editJobClientLink ? "text-foreground font-bold" : "text-muted-foreground/50"}`}>
+                      {editJobClientLink 
+                        ? (() => {
+                            const selected = clients.find(c => c.id === editJobClientLink);
+                            return selected ? `${selected.name} (${selected.phone})` : "-- SELECT CLIENT VISIONARY --";
+                          })()
+                        : "-- SELECT CLIENT VISIONARY --"}
+                    </span>
+                  )}
+                  <span className="text-muted-foreground/80 text-[10px] ml-2 flex-shrink-0">
+                    {isEditJobClientDropdownOpen ? "▲" : "▼"}
+                  </span>
+                </div>
+
+                {/* Dropdown Options List */}
+                {isEditJobClientDropdownOpen && (
+                  <>
+                    {/* Invisible overlay to close dropdown when clicking outside */}
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsEditJobClientDropdownOpen(false);
+                      }} 
+                    />
+                    
+                    <div className="absolute top-[calc(100%+4px)] left-0 right-0 max-h-56 overflow-y-auto bg-[#080c18] border border-white/10 rounded-xl shadow-2xl z-50 divide-y divide-white/5 scrollbar-thin scrollbar-thumb-white/10">
+                      {(() => {
+                        const actualClients = clients.filter(
+                          (c) => c.email !== "settings@netra.graphics" && c.phone !== "SYSTEM"
+                        );
+                        const filtered = editJobClientSearchQuery.trim()
+                          ? (() => {
+                              const q = editJobClientSearchQuery.toLowerCase();
+                              return actualClients.filter(
+                                (c) =>
+                                  c.name.toLowerCase().includes(q) ||
+                                  c.phone.toLowerCase().includes(q)
+                              );
+                            })()
+                          : actualClients;
+
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="p-4 text-center text-xs text-muted-foreground">
+                              -- NO MATCHING CLIENTS --
+                            </div>
+                          );
+                        }
+
+                        return filtered.map(client => {
+                          const isSelected = client.id === editJobClientLink;
+                          return (
+                            <div
+                              key={client.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditJobClientLink(client.id);
+                                setIsEditJobClientDropdownOpen(false);
+                              }}
+                              className={`p-3 text-xs uppercase cursor-pointer transition-colors flex items-center justify-between hover:bg-cyan-500/10 hover:text-cyan-400 ${
+                                isSelected 
+                                  ? "bg-cyan-500/15 text-cyan-400 font-black" 
+                                  : "text-foreground/90"
+                              }`}
+                            >
+                              <span className="font-bold">{client.name}</span>
+                              <span className="text-[10px] text-muted-foreground font-mono font-normal normal-case ml-2">
+                                {client.phone}
+                              </span>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Task Name Input */}
+            <div className="space-y-1.5">
+              <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Task Name / Service *</label>
+              <Input
+                value={editJobTaskName}
+                onChange={(e) => setEditJobTaskName(e.target.value)}
+                className="bg-[#0c101d] border-white/10 rounded-xl focus:border-cyan-400 text-xs"
+                placeholder="Enter custom task description..."
+                required
+              />
+            </div>
+
+            {/* Date input */}
+            <div className="space-y-1.5">
+              <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Date Logged *</label>
+              <Input
+                type="date"
+                value={editJobDate}
+                onChange={(e) => setEditJobDate(e.target.value)}
+                className="bg-[#0c101d] border-white/10 rounded-xl focus:border-cyan-400 text-xs text-foreground font-semibold"
+                required
+              />
+            </div>
+
+            {/* Pricing details */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Quantity</label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={editJobQty}
+                  onChange={(e) => {
+                    setEditJobLastCalculatedBy("rate");
+                    setEditJobQty(e.target.value === "" ? "" : parseInt(e.target.value) || 1);
+                  }}
+                  className="bg-[#0c101d] border-white/10 rounded-xl focus:border-cyan-400 text-xs"
+                  placeholder="1"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Rate (₹) per unit *</label>
+                <Input
+                  type="number"
+                  step="any"
+                  min={0}
+                  value={editJobRate}
+                  onChange={(e) => {
+                    setEditJobLastCalculatedBy("rate");
+                    setEditJobRate(e.target.value);
+                  }}
+                  onFocus={() => { if (Number(editJobRate) === 0) setEditJobRate(""); }}
+                  className="bg-[#0c101d] border-white/10 rounded-xl focus:border-cyan-400 text-xs"
+                  placeholder="Rate per unit"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 border border-white/10">
+              <span className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold flex-1">Gross Quote (Qty × Rate)</span>
+              <span className="font-black text-sm text-foreground">₹{(Number(editJobQty) * Number(editJobRate) || 0).toLocaleString('en-IN')}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Special Discount (₹)</label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={editJobDiscount}
+                  onChange={(e) => {
+                    setEditJobLastCalculatedBy("rate");
+                    setEditJobDiscount(e.target.value === "" ? "" : parseFloat(e.target.value) || 0);
+                  }}
+                  onFocus={() => { if (editJobDiscount === 0) setEditJobDiscount(""); }}
+                  className="bg-[#0c101d] border-white/10 rounded-xl focus:border-cyan-400 text-xs"
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Estimated Quote (₹) *</label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={editJobAmount}
+                  onChange={(e) => {
+                    setEditJobLastCalculatedBy("total");
+                    setEditJobAmount(e.target.value === "" ? "" : parseFloat(e.target.value) || 0);
+                  }}
+                  onFocus={() => { if (editJobAmount === 0) setEditJobAmount(""); }}
+                  className="bg-[#0c101d] border-cyan-500/30 rounded-xl focus:border-cyan-400 text-xs text-cyan-300 font-bold"
+                  placeholder="Auto-calculated"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 rounded-xl border border-white/10 overflow-hidden">
+              {[
+                { label: 'Gross', val: `₹${(Number(editJobQty) * Number(editJobRate) || 0).toLocaleString('en-IN')}`, color: 'text-foreground' },
+                { label: 'Discount', val: `-₹${(typeof editJobDiscount === 'number' ? editJobDiscount : 0).toLocaleString('en-IN')}`, color: 'text-amber-400' },
+                { label: 'Net Payable', val: `₹${(typeof editJobAmount === 'number' ? editJobAmount : 0).toLocaleString('en-IN')}`, color: 'text-cyan-400' },
+              ].map(({ label, val, color }) => (
+                <div key={label} className="flex flex-col items-center py-2.5 bg-white/5">
+                  <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">{label}</span>
+                  <span className={`font-black text-xs mt-0.5 ${color}`}>{val}</span>
+                </div>
+              ))}
+            </div>
+
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex gap-3 px-6 py-4 border-t border-white/10 bg-[#080c18] flex-shrink-0">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setIsEditJobModalOpen(false);
+                  setEditingJob(null);
+                  setEditJobClientLink("");
+                  setEditJobTaskName("");
+                  setEditJobAmount("");
+                  setEditJobDate("");
+                  setEditJobClientSearchQuery("");
+                  setIsEditJobClientDropdownOpen(false);
+                  setEditJobQty("");
+                  setEditJobRate("");
+                  setEditJobDiscount(0);
+                  setEditJobLastCalculatedBy("rate");
+                }}
+                className="flex-1 border border-white/10 text-muted-foreground text-xs font-semibold hover:bg-white/5 hover:text-foreground h-10 rounded-xl"
+              >
+                ✕ CANCEL
+              </Button>
+
+              <Button
+                type="submit"
+                className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-black font-extrabold text-xs h-10 rounded-xl shadow-lg shadow-cyan-500/10 border-none cursor-pointer"
+              >
+                ✓ SAVE CHANGES
               </Button>
             </div>
           </form>

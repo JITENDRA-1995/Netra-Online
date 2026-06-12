@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { saveInvoice, deleteInvoice, updateInvoice } from "@/supabase/database";
+import { saveInvoice, deleteInvoice, updateInvoice, revertJobsToLedger } from "@/supabase/database";
 
 interface InvoicesPageProps {
   invoices: any[];
@@ -44,6 +44,10 @@ interface InvoicesPageProps {
   onClearEditData?: () => void;
   trashItems?: any[];
   setTrashItems?: React.Dispatch<React.SetStateAction<any[]>>;
+  microJobs?: any[];
+  setMicroJobs?: React.Dispatch<React.SetStateAction<any[]>>;
+  defaultTab?: "SAVED" | "DRAFT" | "CUSTOM" | "MICRO_JOB" | null;
+  setDefaultTab?: (tab: "SAVED" | "DRAFT" | "CUSTOM" | "MICRO_JOB" | null) => void;
 }
 
 const containerVariants = {
@@ -73,12 +77,16 @@ export default function InvoicesPage({
   prefilledEditData,
   onClearEditData,
   trashItems = [],
-  setTrashItems
+  setTrashItems,
+  microJobs = [],
+  setMicroJobs = () => {},
+  defaultTab,
+  setDefaultTab
 }: InvoicesPageProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
-  const [invoiceTab, setInvoiceTab] = useState<"SAVED" | "DRAFT" | "CUSTOM">("SAVED");
+  const [invoiceTab, setInvoiceTab] = useState<"SAVED" | "DRAFT" | "CUSTOM" | "MICRO_JOB">(defaultTab || "SAVED");
 
   // Edit mode tracking state
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
@@ -176,6 +184,15 @@ export default function InvoicesPage({
     }
   }, [prefilledEditData]);
 
+  useEffect(() => {
+    if (defaultTab) {
+      setInvoiceTab(defaultTab);
+      if (setDefaultTab) {
+        setDefaultTab(null);
+      }
+    }
+  }, [defaultTab, setDefaultTab]);
+
   const handleCloseWorkspace = () => {
     setIsWorkspaceOpen(false);
     setEditingInvoiceId(null);
@@ -207,7 +224,7 @@ export default function InvoicesPage({
   // Deletion States
   const [invoiceToDelete, setInvoiceToDelete] = useState<any>(null);
   const [batchInvoicesToDelete, setBatchInvoicesToDelete] = useState<any[] | null>(null);
-  const [deleteStrategy, setDeleteStrategy] = useState<"keep" | "purge">("keep");
+  const [deleteStrategy, setDeleteStrategy] = useState<"keep" | "purge" | "revert_ledger">("keep");
 
   // Form States
   const [billingName, setBillingName] = useState("");
@@ -300,11 +317,31 @@ export default function InvoicesPage({
 
   // Get up-to-date project info to keep status in sync dynamically
   const getUpToDateInvoice = (inv: any) => {
-    if (!inv.rawProject || !inv.rawProject.id) return inv;
+    let clientName = inv.clientName;
+    if (inv.clientLink) {
+      const currentClient = clients.find(c => c.id === inv.clientLink);
+      if (currentClient) {
+        clientName = currentClient.name;
+      }
+    }
+
+    if (!inv.rawProject || !inv.rawProject.id) {
+      return {
+        ...inv,
+        clientName
+      };
+    }
     const currentProj = projects.find(p => p.id === inv.rawProject.id);
-    if (!currentProj) return inv;
+    if (!currentProj) {
+      return {
+        ...inv,
+        clientName
+      };
+    }
     return {
       ...inv,
+      clientName: currentProj.client?.name || currentProj.name || clientName,
+      projectService: currentProj.service || inv.projectService,
       rawProject: currentProj
     };
   };
@@ -319,21 +356,24 @@ export default function InvoicesPage({
 
     if (!matchesSearch) return false;
 
-    // 2. Tab filter (Saved vs Draft vs Custom)
+    // 2. Tab filter (Saved vs Draft vs Custom vs Micro-Job)
+    const isMicroJobInvoice = (inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && inv.invoiceNo.startsWith('CMS'));
     const hasProject = !!(inv.rawProject && inv.rawProject.id);
     const isStandalone = hasProject && inv.rawProject.isStandalone;
-    const isCustom = !hasProject || isStandalone || inv.invoiceNo.includes('/C');
+    const isCustom = !isMicroJobInvoice && (!hasProject || isStandalone || inv.invoiceNo.includes('/C'));
     
     // Project with status other than completed goes to draft
-    const isDraft = hasProject && !isCustom && inv.rawProject.status !== 'Completed';
+    const isDraft = !isMicroJobInvoice && hasProject && !isCustom && inv.rawProject.status !== 'Completed';
     
     let matchesTab = false;
     if (invoiceTab === "DRAFT") {
       matchesTab = isDraft;
     } else if (invoiceTab === "CUSTOM") {
       matchesTab = isCustom;
+    } else if (invoiceTab === "MICRO_JOB") {
+      matchesTab = isMicroJobInvoice;
     } else {
-      matchesTab = !isDraft && !isCustom;
+      matchesTab = !isDraft && !isCustom && !isMicroJobInvoice;
     }
     if (!matchesTab) return false;
 
@@ -389,6 +429,22 @@ export default function InvoicesPage({
         console.warn("Supabase delete failed, falling back to local memory:", dbErr);
       }
 
+      if (deleteStrategy === "revert_ledger" && inv.microJobIds && inv.microJobIds.length > 0) {
+        try {
+          await revertJobsToLedger(inv.microJobIds);
+        } catch (revertErr) {
+          console.warn("Failed to revert micro jobs in Supabase:", revertErr);
+        }
+        if (setMicroJobs) {
+          setMicroJobs(prev => prev.map(job => {
+            if (inv.microJobIds.includes(job.jobId) || inv.microJobIds.some(id => String(id) === String(job.jobId))) {
+              return { ...job, billingStatus: "Unbilled", invoiceLink: null };
+            }
+            return job;
+          }));
+        }
+      }
+
       const purgedEntries = deleteStrategy === "purge"
         ? cashbookEntries.filter(entry => 
             entry.invoiceId === inv.id || 
@@ -423,6 +479,8 @@ export default function InvoicesPage({
           !(entry.desc && entry.desc.includes(inv.invoiceNo))
         ));
         toast({ title: "Invoice & Log Entry Purged", description: "Successfully removed invoice and reverted cashbook logs." });
+      } else if (deleteStrategy === "revert_ledger") {
+        toast({ title: "Invoice Deleted & Logs Reverted", description: "Invoice deleted and associated micro-jobs sent back to ledger." });
       } else {
         toast({ title: "Invoice Deleted", description: "Invoice removed from vault. Cashbook entries preserved." });
       }
@@ -431,6 +489,7 @@ export default function InvoicesPage({
       toast({ title: "Failed to delete", description: "An error occurred during deletion.", variant: "destructive" });
     } finally {
       setInvoiceToDelete(null);
+      setDeleteStrategy("keep");
     }
   };
 
@@ -1275,6 +1334,21 @@ export default function InvoicesPage({
                       />
                       <span className="text-red-400 font-semibold">Purge associated Cashbook entry (Revert Cashflow)</span>
                     </label>
+                    {invoiceToDelete && 
+                     (invoiceToDelete.microJobIds?.length > 0 || (invoiceToDelete.invoiceNo && invoiceToDelete.invoiceNo.startsWith('CMS'))) &&
+                     (invoiceToDelete.paymentStatus?.toLowerCase() === 'pending' || invoiceToDelete.paymentStatus?.toLowerCase() === 'unpaid') && (
+                      <label className="flex items-center gap-2 cursor-pointer text-[11px] text-white/80 select-none">
+                        <input
+                          type="radio"
+                          name="deleteInvoiceStrategy"
+                          value="revert_ledger"
+                          checked={deleteStrategy === 'revert_ledger'}
+                          onChange={() => setDeleteStrategy('revert_ledger')}
+                          className="accent-amber-500"
+                        />
+                        <span className="text-amber-400 font-semibold">Send Back to MICRO JOB LEDGER</span>
+                      </label>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1285,6 +1359,7 @@ export default function InvoicesPage({
                   onClick={() => {
                     setInvoiceToDelete(null);
                     setBatchInvoicesToDelete(null);
+                    setDeleteStrategy("keep");
                   }}
                   className="border border-white/10 text-white hover:bg-white/5 text-xs rounded-xl px-5 h-9 bg-transparent cursor-pointer font-bold transition-all"
                 >
@@ -1293,9 +1368,19 @@ export default function InvoicesPage({
                 <button
                   type="button"
                   onClick={invoiceToDelete ? executeSingleDelete : executeBatchDelete}
-                  className={deleteStrategy === 'keep' ? "bg-cyan-500 hover:bg-cyan-600 text-black font-extrabold text-xs rounded-xl px-6 h-9 shadow-lg shadow-cyan-500/10 cursor-pointer border-none transition-all" : "bg-red-500 hover:bg-red-600 text-white font-extrabold text-xs rounded-xl px-6 h-9 shadow-lg shadow-red-500/10 cursor-pointer border-none transition-all"}
+                  className={
+                    deleteStrategy === 'keep'
+                      ? "bg-cyan-500 hover:bg-cyan-600 text-black font-extrabold text-xs rounded-xl px-6 h-9 shadow-lg shadow-cyan-500/10 cursor-pointer border-none transition-all"
+                      : deleteStrategy === 'revert_ledger'
+                      ? "bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs rounded-xl px-6 h-9 shadow-lg shadow-amber-500/10 cursor-pointer border-none transition-all"
+                      : "bg-red-500 hover:bg-red-600 text-white font-extrabold text-xs rounded-xl px-6 h-9 shadow-lg shadow-red-500/10 cursor-pointer border-none transition-all"
+                  }
                 >
-                  {deleteStrategy === 'keep' ? "CONFIRM DELETION" : "CONFIRM PURGE & REVERT"}
+                  {deleteStrategy === 'keep'
+                    ? "CONFIRM DELETION"
+                    : deleteStrategy === 'revert_ledger'
+                    ? "SEND BACK TO MICRO JOB LEDGER"
+                    : "CONFIRM PURGE & REVERT"}
                 </button>
               </div>
             </motion.div>
@@ -1478,6 +1563,18 @@ export default function InvoicesPage({
                 onClick={() => setInvoiceTab("CUSTOM")}
               >
                 CUSTOM INVOICES
+              </Button>
+              <Button
+                variant={invoiceTab === "MICRO_JOB" ? "secondary" : "ghost"}
+                size="sm"
+                className={`h-7 rounded-md text-[10px] font-bold tracking-wider px-3 shrink-0 ${
+                  invoiceTab === "MICRO_JOB" 
+                    ? "bg-white/10 text-purple-400" 
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => setInvoiceTab("MICRO_JOB")}
+              >
+                MICRO-JOB INVOICES
               </Button>
             </div>
             <div className="relative w-64">
@@ -1674,103 +1771,167 @@ export default function InvoicesPage({
             </thead>
             <tbody className="divide-y divide-white/5 text-xs">
               {filteredInvoices.length > 0 ? (
-                filteredInvoices.map(inv => (
-                  <tr key={inv.id} className="hover:bg-white/[0.01] transition-colors">
-                    <td className="p-4 text-center">
-                      <input
-                        type="checkbox"
-                        checked={selectedVaultInvoices.includes(inv.id)}
-                        className="rounded accent-cyan-400"
-                        onChange={(e) => {
-                          if (e.target.checked) setSelectedVaultInvoices(prev => [...prev, inv.id]);
-                          else setSelectedVaultInvoices(prev => prev.filter(id => id !== inv.id));
-                        }}
-                      />
-                    </td>
-                    <td className={`p-4 font-bold ${
-                      inv.rawProject && inv.rawProject.id && inv.rawProject.status && inv.rawProject.status !== 'Completed'
-                        ? 'text-amber-400'
-                        : 'text-cyan-400'
-                    }`}>{inv.invoiceNo}</td>
-                    <td className="p-4">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-foreground">{inv.clientName}</span>
-                        <span className="text-3xs text-muted-foreground mt-0.5">{inv.projectService}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 text-center text-muted-foreground">{inv.issueDate}</td>
-                    <td className="p-4 text-center">
-                      <Badge
-                        className={`text-3xs uppercase tracking-wider font-extrabold border-0 px-2.5 py-1 rounded-md ${
-                          inv.paymentStatus === 'Paid'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
-                        }`}
-                      >
-                        {inv.paymentStatus || 'Paid'}
-                      </Badge>
-                    </td>
-                    <td className="p-4 text-right font-bold text-foreground">₹{inv.grandTotal.toLocaleString()}</td>
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {inv.paymentStatus === 'Pending' && inv.microJobIds && inv.microJobIds.length > 0 && (
+                filteredInvoices.map(inv => {
+                  const isMicroJobInvoice = (inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && inv.invoiceNo.startsWith('CMS'));
+                  const isPaidMicroJob = isMicroJobInvoice && inv.paymentStatus?.toLowerCase() === 'paid';
+
+                  return (
+                    <tr key={inv.id} className="hover:bg-white/[0.01] transition-colors">
+                      <td className="p-4 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedVaultInvoices.includes(inv.id)}
+                          className="rounded accent-cyan-400"
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedVaultInvoices(prev => [...prev, inv.id]);
+                            else setSelectedVaultInvoices(prev => prev.filter(id => id !== inv.id));
+                          }}
+                        />
+                      </td>
+                      <td className={`p-4 font-bold ${
+                        inv.rawProject && inv.rawProject.id && inv.rawProject.status && inv.rawProject.status !== 'Completed'
+                          ? 'text-amber-400'
+                          : 'text-cyan-400'
+                      }`}>{inv.invoiceNo}</td>
+                      <td className="p-4">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-foreground">{inv.clientName}</span>
+                          <span className="text-3xs text-muted-foreground mt-0.5">{inv.projectService}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-center text-muted-foreground">{inv.issueDate}</td>
+                      <td className="p-4 text-center">
+                        <Badge
+                          className={`text-3xs uppercase tracking-wider font-extrabold border-0 px-2.5 py-1 rounded-md ${
+                            inv.paymentStatus?.toLowerCase() === 'paid'
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                          }`}
+                        >
+                          {inv.paymentStatus || 'Paid'}
+                        </Badge>
+                      </td>
+                      <td className="p-4 text-right font-bold text-foreground">₹{inv.grandTotal.toLocaleString()}</td>
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {(inv.paymentStatus?.toLowerCase() === 'pending' || inv.paymentStatus?.toLowerCase() === 'unpaid') && ((inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && inv.invoiceNo.startsWith('CMS'))) && (
+                            <Button
+                              size="sm"
+                              className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 gap-1 font-bold text-xs h-7 px-2.5 rounded-lg"
+                              title="Settle Invoice"
+                              onClick={() => {
+                                setSelectedSettleInvoice(inv);
+                                setIsSettleOpen(true);
+                              }}
+                            >
+                              <span>💳 SETTLE</span>
+                            </Button>
+                          )}
                           <Button
-                            size="sm"
-                            className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 gap-1 font-bold text-xs h-7 px-2.5 rounded-lg"
-                            title="Settle Invoice"
+                            size="icon"
+                            variant="ghost"
+                            className="w-7 h-7 hover:bg-cyan-500/10 hover:text-cyan-400 border border-white/5"
+                            title="View Invoice Document"
                             onClick={() => {
-                              setSelectedSettleInvoice(inv);
-                              setIsSettleOpen(true);
+                              if (!inv.rawProject) {
+                                const clientObj = clients.find(c => (inv.clientLink && c.id === inv.clientLink) || c.name.toLowerCase() === inv.clientName.toLowerCase());
+                                const resolvedItems = (inv.microJobIds && inv.microJobIds.length > 0)
+                                  ? inv.microJobIds.map(id => {
+                                      const job = microJobs.find(mj => String(mj.jobId) === String(id));
+                                      if (!job) return null;
+                                      const formattedDate = new Date(job.dateLogged).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                                      return {
+                                        service: `${job.taskName.replace(/^Cumulative Micro-Jobs:\s*/i, "")} (${formattedDate})`,
+                                        quote: (job.qty || 1) * (job.rate !== undefined ? job.rate : job.amount),
+                                        discount: job.discount || 0,
+                                        qty: job.qty || 1,
+                                        rate: job.rate !== undefined ? job.rate : job.amount
+                                      };
+                                    }).filter(Boolean)
+                                  : [];
+
+                                const mockProject = {
+                                  id: inv.id,
+                                  name: inv.clientName,
+                                  service: inv.projectService ? inv.projectService.replace(/^Cumulative Micro-Jobs:\s*/i, "") : "",
+                                  quote: inv.grandTotal,
+                                  discount: 0,
+                                  advanceAmount: 0,
+                                  phone: clientObj?.phone || "",
+                                  email: clientObj?.email || "",
+                                  address: clientObj?.address || "",
+                                  gst: clientObj?.gst || "",
+                                  status: 'Completed',
+                                  isStandalone: true,
+                                  items: resolvedItems.length > 0 ? resolvedItems : [{
+                                    service: inv.projectService ? inv.projectService.replace(/^Cumulative Micro-Jobs:\s*/i, "") : "",
+                                    quote: inv.grandTotal,
+                                    discount: 0,
+                                    qty: 1,
+                                    rate: inv.grandTotal
+                                  }],
+                                  invoiceNo: inv.invoiceNo,
+                                  projectId: inv.projectId,
+                                  paymentStatus: inv.paymentStatus || 'Pending'
+                                };
+                                setInvoiceProject(mockProject);
+                              } else {
+                                const cleanedRawProject = { ...inv.rawProject };
+                                if (cleanedRawProject.service) {
+                                  cleanedRawProject.service = cleanedRawProject.service.replace(/^Cumulative Micro-Jobs:\s*/i, "");
+                                }
+                                if (cleanedRawProject.items) {
+                                  cleanedRawProject.items = cleanedRawProject.items.map(item => ({
+                                    ...item,
+                                    service: item.service ? item.service.replace(/^Cumulative Micro-Jobs:\s*/i, "") : ""
+                                  }));
+                                }
+                                setInvoiceProject({ ...cleanedRawProject, invoiceNo: inv.invoiceNo, projectId: inv.projectId });
+                              }
+                              setIsInvoicePreviewOpen(true);
                             }}
                           >
-                            <span>💳 SETTLE</span>
+                            <FileText className="w-3.5 h-3.5" />
                           </Button>
-                        )}
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="w-7 h-7 hover:bg-cyan-500/10 hover:text-cyan-400 border border-white/5"
-                          title="View Invoice Document"
-                          onClick={() => {
-                            setInvoiceProject({ ...inv.rawProject, invoiceNo: inv.invoiceNo, projectId: inv.projectId });
-                            setIsInvoicePreviewOpen(true);
-                          }}
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="w-7 h-7 hover:bg-amber-500/10 hover:text-amber-400 border border-white/5"
-                          title="Edit Invoice Details"
-                          onClick={() => {
-                            if (onEditInvoice) {
-                              onEditInvoice(inv);
-                            }
-                          }}
-                        >
-                          <Edit className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="w-7 h-7 hover:bg-red-500/10 hover:text-red-400 border border-white/5"
-                          title="Delete Record"
-                          onClick={() => {
-                            setInvoiceToDelete(inv);
-                            setDeleteStrategy("keep");
-                          }}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className={`w-7 h-7 border border-white/5 ${
+                              isPaidMicroJob
+                                ? "opacity-30 cursor-not-allowed pointer-events-none"
+                                : "hover:bg-amber-500/10 hover:text-amber-400"
+                            }`}
+                            title={isPaidMicroJob ? "Paid Micro-Job invoices cannot be edited" : "Edit Invoice Details"}
+                            disabled={isPaidMicroJob}
+                            onClick={() => {
+                              if (!isPaidMicroJob && onEditInvoice) {
+                                onEditInvoice(inv);
+                              }
+                            }}
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="w-7 h-7 hover:bg-red-500/10 hover:text-red-400 border border-white/5"
+                            title="Delete Record"
+                            onClick={() => {
+                              setInvoiceToDelete(inv);
+                              setDeleteStrategy("keep");
+                            }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-muted-foreground uppercase tracking-widest text-3xs font-semibold">
-                    {invoiceTab === "DRAFT" ? "NO TEMPORARY DRAFT INVOICES IN VAULT" : invoiceTab === "CUSTOM" ? "NO CUSTOM INVOICES IN VAULT" : "LEDGER IS VOID OF SAVED INVOICES"}
+                    {invoiceTab === "DRAFT" ? "NO TEMPORARY DRAFT INVOICES IN VAULT" : invoiceTab === "CUSTOM" ? "NO CUSTOM INVOICES IN VAULT" : invoiceTab === "MICRO_JOB" ? "NO MICRO-JOB CUMULATIVE INVOICES IN VAULT" : "LEDGER IS VOID OF SAVED INVOICES"}
                   </td>
                 </tr>
               )}

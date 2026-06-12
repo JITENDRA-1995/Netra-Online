@@ -46,7 +46,8 @@ import {
   getInquiries, createInquiry, updateInquiry, deleteInquiry,
   getClients, createClientProfile, verifyClientVaultKey, updateClientProfile,
   getProjects, igniteProject, updateProjectState, toggleMilestone, addProjectActivityLog, sendChatMessage, subscribeToChats, uploadMediaVaultAsset,
-  getInvoices, saveInvoice, deleteInvoice, updateInvoice
+  getInvoices, saveInvoice, deleteInvoice, updateInvoice,
+  getMicroJobs
 } from './supabase/database';
 
 
@@ -556,6 +557,7 @@ function ServiceSlideshowContent({ service, onClose }) {
 
 function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [invoiceDefaultTab, setInvoiceDefaultTab] = useState(null);
   const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
   const [trashItems, setTrashItems] = useState(() => {
     const saved = localStorage.getItem('netra_trash');
@@ -1382,6 +1384,11 @@ function App() {
           });
           setInvoices(mappedInvoices);
         }
+
+        const dbMicroJobs = await getMicroJobs();
+        if (dbMicroJobs) {
+          setMicroJobs(dbMicroJobs);
+        }
       } catch (error) {
         console.error("Failed to load data from Supabase:", error);
       }
@@ -1597,9 +1604,28 @@ function App() {
     const deadline = new Date(q.deadline);
     const now = new Date();
     const diff = deadline - now;
-    const isWithin5Days = diff <= 5 * 24 * 60 * 60 * 1000;
+    const alertDays = q.alertMeDays !== undefined && q.alertMeDays !== "" ? Number(q.alertMeDays) : 1;
+    const triggerDays = Math.max(1, alertDays);
+    const isWithinWarning = diff <= triggerDays * 24 * 60 * 60 * 1000;
     const isAcknowledged = q.acknowledgedDeadline === q.deadline;
-    return isWithin5Days && !isAcknowledged && !readFlames.includes(q.id);
+    return isWithinWarning && !isAcknowledged && !readFlames.includes(q.id);
+  });
+
+  const flamesHistory = ignitionQueue.filter(q => {
+    if (q.status === "Completed" || q.status === "Cancelled") return false;
+    if (!q.deadline) return false;
+    const deadline = new Date(q.deadline);
+    const now = new Date();
+    const diff = deadline - now;
+    const alertDays = q.alertMeDays !== undefined && q.alertMeDays !== "" ? Number(q.alertMeDays) : 1;
+    const triggerDays = Math.max(1, alertDays);
+    const isWithinWarning = diff <= triggerDays * 24 * 60 * 60 * 1000;
+    const isAcknowledged = q.acknowledgedDeadline === q.deadline;
+    return isWithinWarning && (isAcknowledged || readFlames.includes(q.id));
+  });
+
+  const sparksHistory = inquiries.filter(q => {
+    return q.status === "Read" || q.status === "Ignited" || q.status === "Replied" || q.status === "Resolved";
   });
 
   const hasUrgentAlert = flames.length > 0 || sparks.length > 0;
@@ -1730,6 +1756,8 @@ function App() {
   const [redirectFilterService, setRedirectFilterService] = useState('');
   const [invoiceProject, setInvoiceProject] = useState(null);
   const [invoices, setInvoices] = useState([]);
+  const [microJobs, setMicroJobs] = useState([]);
+  const [expandedWarningTab, setExpandedWarningTab] = useState(null); // 'DEADLINES' | 'INQUIRIES' | null
   const [selectedBatchProjects, setSelectedBatchProjects] = useState([]);
   const [selectedVaultInvoices, setSelectedVaultInvoices] = useState([]);
   const [highlightedCashbookId, setHighlightedCashbookId] = useState(null);
@@ -3137,6 +3165,9 @@ function App() {
         paymentStatus = 'part';
       }
 
+      const alertMeDaysInput = formData.get('alertMeDays');
+      const alertMeDays = alertMeDaysInput !== null && alertMeDaysInput !== "" ? parseInt(alertMeDaysInput) : "";
+
       const projectPayload = {
         name: clientInfo.name,
         service: serviceName,
@@ -3144,6 +3175,7 @@ function App() {
         progress: 20,
         status: "Active",
         priority: "Normal",
+        alertMeDays: alertMeDays,
         description: prefillData?.description || '',
         deadline: formData.get('deadline'),
         isManual: true,
@@ -3314,6 +3346,9 @@ function App() {
 
     const discountPercentVal = ((discountVal / (quoteVal || 1)) * 100).toFixed(2);
 
+    const alertMeDaysInput = formData.get('alertMeDays');
+    const alertMeDays = alertMeDaysInput !== null && alertMeDaysInput !== "" ? parseInt(alertMeDaysInput) : "";
+
     const updatedFields = {
       service: serviceName,
       deadline: formData.get('deadline'),
@@ -3325,7 +3360,8 @@ function App() {
       discountPercent: discountPercentVal,
       discount: discountVal,
       advanceAmount: advanceVal,
-      paymentStatus: paymentStatus
+      paymentStatus: paymentStatus,
+      alertMeDays: alertMeDays
     };
 
     try {
@@ -5040,8 +5076,11 @@ function App() {
                                 setProjectToDelete(proj);
                               }
                             }}
+                            microJobs={microJobs}
+                            setMicroJobs={setMicroJobs}
+                            setInvoiceDefaultTab={setInvoiceDefaultTab}
+                            setActiveAdminModule={setActiveAdminModule}
                           />
-
                         )}
 
                         {activeAdminModule === "INQUIRIES" && (
@@ -5103,6 +5142,10 @@ function App() {
                              onClearEditData={() => setEditingInvoiceData(null)}
                              trashItems={trashItems}
                              setTrashItems={setTrashItems}
+                             defaultTab={invoiceDefaultTab}
+                             setDefaultTab={setInvoiceDefaultTab}
+                             microJobs={microJobs}
+                             setMicroJobs={setMicroJobs}
                            />
                         )}
 
@@ -5271,9 +5314,16 @@ function App() {
                                       style={{ width: '100%', padding: '0.8rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '4px', outline: 'none' }}
                                     />
                                   </div>
+                                </div>
+
+                                <div className="form-row">
                                   <div className="input-group">
                                     <label>Target Delivery Date</label>
                                     <input type="date" name="deadline" required />
+                                  </div>
+                                  <div className="input-group">
+                                    <label>Alert Me (Days Before Due)</label>
+                                    <input type="number" name="alertMeDays" min="0" placeholder="Default: 1 day" style={{ width: '100%', padding: '0.8rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '4px', outline: 'none' }} />
                                   </div>
                                 </div>
 
@@ -5495,6 +5545,10 @@ function App() {
                                         <label>Deadline Adjustment</label>
                                         <input type="date" name="deadline" defaultValue={currentProject?.deadline} required />
                                       </div>
+                                      <div className="input-group">
+                                        <label>Alert Me (Days Before Due)</label>
+                                        <input type="number" name="alertMeDays" defaultValue={currentProject?.alertMeDays} min="0" placeholder="Default: 1 day" style={{ width: '100%', padding: '0.8rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '4px', outline: 'none' }} />
+                                      </div>
                                     </div>
 
                                     {/* QTY / Rate / Quote — bidirectional calculation */}
@@ -5591,15 +5645,87 @@ function App() {
                               </p>
 
                               <div className="warning-details-row">
-                                <div className="warning-details-card">
+                                <div 
+                                  className={`warning-details-card cursor-pointer hover:bg-white/5 transition-colors ${expandedWarningTab === 'DEADLINES' ? 'border-[#ff5e00]/40 bg-[#ff5e00]/5' : ''}`}
+                                  onClick={() => {
+                                    if (flames.length === 1) {
+                                      setProjectsSearchQuery(flames[0].name);
+                                      setActiveAdminModule("PROJECTS");
+                                      setIsAdminGridActive(false);
+                                      setIsWarningDismissed(true);
+                                      pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: false });
+                                    } else if (flames.length > 1) {
+                                      setExpandedWarningTab(expandedWarningTab === 'DEADLINES' ? null : 'DEADLINES');
+                                    }
+                                  }}
+                                >
                                   <h3>PENDING DEADLINES</h3>
-                                  <span className="warning-count">{flames.length}</span>
+                                  <span className="warning-count text-[#ff5e00]">{flames.length}</span>
                                 </div>
-                                <div className="warning-details-card">
+                                <div 
+                                  className={`warning-details-card cursor-pointer hover:bg-white/5 transition-colors ${expandedWarningTab === 'INQUIRIES' ? 'border-cyan-500/40 bg-cyan-500/5' : ''}`}
+                                  onClick={() => {
+                                    if (sparks.length === 1) {
+                                      setInquiriesSearchQuery(sparks[0].name || sparks[0].clientName);
+                                      setActiveAdminModule("INQUIRIES");
+                                      setIsAdminGridActive(false);
+                                      setIsWarningDismissed(true);
+                                      pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: false });
+                                    } else if (sparks.length > 1) {
+                                      setExpandedWarningTab(expandedWarningTab === 'INQUIRIES' ? null : 'INQUIRIES');
+                                    }
+                                  }}
+                                >
                                   <h3>NEW INQUIRIES</h3>
-                                  <span className="warning-count">{sparks.length}</span>
+                                  <span className="warning-count text-[#00E5FF]">{sparks.length}</span>
                                 </div>
                               </div>
+
+                              {/* Expanded List Selection */}
+                              {expandedWarningTab === 'DEADLINES' && flames.length > 0 && (
+                                <div className="expanded-warning-list border border-white/5 rounded-2xl p-4 bg-black/40 max-h-48 overflow-y-auto space-y-1.5 text-left w-full max-w-md my-4">
+                                  <h4 className="text-3xs uppercase tracking-widest text-[#ff5e00] font-bold mb-2 border-b border-white/5 pb-1">Select Project to Redirect:</h4>
+                                  {flames.map(f => (
+                                    <div 
+                                      key={f.id} 
+                                      className="p-2 hover:bg-white/5 rounded-xl cursor-pointer transition-colors text-xs flex justify-between items-center text-foreground"
+                                      onClick={() => {
+                                        setProjectsSearchQuery(f.name);
+                                        setActiveAdminModule("PROJECTS");
+                                        setIsAdminGridActive(false);
+                                        setIsWarningDismissed(true);
+                                        setExpandedWarningTab(null);
+                                        pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: false });
+                                      }}
+                                    >
+                                      <span className="font-semibold">{f.name}</span>
+                                      <span className="text-3xs text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">Due {new Date(f.deadline).toLocaleDateString()}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {expandedWarningTab === 'INQUIRIES' && sparks.length > 0 && (
+                                <div className="expanded-warning-list border border-white/5 rounded-2xl p-4 bg-black/40 max-h-48 overflow-y-auto space-y-1.5 text-left w-full max-w-md my-4">
+                                  <h4 className="text-3xs uppercase tracking-widest text-[#00E5FF] font-bold mb-2 border-b border-white/5 pb-1">Select Inquiry to Redirect:</h4>
+                                  {sparks.map(s => (
+                                    <div 
+                                      key={s.id} 
+                                      className="p-2 hover:bg-white/5 rounded-xl cursor-pointer transition-colors text-xs flex justify-between items-center text-foreground"
+                                      onClick={() => {
+                                        setInquiriesSearchQuery(s.name || s.clientName);
+                                        setActiveAdminModule("INQUIRIES");
+                                        setIsAdminGridActive(false);
+                                        setIsWarningDismissed(true);
+                                        setExpandedWarningTab(null);
+                                        pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: false });
+                                      }}
+                                    >
+                                      <span className="font-semibold">{s.name || s.clientName}</span>
+                                      <span className="text-3xs text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">{s.service || "General Inquiry"}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
 
                               <div className="warning-actions">
                                 <button 
@@ -6059,11 +6185,13 @@ function App() {
                   <div className="drawer-content">
                     {notifTab === 'SPARKS' ? (
                       <div className="notif-list">
-                        {sparks.length > 0 ? sparks.map(s => (
+                        {sparks.length > 0 && sparks.map(s => (
                           <div key={s.id} className="notif-card spark flex justify-between items-center" onClick={() => {
+                            setInquiriesSearchQuery(s.name || s.clientName);
                             setActiveAdminModule("INQUIRIES");
-                            setIsAdminGridActive(true);
+                            setIsAdminGridActive(false);
                             setIsNotificationOpen(false);
+                            pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: false });
                           }}>
                             <div className="flex items-center gap-3">
                               <div className="notif-icon-box cyan">✦</div>
@@ -6082,20 +6210,51 @@ function App() {
                               MARK READ
                             </button>
                           </div>
-                        )) : (
+                        ))}
+
+                        {/* Sparks History */}
+                        {sparksHistory.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-white/5">
+                            <h4 className="text-3xs uppercase tracking-widest text-muted-foreground font-bold mb-2 px-2">History</h4>
+                            {sparksHistory.map(s => (
+                              <div key={s.id} className="notif-card spark history opacity-65 flex justify-between items-center" onClick={() => {
+                                setInquiriesSearchQuery(s.name || s.clientName);
+                                setActiveAdminModule("INQUIRIES");
+                                setIsAdminGridActive(false);
+                                setIsNotificationOpen(false);
+                                pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: false });
+                              }}>
+                                <div className="flex items-center gap-3">
+                                  <div className="notif-icon-box grayscale">✦</div>
+                                  <div className="notif-info">
+                                    <p className="notif-msg">Inquiry from <strong>{s.name}</strong></p>
+                                    <span className="notif-time">{s.date}</span>
+                                  </div>
+                                </div>
+                                <span className="text-3xs uppercase tracking-wider text-muted-foreground font-extrabold px-2 py-0.5 rounded bg-white/5 border border-white/10">
+                                  {s.status === 'Ignited' ? 'Ignited 🔥' : 'Read'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {sparks.length === 0 && sparksHistory.length === 0 && (
                           <div className="empty-state">
                             <span className="empty-icon">✧</span>
-                            <p>No new sparks detected.</p>
+                            <p>No sparks detected.</p>
                           </div>
                         )}
                       </div>
                     ) : (
                       <div className="notif-list">
-                        {flames.length > 0 ? flames.map(f => (
+                        {flames.length > 0 && flames.map(f => (
                           <div key={f.id} className="notif-card flame flex justify-between items-center" onClick={() => {
-                            setActiveAdminModule("DASHBOARD");
-                            setIsAdminGridActive(true);
+                            setProjectsSearchQuery(f.name);
+                            setActiveAdminModule("PROJECTS");
+                            setIsAdminGridActive(false);
                             setIsNotificationOpen(false);
+                            pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: false });
                           }}>
                             <div className="flex items-center gap-3">
                               <div className="notif-icon-box orange">🔥</div>
@@ -6110,14 +6269,46 @@ function App() {
                             <button
                               className="text-3xs uppercase tracking-wider text-orange-400 hover:text-orange-300 font-extrabold px-2.5 py-1 rounded bg-orange-400/10 border border-orange-400/20 cursor-pointer"
                               onClick={(e) => {
-                                e.stopPropagation();
-                                markFlameAsRead(f.id);
+                                  e.stopPropagation();
+                                  markFlameAsRead(f.id);
                               }}
                             >
                               DISMISS
                             </button>
                           </div>
-                        )) : (
+                        ))}
+
+                        {/* Flames History */}
+                        {flamesHistory.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-white/5">
+                            <h4 className="text-3xs uppercase tracking-widest text-muted-foreground font-bold mb-2 px-2">History</h4>
+                            {flamesHistory.map(f => (
+                              <div key={f.id} className="notif-card flame history opacity-65 flex justify-between items-center" onClick={() => {
+                                setProjectsSearchQuery(f.name);
+                                setActiveAdminModule("PROJECTS");
+                                setIsAdminGridActive(false);
+                                setIsNotificationOpen(false);
+                                pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: false });
+                              }}>
+                                <div className="flex items-center gap-3">
+                                  <div className="notif-icon-box grayscale">🔥</div>
+                                  <div className="notif-info">
+                                    <p className="notif-msg">
+                                      {new Date(f.deadline) - new Date() < 0 ? "Project Overdue: " : "Deadline approached: "}
+                                      <strong>{f.name}</strong>
+                                    </p>
+                                    <span className="notif-time">{getFlameNotifText(f)}</span>
+                                  </div>
+                                </div>
+                                <span className="text-3xs uppercase tracking-wider text-muted-foreground font-extrabold px-2 py-0.5 rounded bg-white/5 border border-white/10">
+                                  Dismissed
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {flames.length === 0 && flamesHistory.length === 0 && (
                           <div className="empty-state">
                             <span className="empty-icon">🕯️</span>
                             <p>No urgent flames currently burning.</p>
@@ -6362,8 +6553,18 @@ function App() {
                 >
                   {(() => {
                     const rowsPerPage = 6;
-                    const existingInvoice = invoices.find(inv => inv.rawProject?.id === invoiceProject.id);
+                    const existingInvoice = invoices.find(inv => inv.id === invoiceProject.id || inv.rawProject?.id === invoiceProject.id);
                     const stableInvoiceNo = existingInvoice ? existingInvoice.invoiceNo : (invoiceProject.invoiceNo || getUniqueInvoiceNumber(invoiceProject.createdAt));
+
+                    const isMicroJobInvoice = (invoiceProject.invoiceNo && invoiceProject.invoiceNo.startsWith('CMS')) || 
+                                              (invoiceProject.projectId === 'MICRO_JOB') ||
+                                              (invoiceProject.microJobIds && invoiceProject.microJobIds.length > 0) ||
+                                              (existingInvoice && existingInvoice.invoiceNo && existingInvoice.invoiceNo.startsWith('CMS'));
+
+                    const isPendingMicroJob = isMicroJobInvoice && 
+                      (invoiceProject.paymentStatus?.toLowerCase() === 'pending' || 
+                       invoiceProject.paymentStatus?.toLowerCase() === 'unpaid' ||
+                       (existingInvoice && (existingInvoice.paymentStatus?.toLowerCase() === 'pending' || existingInvoice.paymentStatus?.toLowerCase() === 'unpaid')));
 
                     // If it's a batch project, use its internal items, otherwise use single project as one item
                     const allItems = (invoiceProject.items && invoiceProject.items.length > 0)
@@ -6437,7 +6638,9 @@ function App() {
                               </div>
                             </div>
                             <div style={{ textAlign: 'right', zIndex: 2 }}>
-                              <h2 style={{ margin: 0, fontSize: '2.0rem', letterSpacing: '3px', fontWeight: '900', fontFamily: 'Urbanist, sans-serif' }}>TAX INVOICE</h2>
+                              <h2 style={{ margin: 0, fontSize: '2.0rem', letterSpacing: '3px', fontWeight: '900', fontFamily: 'Urbanist, sans-serif' }}>
+                                {isPendingMicroJob ? "DRAFT INVOICE" : "TAX INVOICE"}
+                              </h2>
                               <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.9, maxWidth: '300px', marginLeft: 'auto' }}>{adminProfile.address}</p>
                             </div>
                           </div>
@@ -6579,8 +6782,10 @@ function App() {
                                       const grandTotal = subtotal - discount;
                                       const remaining = grandTotal - advance;
 
-                                      if (isCompleted) {
-                                        // Completed: show clean Grand Total only
+                                      const showGrandTotal = isMicroJobInvoice ? !isPendingMicroJob : isCompleted;
+
+                                      if (showGrandTotal) {
+                                        // Completed / Settled: show clean Grand Total only
                                         return (
                                           <div style={{
                                             background: '#1b5e20', padding: '10px 15px', color: '#fff', borderRadius: '6px',
@@ -6591,7 +6796,7 @@ function App() {
                                           </div>
                                         );
                                       } else {
-                                        // In Progress: show advance deduction + Remaining Due
+                                        // In Progress / Pending Microjob: show advance deduction + Remaining Due
                                         return (
                                           <>
                                             {advance > 0 && (

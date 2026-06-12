@@ -29,6 +29,7 @@ export const getProjects = async () => {
     let descText = project.description || '';
     let priority = 'Normal';
     let acknowledgedDeadline = '';
+    let alertMeDays = '';
 
     if (descText.startsWith("JSON_METADATA:")) {
       try {
@@ -38,6 +39,7 @@ export const getProjects = async () => {
         descText = parsed.description || '';
         priority = parsed.priority || 'Normal';
         acknowledgedDeadline = parsed.acknowledgedDeadline || '';
+        alertMeDays = parsed.alertMeDays !== undefined ? parsed.alertMeDays : '';
       } catch (e) {
         console.error("Failed to parse JSON_METADATA in project description:", e);
       }
@@ -64,6 +66,7 @@ export const getProjects = async () => {
       progress: Math.max(20, project.progress || 0),
       priority: priority,
       acknowledgedDeadline: acknowledgedDeadline,
+      alertMeDays: alertMeDays,
       client: project.clients ? {
         id: project.clients.id,
         name: project.clients.name,
@@ -101,7 +104,8 @@ export const igniteProject = async (projectData) => {
     rate: projectData.rate || (projectData.quote / (projectData.qty || 1)),
     description: desc,
     priority: projectData.priority || 'Normal',
-    acknowledgedDeadline: ''
+    acknowledgedDeadline: '',
+    alertMeDays: projectData.alertMeDays !== undefined ? projectData.alertMeDays : ''
   })}`;
 
   // 1. Insert core project details
@@ -185,8 +189,8 @@ export const updateProjectState = async (projectId, updates) => {
   if (updates.category !== undefined) updatePayload.category = updates.category;
   if (updates.progress !== undefined) updatePayload.progress = updates.progress;
 
-  // Handle QTY and Rate serialization if description, quote, qty, rate, priority, or acknowledgedDeadline are updated
-  if (updates.description !== undefined || updates.qty !== undefined || updates.rate !== undefined || updates.quote !== undefined || updates.priority !== undefined || updates.acknowledgedDeadline !== undefined) {
+  // Handle QTY and Rate serialization if description, quote, qty, rate, priority, acknowledgedDeadline, or alertMeDays are updated
+  if (updates.description !== undefined || updates.qty !== undefined || updates.rate !== undefined || updates.quote !== undefined || updates.priority !== undefined || updates.acknowledgedDeadline !== undefined || updates.alertMeDays !== undefined) {
     // 1. Fetch current description and quote to extract existing metadata
     const { data: currentProj } = await supabase
       .from('projects')
@@ -199,6 +203,7 @@ export const updateProjectState = async (projectId, updates) => {
     let existingDesc = currentProj ? (currentProj.description || '') : '';
     let existingPriority = 'Normal';
     let existingAcknowledgedDeadline = '';
+    let existingAlertMeDays = '';
 
     if (existingDesc.startsWith("JSON_METADATA:")) {
       try {
@@ -208,6 +213,7 @@ export const updateProjectState = async (projectId, updates) => {
         existingDesc = parsed.description || '';
         existingPriority = parsed.priority || 'Normal';
         existingAcknowledgedDeadline = parsed.acknowledgedDeadline || '';
+        existingAlertMeDays = parsed.alertMeDays !== undefined ? parsed.alertMeDays : '';
       } catch (e) {
         console.error("Failed to parse JSON_METADATA during project update:", e);
       }
@@ -218,6 +224,7 @@ export const updateProjectState = async (projectId, updates) => {
     const newDesc = updates.description !== undefined ? updates.description : existingDesc;
     const newPriority = updates.priority !== undefined ? updates.priority : existingPriority;
     const newAcknowledgedDeadline = updates.acknowledgedDeadline !== undefined ? updates.acknowledgedDeadline : existingAcknowledgedDeadline;
+    const newAlertMeDays = updates.alertMeDays !== undefined ? updates.alertMeDays : existingAlertMeDays;
     
     // If quote is updated but rate is not, recalculate rate to match new quote
     if (updates.quote !== undefined && updates.rate === undefined) {
@@ -229,7 +236,8 @@ export const updateProjectState = async (projectId, updates) => {
       rate: newRate,
       description: newDesc,
       priority: newPriority,
-      acknowledgedDeadline: newAcknowledgedDeadline
+      acknowledgedDeadline: newAcknowledgedDeadline,
+      alertMeDays: newAlertMeDays
     })}`;
   }
 
