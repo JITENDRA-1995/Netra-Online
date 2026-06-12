@@ -1757,6 +1757,7 @@ function App() {
   const [invoiceProject, setInvoiceProject] = useState(null);
   const [invoices, setInvoices] = useState([]);
   const [microJobs, setMicroJobs] = useState([]);
+  const [redirectBackToMicroJob, setRedirectBackToMicroJob] = useState(false);
   const [expandedWarningTab, setExpandedWarningTab] = useState(null); // 'DEADLINES' | 'INQUIRIES' | null
   const [selectedBatchProjects, setSelectedBatchProjects] = useState([]);
   const [selectedVaultInvoices, setSelectedVaultInvoices] = useState([]);
@@ -5049,6 +5050,17 @@ function App() {
                               setFinancialTab("PROJECTS");
                               setActiveAdminModule("FINANCIALS");
                             }}
+                            onOpenMicroJobModal={() => {
+                              setRedirectBackToMicroJob(true);
+                              setActiveAdminModule("PROJECTS");
+                            }}
+                            onOpenCreateInvoice={() => {
+                              setActiveAdminModule("INVOICES");
+                            }}
+                            onAddCashbookEntry={(entry) => {
+                              setCashbookEntries(prev => [entry, ...prev]);
+                            }}
+                            setFinancialTab={setFinancialTab}
                           />
                         )}
 
@@ -5080,6 +5092,8 @@ function App() {
                             setMicroJobs={setMicroJobs}
                             setInvoiceDefaultTab={setInvoiceDefaultTab}
                             setActiveAdminModule={setActiveAdminModule}
+                            redirectBackToMicroJob={redirectBackToMicroJob}
+                            setRedirectBackToMicroJob={setRedirectBackToMicroJob}
                           />
                         )}
 

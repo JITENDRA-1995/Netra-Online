@@ -22,6 +22,14 @@ import {
   AlertTriangle,
   Clock,
   ChevronRight,
+  Plus,
+  Bolt,
+  Sparkles,
+  CreditCard,
+  TrendingUp as IncomeIcon,
+  Wallet,
+  Receipt,
+  X,
 } from "lucide-react";
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -93,6 +101,10 @@ interface DashboardProps {
   onDownloadInvoice?: (project: any) => void;
   onFilterProjectsByClient?: (clientName: string) => void;
   onRedirectToFinancialsProject?: (project: any) => void;
+  onOpenMicroJobModal?: () => void;
+  onOpenCreateInvoice?: () => void;
+  onAddCashbookEntry?: (entry: any) => void;
+  setFinancialTab?: (tab: string) => void;
 }
 
 export default function Dashboard({
@@ -105,8 +117,38 @@ export default function Dashboard({
   setActiveAdminModule,
   onDownloadInvoice,
   onFilterProjectsByClient,
-  onRedirectToFinancialsProject
+  onRedirectToFinancialsProject,
+  onOpenMicroJobModal,
+  onOpenCreateInvoice,
+  onAddCashbookEntry,
+  setFinancialTab,
 }: DashboardProps) {
+  const [quickEntryType, setQuickEntryType] = useState<'INCOME' | 'EXPENSE' | null>(null);
+  const [qeAmount, setQeAmount] = useState('');
+  const [qeDesc, setQeDesc] = useState('');
+  const [qeCategory, setQeCategory] = useState('');
+  const [qeMode, setQeMode] = useState('UPI');
+  const [qeDate, setQeDate] = useState(new Date().toISOString().split('T')[0]);
+  const [qeSubmitting, setQeSubmitting] = useState(false);
+
+  const handleQuickEntrySubmit = async () => {
+    if (!qeAmount || !qeDesc) return;
+    setQeSubmitting(true);
+    const entry = {
+      id: Date.now(),
+      date: qeDate || new Date().toISOString().split('T')[0],
+      desc: qeDesc,
+      amount: parseFloat(qeAmount),
+      type: quickEntryType,
+      mode: qeMode,
+      category: qeCategory || (quickEntryType === 'INCOME' ? 'General Income' : 'General Expense'),
+    };
+    if (onAddCashbookEntry) onAddCashbookEntry(entry);
+    setQeAmount(''); setQeDesc(''); setQeCategory(''); setQeMode('UPI');
+    setQeDate(new Date().toISOString().split('T')[0]);
+    setQeSubmitting(false);
+    setQuickEntryType(null);
+  };
   // Active Tab state
   const [selectedTab, setSelectedTab] = useState<'revenue' | 'projects' | 'clients' | 'invoices'>('revenue');
 
@@ -357,6 +399,113 @@ export default function Dashboard({
                 <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={2} fill="url(#expenseGrad)" />
               </AreaChart>
             </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* ── Quick Actions Panel ── */}
+        <div className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500/20 to-violet-500/20 border border-cyan-500/30 flex items-center justify-center">
+              <Zap className="w-4 h-4 text-cyan-400" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-foreground text-base tracking-wide">Quick Actions</h3>
+              <p className="text-3xs text-muted-foreground uppercase tracking-widest">Fast-access studio operations</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {[
+              {
+                label: 'Create Project',
+                sub: 'Start New Ignition',
+                icon: Zap,
+                color: '#8b5cf6',
+                glow: 'rgba(139,92,246,0.25)',
+                border: '#8b5cf640',
+                bg: '#8b5cf610',
+                action: () => onOpenIgnitionModal && onOpenIgnitionModal(),
+              },
+              {
+                label: 'Log Micro Job',
+                sub: 'Log New Job',
+                icon: Bolt,
+                color: '#00d4ff',
+                glow: 'rgba(0,212,255,0.25)',
+                border: '#00d4ff40',
+                bg: '#00d4ff10',
+                action: () => {
+                  if (onOpenMicroJobModal) { onOpenMicroJobModal(); }
+                  else if (setActiveAdminModule) { setActiveAdminModule('PROJECTS'); }
+                },
+              },
+              {
+                label: 'Create Client',
+                sub: 'Add New Visionary',
+                icon: Users,
+                color: '#10b981',
+                glow: 'rgba(16,185,129,0.25)',
+                border: '#10b98140',
+                bg: '#10b98110',
+                action: () => onOpenCreateClient && onOpenCreateClient(),
+              },
+              {
+                label: 'Create Invoice',
+                sub: 'Create New Invoice',
+                icon: Receipt,
+                color: '#f59e0b',
+                glow: 'rgba(245,158,11,0.25)',
+                border: '#f59e0b40',
+                bg: '#f59e0b10',
+                action: () => {
+                  if (onOpenCreateInvoice) { onOpenCreateInvoice(); }
+                  else if (setActiveAdminModule) { setActiveAdminModule('INVOICES'); }
+                },
+              },
+              {
+                label: 'Log Income',
+                sub: 'New Income',
+                icon: TrendingUp,
+                color: '#34d399',
+                glow: 'rgba(52,211,153,0.25)',
+                border: '#34d39940',
+                bg: '#34d39910',
+                action: () => setQuickEntryType('INCOME'),
+              },
+              {
+                label: 'Log Expense',
+                sub: 'New Expense',
+                icon: Wallet,
+                color: '#f43f5e',
+                glow: 'rgba(244,63,94,0.25)',
+                border: '#f43f5e40',
+                bg: '#f43f5e10',
+                action: () => setQuickEntryType('EXPENSE'),
+              },
+            ].map((action) => (
+              <motion.button
+                key={action.label}
+                onClick={action.action}
+                whileHover={{ scale: 1.04, boxShadow: `0 0 20px ${action.glow}` }}
+                whileTap={{ scale: 0.97 }}
+                className="group relative flex flex-col items-center justify-center gap-2 rounded-2xl p-4 border cursor-pointer text-center transition-all duration-200 overflow-hidden"
+                style={{ borderColor: action.border, background: action.bg }}
+              >
+                <div
+                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                  style={{ background: `radial-gradient(circle at 50% 50%, ${action.glow}, transparent 70%)` }}
+                />
+                <div
+                  className="relative w-10 h-10 rounded-xl flex items-center justify-center mb-0.5 transition-transform duration-200 group-hover:scale-110"
+                  style={{ background: `${action.color}18`, border: `1px solid ${action.color}35` }}
+                >
+                  <action.icon className="w-5 h-5" style={{ color: action.color }} />
+                </div>
+                <div className="relative z-10">
+                  <div className="text-xs font-extrabold text-foreground group-hover:text-white transition-colors leading-tight">{action.label}</div>
+                  <div className="text-3xs text-muted-foreground mt-0.5 tracking-wide">{action.sub}</div>
+                </div>
+              </motion.button>
+            ))}
           </div>
         </div>
 
@@ -798,6 +947,74 @@ export default function Dashboard({
           {selectedTab === 'clients' && renderClientsView()}
           {selectedTab === 'invoices' && renderInvoicesView()}
         </motion.div>
+      </AnimatePresence>
+
+      {/* Quick Entry Modal (Income/Expense) */}
+      <AnimatePresence>
+        {quickEntryType && (
+          <div className="fixed inset-0 z-[10060] flex items-center justify-center" 
+               style={{ backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}>
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              className="bg-[#080c18] rounded-2xl p-6 max-w-sm w-[90vw] shadow-2xl"
+              style={{ border: `1px solid ${quickEntryType === 'INCOME' ? '#34d39940' : '#f43f5e40'}` }}
+            >
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                       style={{ background: quickEntryType === 'INCOME' ? '#34d39910' : '#f43f5e10',
+                                border: `1px solid ${quickEntryType === 'INCOME' ? '#34d39940' : '#f43f5e40'}` }}>
+                    {quickEntryType === 'INCOME' ? <TrendingUp className="w-4 h-4 text-emerald-400" /> : <Wallet className="w-4 h-4 text-rose-400" />}
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm" style={{ color: quickEntryType === 'INCOME' ? '#34d399' : '#f43f5e' }}>
+                      LOG {quickEntryType}
+                    </h3>
+                    <p className="text-3xs text-muted-foreground uppercase tracking-wider font-semibold">Quick entry</p>
+                  </div>
+                </div>
+                <button onClick={() => setQuickEntryType(null)} className="text-muted-foreground hover:text-white transition-colors bg-transparent border-none outline-none cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <input type="number" placeholder="Amount (₹)" value={qeAmount}
+                  onChange={e => setQeAmount(e.target.value)}
+                  className="w-full h-9 px-3 bg-white/5 border border-white/10 rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-500/50" />
+                <input type="text" placeholder="Description" value={qeDesc}
+                  onChange={e => setQeDesc(e.target.value)}
+                  className="w-full h-9 px-3 bg-white/5 border border-white/10 rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-500/50" />
+                <input type="text" placeholder="Category (optional)" value={qeCategory}
+                  onChange={e => setQeCategory(e.target.value)}
+                  className="w-full h-9 px-3 bg-white/5 border border-white/10 rounded-xl text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-500/50" />
+                <div className="grid grid-cols-2 gap-2">
+                  <select value={qeMode} onChange={e => setQeMode(e.target.value)}
+                    className="h-9 px-3 bg-[#0a0f1e] border border-white/10 rounded-xl text-xs text-foreground cursor-pointer">
+                    <option value="UPI">UPI / Online</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="Cheque">Cheque</option>
+                  </select>
+                  <input type="date" value={qeDate} onChange={e => setQeDate(e.target.value)}
+                    className="h-9 px-3 bg-[#0a0f1e] border border-white/10 rounded-xl text-xs text-foreground cursor-pointer" />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-5">
+                <button onClick={() => setQuickEntryType(null)}
+                  className="flex-1 h-9 rounded-xl border border-white/10 text-muted-foreground text-xs font-semibold hover:bg-white/5 transition-colors bg-transparent cursor-pointer">
+                  CANCEL
+                </button>
+                <button onClick={handleQuickEntrySubmit} disabled={!qeAmount || !qeDesc || qeSubmitting}
+                  className="flex-1 h-9 rounded-xl text-xs font-extrabold text-white border-none transition-colors disabled:opacity-50 cursor-pointer"
+                  style={{ background: quickEntryType === 'INCOME' ? '#10b981' : '#f43f5e' }}>
+                  {qeSubmitting ? 'SAVING...' : `SAVE ${quickEntryType}`}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
     </motion.div>
   );

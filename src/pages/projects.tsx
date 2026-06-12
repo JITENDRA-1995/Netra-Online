@@ -340,9 +340,12 @@ export default function Projects({
   }, [clients, clientSearchQuery]);
 
   useEffect(() => {
-    if (redirectBackToMicroJob && typeof redirectBackToMicroJob === "number") {
+    if (redirectBackToMicroJob) {
       setIsQuickJobModalOpen(true);
-      setNewJobClientLink(redirectBackToMicroJob);
+      setActiveTab("MicroJobs");
+      if (typeof redirectBackToMicroJob === "number") {
+        setNewJobClientLink(redirectBackToMicroJob);
+      }
       if (setRedirectBackToMicroJob) {
         setRedirectBackToMicroJob(false);
       }
