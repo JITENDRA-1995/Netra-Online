@@ -161,16 +161,63 @@ export const fetchClientProjectDetail = async (projectId) => {
     }
   }
 
+  const status = project.status;
+  const progress = project.progress;
+  const stage = project.stage;
+
+  let maxCompletedPosition = -1;
+  if (status === "Completed" || progress >= 100 || stage >= 5) {
+    maxCompletedPosition = 4;
+  } else if (progress >= 80 || stage >= 4) {
+    maxCompletedPosition = 3;
+  } else if (progress >= 60 || stage >= 3) {
+    maxCompletedPosition = 2;
+  } else if (progress >= 40 || stage >= 2) {
+    maxCompletedPosition = 1;
+  } else if (progress >= 20 || stage >= 1) {
+    maxCompletedPosition = 0;
+  }
+
+  // Self-heal database if milestones state does not match stage/progress
+  let needsSync = false;
+  for (const m of (project.project_milestones || [])) {
+    const shouldBeCompleted = maxCompletedPosition >= 0 && m.position <= maxCompletedPosition;
+    if (m.completed !== shouldBeCompleted) {
+      needsSync = true;
+      break;
+    }
+  }
+
+  if (needsSync && maxCompletedPosition >= 0) {
+    supabase
+      .from('project_milestones')
+      .update({ completed: true })
+      .eq('project_id', projectId)
+      .lte('position', maxCompletedPosition)
+      .then(() => {
+        supabase
+          .from('project_milestones')
+          .update({ completed: false })
+          .eq('project_id', projectId)
+          .gt('position', maxCompletedPosition)
+          .catch(err => console.error("Error healing milestones gt:", err));
+      })
+      .catch(err => console.error("Error healing milestones lte:", err));
+  }
+
   const milestones = (project.project_milestones || [])
     .sort((a, b) => a.position - b.position)
-    .map(m => ({
-      id: m.id,
-      title: m.name,
-      description: '',
-      isCompleted: m.completed,
-      completedAt: m.completed ? m.updated_at || project.updated_at || project.created_at : null,
-      order: m.position
-    }));
+    .map(m => {
+      const isCompleted = m.completed || (maxCompletedPosition >= 0 && m.position <= maxCompletedPosition);
+      return {
+        id: m.id,
+        title: m.name,
+        description: '',
+        isCompleted,
+        completedAt: isCompleted ? m.updated_at || project.updated_at || project.created_at : null,
+        order: m.position
+      };
+    });
 
   return {
     id: project.id,
@@ -295,27 +342,59 @@ export const subscribeToClientChats = (projectId, clientName, onMessageReceived)
     .on(
       'postgres_changes',
       {
-        event: 'INSERT',
+        event: '*',
         schema: 'public',
         table: 'project_chats',
         filter: `project_id=eq.${projectId}`
       },
       (payload) => {
-        const msg = payload.new;
-        const isClient = (msg.sender || '').toLowerCase() === 'client' || 
-                         (clientName && (msg.sender || '').toLowerCase() === clientName.toLowerCase());
-        onMessageReceived({
-          id: msg.id,
-          senderName: msg.sender,
-          senderType: isClient ? 'client' : 'admin',
-          content: msg.message,
-          createdAt: msg.created_at,
-          attachmentUrl: null,
-          attachmentName: null
-        });
+        if (payload.eventType === 'INSERT') {
+          const msg = payload.new;
+          const isClient = (msg.sender || '').toLowerCase() === 'client' || 
+                           (clientName && (msg.sender || '').toLowerCase() === clientName.toLowerCase());
+          onMessageReceived({
+            id: msg.id,
+            senderName: msg.sender,
+            senderType: isClient ? 'client' : 'admin',
+            content: msg.message,
+            createdAt: msg.created_at,
+            attachmentUrl: null,
+            attachmentName: null,
+            eventType: 'INSERT'
+          });
+        } else if (payload.eventType === 'DELETE') {
+          onMessageReceived({
+            id: payload.old.id,
+            eventType: 'DELETE'
+          });
+        }
       }
     )
     .subscribe();
+};
+
+/**
+ * Clear all chat messages for a client's project
+ */
+export const clearClientProjectChats = async (projectId, clientName) => {
+  const { data, error } = await supabase
+    .from('project_chats')
+    .delete()
+    .eq('project_id', projectId);
+
+  if (error) throw error;
+
+  // Insert project activity log for chat cleared
+  await supabase
+    .from('project_activity_logs')
+    .insert([
+      {
+        project_id: projectId,
+        action: `Chat history was cleared by client ${clientName || 'Client'}.`
+      }
+    ]);
+
+  return data;
 };
 
 /**
@@ -325,7 +404,7 @@ export const fetchClientInvoices = async (clientId) => {
   // 1. Fetch client's projects to get project mapping
   const { data: projects, error: pError } = await supabase
     .from('projects')
-    .select('id, name, payment_status')
+    .select('id, name, status, payment_status')
     .eq('client_id', clientId);
 
   if (pError) throw pError;
@@ -353,6 +432,7 @@ export const fetchClientInvoices = async (clientId) => {
       projectTitle: inv.project_service || proj?.name || 'Design Services',
       amount: parseFloat(inv.grand_total),
       status,
+      projectStatus: proj?.status || 'Active',
       createdAt: inv.issue_date || inv.created_at,
       dueDate: inv.issue_date ? new Date(new Date(inv.issue_date).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : null,
       paidAt: status === 'paid' ? inv.created_at : null,
@@ -408,10 +488,49 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
     }
   ];
 
+  // Fetch global settings for bankingDetails and adminProfile
+  let bankingDetails = {
+    bankName: "STATE BANK OF INDIA",
+    accountName: "NETRA GRAPHICS",
+    accountNumber: "20198798116",
+    ifscCode: "SBIN0060152",
+    upiId: "netragraphics@sbi"
+  };
+  let adminProfile = {
+    businessName: "NETRA GRAPHICS",
+    address: "Shreeji Complex, Opp. AaramGruh, Mendarda-Sasan Road, Mendarda-362260",
+    phone: "73590 93035",
+    email: "contact@netragraphics.com",
+    instagram: "HIRAPARASAVANPHOTOGRAPHER"
+  };
+
+  try {
+    const { data: settingsClient } = await supabase
+      .from('clients')
+      .select('address')
+      .eq('email', 'settings@netra.graphics')
+      .maybeSingle();
+      
+    if (settingsClient?.address) {
+      const parsed = JSON.parse(settingsClient.address);
+      if (parsed.banking) bankingDetails = parsed.banking;
+      if (parsed.profile) adminProfile = parsed.profile;
+    }
+  } catch (e) {
+    console.error("Error fetching system settings for client invoice details:", e);
+  }
+
+  const discount = parseFloat(inv.projects?.discount || 0);
+  const subtotal = parseFloat(inv.projects?.quote || amount + discount);
+
   return {
     id: inv.id,
     invoiceNumber: inv.invoice_no,
     status,
+    projectStatus: inv.projects?.status || 'Active',
+    advanceAmount: inv.projects?.advance_amount || 0,
+    discount,
+    subtotal,
     amount,
     createdAt: inv.issue_date || inv.created_at,
     dueDate: inv.issue_date ? new Date(new Date(inv.issue_date).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : null,
@@ -429,7 +548,9 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
       email: '',
       phone: '',
       address: ''
-    }
+    },
+    bankingDetails,
+    adminProfile
   };
 };
 
@@ -440,9 +561,7 @@ export const updateClientVaultProfile = async (clientId, updates) => {
   const { data, error } = await supabase
     .from('clients')
     .update({
-      name: updates.name,
-      phone: updates.phone,
-      address: updates.address
+      pending_profile_update: updates
     })
     .eq('id', clientId)
     .select()

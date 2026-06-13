@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Search, Pencil, Trash2, FileText, SlidersHorizontal, Grid, List, Eye } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, FileText, SlidersHorizontal, Grid, List, Eye, ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -162,6 +162,17 @@ export default function Projects({
   const [activeTab, setActiveTab] = useState<"Missions" | "MicroJobs">("Missions");
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
+  const [jobSortField, setJobSortField] = useState<"client" | "date" | "task" | "amount" | null>(null);
+  const [jobSortDirection, setJobSortDirection] = useState<"asc" | "desc">("asc");
+
+  const handleToggleJobSort = (field: "client" | "date" | "task" | "amount") => {
+    if (jobSortField === field) {
+      setJobSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setJobSortField(field);
+      setJobSortDirection("asc");
+    }
+  };
   const [isQuickJobModalOpen, setIsQuickJobModalOpen] = useState(false);
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
 
@@ -637,12 +648,49 @@ export default function Projects({
   }, [microJobs, selectedJobIds]);
 
   const displayedJobs = useMemo(() => {
-    const unbilled = microJobs.filter(job => job.billingStatus === "Unbilled");
+    let unbilled = microJobs.filter(job => job.billingStatus === "Unbilled");
     if (selectedClientLink !== null) {
-      return unbilled.filter(job => job.clientLink === selectedClientLink);
+      unbilled = unbilled.filter(job => job.clientLink === selectedClientLink);
     }
+
+    if (jobSortField) {
+      unbilled = [...unbilled].sort((a, b) => {
+        let valA: any = "";
+        let valB: any = "";
+
+        switch (jobSortField) {
+          case "client":
+            valA = (() => {
+              const live = a.client ? clients.find(c => String(c.id) === String(a.client.id) || (a.client.email && c.email && c.email.toLowerCase() === a.client.email.toLowerCase()) || (a.client.phone && c.phone && c.phone === a.client.phone)) : null;
+              return (live ? live.name : (a.client?.name || "Unknown Client")).toLowerCase();
+            })();
+            valB = (() => {
+              const live = b.client ? clients.find(c => String(c.id) === String(b.client.id) || (b.client.email && c.email && c.email.toLowerCase() === b.client.email.toLowerCase()) || (b.client.phone && c.phone && c.phone === b.client.phone)) : null;
+              return (live ? live.name : (b.client?.name || "Unknown Client")).toLowerCase();
+            })();
+            break;
+          case "date":
+            valA = a.dateLogged ? new Date(a.dateLogged).getTime() : 0;
+            valB = b.dateLogged ? new Date(b.dateLogged).getTime() : 0;
+            break;
+          case "task":
+            valA = (a.taskName || "").toLowerCase();
+            valB = (b.taskName || "").toLowerCase();
+            break;
+          case "amount":
+            valA = a.amount || 0;
+            valB = b.amount || 0;
+            break;
+        }
+
+        if (valA < valB) return jobSortDirection === "asc" ? -1 : 1;
+        if (valA > valB) return jobSortDirection === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
     return unbilled;
-  }, [microJobs, selectedClientLink]);
+  }, [microJobs, selectedClientLink, jobSortField, jobSortDirection, clients]);
 
   const unbilledDisplayedJobs = useMemo(() => {
     return displayedJobs;
@@ -1618,10 +1666,46 @@ export default function Projects({
                       }}
                     />
                   </th>
-                  <th className="p-4">Client Name</th>
-                  <th className="p-4 text-center">Date Logged</th>
-                  <th className="p-4">Task Description</th>
-                  <th className="p-4 text-right">Amount (INR)</th>
+                  <th className="p-4 cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleJobSort("client")}>
+                    <div className="flex items-center gap-1.5">
+                      <span>Client Name</span>
+                      {jobSortField === "client" ? (
+                        jobSortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-cyan-400" /> : <ChevronDown className="w-3.5 h-3.5 text-cyan-400" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-muted-foreground/30" />
+                      )}
+                    </div>
+                  </th>
+                  <th className="p-4 text-center cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleJobSort("date")}>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span>Date Logged</span>
+                      {jobSortField === "date" ? (
+                        jobSortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-cyan-400" /> : <ChevronDown className="w-3.5 h-3.5 text-cyan-400" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-muted-foreground/30" />
+                      )}
+                    </div>
+                  </th>
+                  <th className="p-4 cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleJobSort("task")}>
+                    <div className="flex items-center gap-1.5">
+                      <span>Task Description</span>
+                      {jobSortField === "task" ? (
+                        jobSortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-cyan-400" /> : <ChevronDown className="w-3.5 h-3.5 text-cyan-400" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-muted-foreground/30" />
+                      )}
+                    </div>
+                  </th>
+                  <th className="p-4 text-right cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleJobSort("amount")}>
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span>Amount (INR)</span>
+                      {jobSortField === "amount" ? (
+                        jobSortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-cyan-400" /> : <ChevronDown className="w-3.5 h-3.5 text-cyan-400" />
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-muted-foreground/30" />
+                      )}
+                    </div>
+                  </th>
                   <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>

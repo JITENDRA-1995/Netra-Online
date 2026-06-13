@@ -28,8 +28,11 @@ export function ClientInvoices({ currentClient, onTabChange, setSelectedInvoiceI
     loadInvoices();
   }, [currentClient]);
 
-  const getStatusBadge = (status) => {
-    switch (status) {
+  const getStatusBadge = (invoice) => {
+    if (invoice.projectStatus !== 'Completed') {
+      return <Badge className="bg-cyan-500/10 text-cyan-400 border-cyan-500/20 hover:bg-cyan-500/20"><Clock className="h-3 w-3 mr-1" /> Draft</Badge>;
+    }
+    switch (invoice.status) {
       case 'paid':
         return <Badge className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"><CheckCircle2 className="h-3 w-3 mr-1" /> Paid</Badge>;
       case 'sent':
@@ -38,7 +41,7 @@ export function ClientInvoices({ currentClient, onTabChange, setSelectedInvoiceI
       case 'overdue':
         return <Badge variant="destructive" className="bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20"><AlertCircle className="h-3 w-3 mr-1" /> Overdue</Badge>;
       default:
-        return <Badge variant="outline" className="capitalize">{status}</Badge>;
+        return <Badge variant="outline" className="capitalize">{invoice.status}</Badge>;
     }
   };
 
@@ -84,8 +87,10 @@ export function ClientInvoices({ currentClient, onTabChange, setSelectedInvoiceI
                 <CardContent className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-3">
-                      <span className="font-medium text-foreground">{invoice.invoiceNumber}</span>
-                      {getStatusBadge(invoice.status)}
+                      <span className="font-medium text-foreground">
+                        {invoice.projectStatus !== 'Completed' ? `Draft: ${invoice.invoiceNumber}` : invoice.invoiceNumber}
+                      </span>
+                      {getStatusBadge(invoice)}
                     </div>
                     <p className="text-sm text-muted-foreground">{invoice.projectTitle || 'General Design Services'}</p>
                   </div>

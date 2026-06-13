@@ -22,10 +22,11 @@ export function ClientProfile({ currentClient, setCurrentClient }) {
 
   useEffect(() => {
     if (currentClient) {
+      const pending = currentClient.pending_profile_update;
       setFormData({
-        name: currentClient.name || "",
-        phone: currentClient.phone || "",
-        address: currentClient.address || "",
+        name: pending?.name || currentClient.name || "",
+        phone: pending?.phone || currentClient.phone || "",
+        address: pending?.address || currentClient.address || "",
         company: "Client Account",
         website: "",
         bio: ""
@@ -82,10 +83,11 @@ export function ClientProfile({ currentClient, setCurrentClient }) {
     }
   };
 
+  const pending = currentClient?.pending_profile_update;
   const isDirty = 
-    formData.name !== (currentClient?.name || "") ||
-    formData.phone !== (currentClient?.phone || "") ||
-    formData.address !== (currentClient?.address || "");
+    formData.name !== (pending?.name || currentClient?.name || "") ||
+    formData.phone !== (pending?.phone || currentClient?.phone || "") ||
+    formData.address !== (pending?.address || currentClient?.address || "");
 
   return (
     <div className="space-y-8 max-w-3xl animate-in fade-in duration-500 client-vault-theme">
@@ -93,6 +95,50 @@ export function ClientProfile({ currentClient, setCurrentClient }) {
         <h1 className="text-3xl font-serif font-medium tracking-tight">Profile Settings</h1>
         <p className="text-muted-foreground">Manage your personal information and contact details.</p>
       </div>
+
+      {currentClient?.pending_profile_update && (
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+            </span>
+            <span>Profile changes are pending admin approval. You can still modify your request or cancel it.</span>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={isSaving}
+            className="text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 text-2xs py-1 px-3 h-7 rounded-lg font-bold border border-amber-500/20 w-fit cursor-pointer transition-all self-end sm:self-auto"
+            onClick={async () => {
+              setIsSaving(true);
+              try {
+                await updateClientVaultProfile(currentClient.id, null);
+                setCurrentClient(prev => ({
+                  ...prev,
+                  pending_profile_update: null
+                }));
+                toast({
+                  title: "Request Cancelled",
+                  description: "Your pending profile updates have been discarded successfully.",
+                });
+              } catch (err) {
+                console.error(err);
+                toast({
+                  variant: "destructive",
+                  title: "Error",
+                  description: "Failed to discard pending changes.",
+                });
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+          >
+            Cancel Request
+          </Button>
+        </div>
+      )}
 
       <div className="grid gap-8">
         <Card className="border-border/50 bg-card overflow-hidden">

@@ -28,7 +28,8 @@ import {
   Lock,
   Key,
   Undo,
-  ShieldAlert
+  ShieldAlert,
+  Mail
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -385,6 +386,9 @@ export default function SettingsPage({
   const [profileGst, setProfileGst] = useState(adminProfile?.gst || "");
   const [profileInstagram, setProfileInstagram] = useState(adminProfile?.instagram || "");
   const [isProfileSaving, setIsProfileSaving] = useState(false);
+  const [emailNewInquiries, setEmailNewInquiries] = useState(adminProfile?.emailNotifications?.newInquiries ?? true);
+  const [emailNewMessages, setEmailNewMessages] = useState(adminProfile?.emailNotifications?.newMessages ?? true);
+  const [emailDeadlines, setEmailDeadlines] = useState(adminProfile?.emailNotifications?.deadlines ?? true);
 
   useEffect(() => {
     if (bankingDetails) {
@@ -404,6 +408,9 @@ export default function SettingsPage({
       setProfileEmail(adminProfile.email || "");
       setProfileGst(adminProfile.gst || "");
       setProfileInstagram(adminProfile.instagram || "");
+      setEmailNewInquiries(adminProfile.emailNotifications?.newInquiries ?? true);
+      setEmailNewMessages(adminProfile.emailNotifications?.newMessages ?? true);
+      setEmailDeadlines(adminProfile.emailNotifications?.deadlines ?? true);
     }
   }, [adminProfile]);
 
@@ -484,7 +491,12 @@ export default function SettingsPage({
         phone: profilePhone,
         email: profileEmail,
         gst: profileGst,
-        instagram: profileInstagram
+        instagram: profileInstagram,
+        emailNotifications: {
+          newInquiries: emailNewInquiries,
+          newMessages: emailNewMessages,
+          deadlines: emailDeadlines
+        }
       });
     } catch (err) {
       console.error("Save profile error:", err);
@@ -1638,6 +1650,57 @@ export default function SettingsPage({
                     placeholder="e.g. hiraparasavanphotographer"
                     className="bg-white/5 border-white/10 text-xs rounded-xl h-10 font-mono text-foreground"
                   />
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-white/5">
+                  <h4 className="font-bold text-xs uppercase tracking-widest text-[#00E5FF] flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-[#00E5FF]" />
+                    Email Notification Subscriptions
+                  </h4>
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    Configure real-time email triggers linked to key agency events. Toast alerts simulate dispatch on active clients.
+                  </p>
+                  
+                  <div className="space-y-3 mt-3">
+                    <label className="flex items-center gap-3 cursor-pointer p-2.5 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] transition-all">
+                      <input 
+                        type="checkbox"
+                        checked={emailNewInquiries}
+                        onChange={e => setEmailNewInquiries(e.target.checked)}
+                        className="w-4.5 h-4.5 rounded border-white/10 bg-black text-indigo-500 accent-indigo-500 cursor-pointer"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-white block">New Inquiries & Leads</span>
+                        <span className="text-[10px] text-muted-foreground block mt-0.5">Receive immediate notification when a prospective client submits an inquiry spark.</span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 cursor-pointer p-2.5 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] transition-all">
+                      <input 
+                        type="checkbox"
+                        checked={emailNewMessages}
+                        onChange={e => setEmailNewMessages(e.target.checked)}
+                        className="w-4.5 h-4.5 rounded border-white/10 bg-black text-indigo-500 accent-indigo-500 cursor-pointer"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-white block">Real-time Conversations</span>
+                        <span className="text-[10px] text-muted-foreground block mt-0.5">Receive immediate notification when a client replies or starts a conversation stream.</span>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 cursor-pointer p-2.5 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] transition-all">
+                      <input 
+                        type="checkbox"
+                        checked={emailDeadlines}
+                        onChange={e => setEmailDeadlines(e.target.checked)}
+                        className="w-4.5 h-4.5 rounded border-white/10 bg-black text-indigo-500 accent-indigo-500 cursor-pointer"
+                      />
+                      <div>
+                        <span className="text-xs font-bold text-white block">Project Deadlines approaching</span>
+                        <span className="text-[10px] text-muted-foreground block mt-0.5">Receive notification alerts for ongoing project missions heading close to their deadlines.</span>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
                 <Button

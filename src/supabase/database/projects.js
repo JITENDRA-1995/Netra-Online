@@ -74,9 +74,31 @@ export const getProjects = async () => {
         email: project.clients.email,
         address: project.clients.address
       } : null,
-      milestones: (project.project_milestones || [])
-        .sort((a, b) => a.position - b.position)
-        .map(m => ({ name: m.name, completed: m.completed })),
+      milestones: (() => {
+        const status = project.status;
+        const progress = project.progress;
+        const stage = project.stage;
+
+        let maxCompletedPosition = -1;
+        if (status === "Completed" || progress >= 100 || stage >= 5) {
+          maxCompletedPosition = 4;
+        } else if (progress >= 80 || stage >= 4) {
+          maxCompletedPosition = 3;
+        } else if (progress >= 60 || stage >= 3) {
+          maxCompletedPosition = 2;
+        } else if (progress >= 40 || stage >= 2) {
+          maxCompletedPosition = 1;
+        } else if (progress >= 20 || stage >= 1) {
+          maxCompletedPosition = 0;
+        }
+
+        return (project.project_milestones || [])
+          .sort((a, b) => a.position - b.position)
+          .map(m => ({
+            name: m.name,
+            completed: m.completed || (maxCompletedPosition >= 0 && m.position <= maxCompletedPosition)
+          }));
+      })(),
       activityLog: (project.project_activity_logs || [])
         .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
         .map(l => ({ action: l.action, time: new Date(l.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) })),
@@ -249,6 +271,45 @@ export const updateProjectState = async (projectId, updates) => {
     .single();
 
   if (error) throw error;
+
+  // Sync project_milestones table based on progress, stage, or status
+  try {
+    const status = updates.status || data?.status;
+    const progress = updates.progress !== undefined ? updates.progress : data?.progress;
+    const stage = updates.stage !== undefined ? updates.stage : data?.stage;
+
+    let maxCompletedPosition = -1;
+    if (status === "Completed" || progress >= 100 || stage >= 5) {
+      maxCompletedPosition = 4;
+    } else if (progress >= 80 || stage >= 4) {
+      maxCompletedPosition = 3;
+    } else if (progress >= 60 || stage >= 3) {
+      maxCompletedPosition = 2;
+    } else if (progress >= 40 || stage >= 2) {
+      maxCompletedPosition = 1;
+    } else if (progress >= 20 || stage >= 1) {
+      maxCompletedPosition = 0;
+    }
+
+    if (maxCompletedPosition >= 0) {
+      // Mark milestones up to maxCompletedPosition as completed
+      await supabase
+        .from('project_milestones')
+        .update({ completed: true })
+        .eq('project_id', projectId)
+        .lte('position', maxCompletedPosition);
+
+      // Mark milestones after maxCompletedPosition as incomplete
+      await supabase
+        .from('project_milestones')
+        .update({ completed: false })
+        .eq('project_id', projectId)
+        .gt('position', maxCompletedPosition);
+    }
+  } catch (syncErr) {
+    console.error("Failed to sync project milestones in database:", syncErr);
+  }
+
   return data;
 };
 
@@ -308,22 +369,54 @@ export const subscribeToChats = (projectId, onMessageReceived) => {
     .on(
       'postgres_changes',
       {
-        event: 'INSERT',
+        event: '*',
         schema: 'public',
         table: 'project_chats',
         filter: `project_id=eq.${projectId}`
       },
       (payload) => {
-        const msg = payload.new;
-        onMessageReceived({
-          id: msg.id,
-          sender: msg.sender,
-          text: msg.message,
-          time: new Date(msg.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-        });
+        if (payload.eventType === 'INSERT') {
+          const msg = payload.new;
+          onMessageReceived({
+            id: msg.id,
+            sender: msg.sender,
+            text: msg.message,
+            time: new Date(msg.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+            eventType: 'INSERT'
+          });
+        } else if (payload.eventType === 'DELETE') {
+          onMessageReceived({
+            id: payload.old.id,
+            eventType: 'DELETE'
+          });
+        }
       }
     )
     .subscribe();
+};
+
+/**
+ * Clear all chat messages for a project
+ */
+export const clearProjectChats = async (projectId) => {
+  const { data, error } = await supabase
+    .from('project_chats')
+    .delete()
+    .eq('project_id', projectId);
+
+  if (error) throw error;
+
+  // Log activity
+  await supabase
+    .from('project_activity_logs')
+    .insert([
+      {
+        project_id: projectId,
+        action: `Project chat history was cleared.`
+      }
+    ]);
+
+  return data;
 };
 
 /* ==========================================================================

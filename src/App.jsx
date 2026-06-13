@@ -1332,6 +1332,41 @@ function App() {
     }
   }, [clients, currentClient]);
 
+  const notifiedDeadlinesRef = useRef([]);
+
+  // Project Approaching Deadlines Checker
+  useEffect(() => {
+    if (ignitionQueue.length === 0 || !isCommandCenterActive) return;
+    if (!(adminProfile?.emailNotifications?.deadlines ?? true)) return;
+
+    const checkDeadlines = () => {
+      const now = new Date();
+      ignitionQueue.forEach(project => {
+        if (['completed', 'cancelled'].includes((project.status || '').toLowerCase())) return;
+        if (notifiedDeadlinesRef.current.includes(project.id)) return;
+
+        if (project.deadline) {
+          const deadlineDate = new Date(project.deadline);
+          const timeDiff = deadlineDate.getTime() - now.getTime();
+          const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+          const alertThreshold = project.alertMeDays !== undefined && project.alertMeDays !== "" ? Number(project.alertMeDays) : 3;
+
+          if (daysDiff >= 0 && daysDiff <= alertThreshold) {
+            notifiedDeadlinesRef.current.push(project.id);
+            toast({
+              title: "✉️ Email Notification Dispatched",
+              description: `To: ${adminProfile?.email || 'contact@netragraphics.com'}\nSubject: Approaching Deadline: ${project.service}\nDeadline: ${project.deadline} (${daysDiff} days left)`,
+              className: "bg-indigo-950 border-indigo-500/50 text-indigo-200"
+            });
+          }
+        }
+      });
+    };
+
+    checkDeadlines();
+  }, [ignitionQueue, adminProfile, isCommandCenterActive]);
+
   useEffect(() => {
     localStorage.setItem('netra_active_admin_module', activeAdminModule);
   }, [activeAdminModule]);
@@ -1558,6 +1593,15 @@ function App() {
               duration: 8000
             });
             triggerBellPulse();
+
+            // Simulate email dispatch
+            if (adminProfile?.emailNotifications?.newInquiries ?? true) {
+              toast({
+                title: "✉️ Email Notification Dispatched",
+                description: `To: ${adminProfile?.email || 'contact@netragraphics.com'}\nSubject: New Inquiry: ${newInq.name}\nService: ${newInq.service || 'General'}`,
+                className: "bg-indigo-950 border-indigo-500/50 text-indigo-200"
+              });
+            }
           }
         } catch (err) {
           console.warn("Real-time inquiries refresh failed:", err);
@@ -1577,6 +1621,23 @@ function App() {
       })
       .subscribe();
 
+    // 5. Subscribe to project_chats table changes globally for email notifications
+    const chatsGlobalChannel = supabase
+      .channel('chats-global-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'project_chats' }, async (payload) => {
+        const newMsg = payload.new;
+        if (newMsg && newMsg.sender !== 'admin' && newMsg.sender !== 'SYSTEM' && newMsg.sender?.toLowerCase() !== 'admin') {
+          if (adminProfile?.emailNotifications?.newMessages ?? true) {
+            toast({
+              title: "✉️ Email Notification Dispatched",
+              description: `To: ${adminProfile?.email || 'contact@netragraphics.com'}\nSubject: New Message from ${newMsg.sender}\nMessage: "${newMsg.message.substring(0, 30)}${newMsg.message.length > 30 ? '...' : ''}"`,
+              className: "bg-indigo-950 border-indigo-500/50 text-indigo-200"
+            });
+          }
+        }
+      })
+      .subscribe();
+
     return () => {
       if (supabase.removeChannel) {
         supabase.removeChannel(projectsChannel);
@@ -1584,6 +1645,7 @@ function App() {
         supabase.removeChannel(clientsChannel);
         supabase.removeChannel(inquiriesChannel);
         supabase.removeChannel(microJobsChannel);
+        supabase.removeChannel(chatsGlobalChannel);
       }
     };
   }, []);
@@ -2983,10 +3045,23 @@ function App() {
 
       setIgnitionQueue(prev => prev.map(p => {
         if (p.id === projectId) {
+          let maxPos = -1;
+          if (newStatus === "Completed" || nextStage >= 5) maxPos = 4;
+          else if (nextStage === 4) maxPos = 3;
+          else if (nextStage === 3) maxPos = 2;
+          else if (nextStage === 2) maxPos = 1;
+          else if (nextStage === 1) maxPos = 0;
+
+          const updatedMilestones = (p.milestones || []).map((m, idx) => ({
+            ...m,
+            completed: idx <= maxPos
+          }));
+
           return {
             ...p,
             stage: nextStage,
             status: newStatus,
+            milestones: updatedMilestones,
             activityLog: [
               { action: actionMsg, time: new Date().toLocaleTimeString() },
               ...(p.activityLog || [])
@@ -3005,10 +3080,25 @@ function App() {
     setSelectedKanbanProject(prev => {
       if (!prev) return null;
       const nextStage = Math.min(4, prev.stage + 1);
+      const nextStatus = nextStage === 4 ? "Completed" : prev.status;
+
+      let maxPos = -1;
+      if (nextStatus === "Completed" || nextStage >= 5) maxPos = 4;
+      else if (nextStage === 4) maxPos = 3;
+      else if (nextStage === 3) maxPos = 2;
+      else if (nextStage === 2) maxPos = 1;
+      else if (nextStage === 1) maxPos = 0;
+
+      const updatedMilestones = (prev.milestones || []).map((m, idx) => ({
+        ...m,
+        completed: idx <= maxPos
+      }));
+
       return {
         ...prev,
         stage: nextStage,
-        status: nextStage === 4 ? "Completed" : prev.status
+        status: nextStatus,
+        milestones: updatedMilestones
       };
     });
   };
@@ -3040,9 +3130,22 @@ function App() {
 
       setIgnitionQueue(prev => prev.map(p => {
         if (p.id === projectId) {
+          let maxPos = -1;
+          if (newStatus === "Completed" || p.progress >= 100 || p.stage >= 5) maxPos = 4;
+          else if (p.progress >= 80 || p.stage >= 4) maxPos = 3;
+          else if (p.progress >= 60 || p.stage >= 3) maxPos = 2;
+          else if (p.progress >= 40 || p.stage >= 2) maxPos = 1;
+          else if (p.progress >= 20 || p.stage >= 1) maxPos = 0;
+
+          const updatedMilestones = (p.milestones || []).map((m, idx) => ({
+            ...m,
+            completed: idx <= maxPos
+          }));
+
           return {
             ...p,
             status: newStatus,
+            milestones: updatedMilestones,
             activityLog: [
               { action: actionMsg, time: new Date().toLocaleTimeString() },
               ...(p.activityLog || [])
@@ -3055,7 +3158,26 @@ function App() {
       console.error("Failed to update project status in Supabase:", err);
     }
 
-    setSelectedKanbanProject(prev => prev ? { ...prev, status: newStatus } : null);
+    setSelectedKanbanProject(prev => {
+      if (!prev) return null;
+      let maxPos = -1;
+      if (newStatus === "Completed" || prev.progress >= 100 || prev.stage >= 5) maxPos = 4;
+      else if (prev.progress >= 80 || prev.stage >= 4) maxPos = 3;
+      else if (prev.progress >= 60 || prev.stage >= 3) maxPos = 2;
+      else if (prev.progress >= 40 || prev.stage >= 2) maxPos = 1;
+      else if (prev.progress >= 20 || prev.stage >= 1) maxPos = 0;
+
+      const updatedMilestones = (prev.milestones || []).map((m, idx) => ({
+        ...m,
+        completed: idx <= maxPos
+      }));
+
+      return {
+        ...prev,
+        status: newStatus,
+        milestones: updatedMilestones
+      };
+    });
     triggerBellPulse();
   };
 
@@ -3306,6 +3428,12 @@ function App() {
     const subscription = subscribeToChats(selectedProjectTab, (newMsg) => {
       setIgnitionQueue(prevQueue => prevQueue.map(proj => {
         if (proj.id === selectedProjectTab) {
+          if (newMsg.eventType === 'DELETE') {
+            return {
+              ...proj,
+              collaborationStream: (proj.collaborationStream || []).filter(msg => msg.id !== newMsg.id)
+            };
+          }
           const exists = (proj.collaborationStream || []).some(msg => msg.id === newMsg.id);
           if (exists) return proj;
           return {
@@ -3594,13 +3722,57 @@ function App() {
 
     setIgnitionQueue(prev => prev.map(p => {
       if (p.id === projectId) {
+        const nextStatus = updatedFields.status || p.status;
+        const nextStage = updatedFields.stage !== undefined ? updatedFields.stage : p.stage;
+        const nextProgress = updatedFields.progress !== undefined ? updatedFields.progress : p.progress;
+
+        let maxPos = -1;
+        if (nextStatus === "Completed" || nextProgress >= 100 || nextStage >= 5) maxPos = 4;
+        else if (nextProgress >= 80 || nextStage >= 4) maxPos = 3;
+        else if (nextProgress >= 60 || nextStage >= 3) maxPos = 2;
+        else if (nextProgress >= 40 || nextStage >= 2) maxPos = 1;
+        else if (nextProgress >= 20 || nextStage >= 1) maxPos = 0;
+
+        const updatedMilestones = (p.milestones || []).map((m, idx) => ({
+          ...m,
+          completed: idx <= maxPos
+        }));
+
         return {
           ...p,
-          ...updatedFields
+          ...updatedFields,
+          milestones: updatedMilestones
         };
       }
       return p;
     }));
+
+    setSelectedKanbanProject(prev => {
+      if (prev && prev.id === projectId) {
+        const nextStatus = updatedFields.status || prev.status;
+        const nextStage = updatedFields.stage !== undefined ? updatedFields.stage : prev.stage;
+        const nextProgress = updatedFields.progress !== undefined ? updatedFields.progress : prev.progress;
+
+        let maxPos = -1;
+        if (nextStatus === "Completed" || nextProgress >= 100 || nextStage >= 5) maxPos = 4;
+        else if (nextProgress >= 80 || nextStage >= 4) maxPos = 3;
+        else if (nextProgress >= 60 || nextStage >= 3) maxPos = 2;
+        else if (nextProgress >= 40 || nextStage >= 2) maxPos = 1;
+        else if (nextProgress >= 20 || nextStage >= 1) maxPos = 0;
+
+        const updatedMilestones = (prev.milestones || []).map((m, idx) => ({
+          ...m,
+          completed: idx <= maxPos
+        }));
+
+        return {
+          ...prev,
+          ...updatedFields,
+          milestones: updatedMilestones
+        };
+      }
+      return prev;
+    });
   };
 
   const handleUpdateProjectProgressHandy = async (projectId, newProgress) => {
@@ -3637,13 +3809,55 @@ function App() {
       await updateProjectState(projectId, updatedFields);
       setIgnitionQueue(prev => prev.map(p => {
         if (p.id === projectId) {
+          const nextStage = updatedFields.stage !== undefined ? updatedFields.stage : p.stage;
+          const nextStatus = nextStage === 4 && newProgress === 100 ? "Completed" : p.status;
+
+          let maxPos = -1;
+          if (nextStatus === "Completed" || newProgress >= 100 || nextStage >= 5) maxPos = 4;
+          else if (newProgress >= 80 || nextStage >= 4) maxPos = 3;
+          else if (newProgress >= 60 || nextStage >= 3) maxPos = 2;
+          else if (newProgress >= 40 || nextStage >= 2) maxPos = 1;
+          else if (newProgress >= 20 || nextStage >= 1) maxPos = 0;
+
+          const updatedMilestones = (p.milestones || []).map((m, idx) => ({
+            ...m,
+            completed: idx <= maxPos
+          }));
+
           return {
             ...p,
-            ...updatedFields
+            ...updatedFields,
+            milestones: updatedMilestones
           };
         }
         return p;
       }));
+
+      setSelectedKanbanProject(prev => {
+        if (prev && prev.id === projectId) {
+          const nextStage = updatedFields.stage !== undefined ? updatedFields.stage : prev.stage;
+          const nextStatus = nextStage === 4 && newProgress === 100 ? "Completed" : prev.status;
+
+          let maxPos = -1;
+          if (nextStatus === "Completed" || newProgress >= 100 || nextStage >= 5) maxPos = 4;
+          else if (newProgress >= 80 || nextStage >= 4) maxPos = 3;
+          else if (newProgress >= 60 || nextStage >= 3) maxPos = 2;
+          else if (newProgress >= 40 || nextStage >= 2) maxPos = 1;
+          else if (newProgress >= 20 || nextStage >= 1) maxPos = 0;
+
+          const updatedMilestones = (prev.milestones || []).map((m, idx) => ({
+            ...m,
+            completed: idx <= maxPos
+          }));
+
+          return {
+            ...prev,
+            ...updatedFields,
+            milestones: updatedMilestones
+          };
+        }
+        return prev;
+      });
       toast({
         title: "Project Progress Calibrated",
         description: `Successfully updated progress to ${newProgress}%.`
@@ -6166,11 +6380,11 @@ function App() {
                       <h4 className="section-title">PROGRESS ROADMAP</h4>
                       <div className="roadmap-list">
                         {selectedKanbanProject.milestones.map((m, idx) => (
-                          <div key={idx} className={`roadmap-step ${selectedKanbanProject.completedMilestones.includes(m) ? 'done' : ''}`}>
+                          <div key={idx} className={`roadmap-step ${m.completed ? 'done' : ''}`}>
                             <div className="step-check">
-                              {selectedKanbanProject.completedMilestones.includes(m) && "✓"}
+                              {m.completed && "✓"}
                             </div>
-                            <span className="step-name">{m}</span>
+                            <span className="step-name">{m.name}</span>
                           </div>
                         ))}
                       </div>
@@ -6586,6 +6800,7 @@ function App() {
                             status: "Completed",
                             stage: 4,
                             progress: 100,
+                            milestones: (proj.milestones || []).map(m => ({ ...m, completed: true })),
                             activityLog: [
                               { action: `Project marked as Completed & Final Payment of ₹${amt} Logged`, time: new Date().toLocaleTimeString() },
                               ...(proj.activityLog || [])
@@ -6600,7 +6815,8 @@ function App() {
                               stage: 4,
                               status: "Completed",
                               paymentStatus: 'paid',
-                              progress: 100
+                              progress: 100,
+                              milestones: (prev.milestones || []).map(m => ({ ...m, completed: true }))
                             };
                           }
                           return prev;

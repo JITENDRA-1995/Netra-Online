@@ -1,8 +1,11 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { Plus, Search, Pencil, Trash2, Building2, Mail, Phone, Calendar, Key, Copy, Share2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Plus, Search, Pencil, Trash2, Building2, Mail, Phone, Calendar, Key, Copy, Share2, UserCheck, MessageSquare, Send, FileText, X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { supabase } from "../supabase/client";
+import { igniteProject } from "../supabase/database/projects";
+import { approveClientProfileUpdate, rejectClientProfileUpdate } from "../supabase/database/clients";
 
 interface Client {
   id: number;
@@ -15,6 +18,7 @@ interface Client {
   gst?: string;
   accessKey?: string;
   access_key?: string;
+  pending_profile_update?: { name?: string; phone?: string; address?: string; } | null;
 }
 
 interface ClientsProps {
@@ -44,6 +48,264 @@ export default function Clients({
   onDeleteClient
 }: ClientsProps) {
   const [search, setSearch] = useState("");
+
+  // States for Review Changes modal
+  const [reviewClient, setReviewClient] = useState<Client | null>(null);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isActionLoading, setIsActionLoading] = useState(false);
+
+  // States for Conversation Bridge modal
+  const [bridgeClient, setBridgeClient] = useState<Client | null>(null);
+  const [isBridgeModalOpen, setIsBridgeModalOpen] = useState(false);
+  const [bridgeProjects, setBridgeProjects] = useState<any[]>([]);
+  const [selectedBridgeProject, setSelectedBridgeProject] = useState<any | null>(null);
+  const [bridgeMessages, setBridgeMessages] = useState<any[]>([]);
+  const [bridgeContent, setBridgeContent] = useState("");
+  const [isBridgeLoading, setIsBridgeLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Scroll chat to bottom
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [bridgeMessages]);
+
+  // Handle Review Approvals & Rejections
+  const handleApprove = async () => {
+    if (!reviewClient || !reviewClient.pending_profile_update) return;
+    setIsActionLoading(true);
+    try {
+      await approveClientProfileUpdate(reviewClient.id, reviewClient.pending_profile_update);
+      alert("Changes approved successfully! Profile will reflect updates shortly.");
+      setIsReviewModalOpen(false);
+      setReviewClient(null);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to approve changes.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!reviewClient) return;
+    setIsActionLoading(true);
+    try {
+      await rejectClientProfileUpdate(reviewClient.id);
+      alert("Changes rejected successfully.");
+      setIsReviewModalOpen(false);
+      setReviewClient(null);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to reject changes.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  // Handle Conversation Bridge project loading & general chat ignite
+  const handleOpenBridge = async (client: Client) => {
+    setBridgeClient(client);
+    setIsBridgeModalOpen(true);
+    setIsBridgeLoading(true);
+    setBridgeMessages([]);
+    setBridgeContent("");
+
+    // Find client's projects
+    const projects = ignitionQueue.filter(p => 
+      String(p.client_id) === String(client.id) || 
+      String(p.client?.id) === String(client.id) ||
+      p.name?.trim().toLowerCase() === client.name?.trim().toLowerCase()
+    );
+
+    if (projects.length > 0) {
+      setBridgeProjects(projects);
+      setSelectedBridgeProject(projects[0]);
+      setIsBridgeLoading(false);
+    } else {
+      // Auto-create General Support & Chat project
+      try {
+        const milestoneNames = ["Discovery", "Moodboard", "Sketching", "Printing", "Final Flame"];
+        const savedProjCore = await igniteProject({
+          name: client.name,
+          service: "General Support & Chat",
+          stage: 1,
+          progress: 20,
+          status: "Active",
+          priority: "Normal",
+          alertMeDays: "",
+          description: "General support and direct communication channel between client and admin.",
+          deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          client_id: client.id,
+          qty: 1,
+          rate: 0,
+          quote: 0,
+          discountValue: "0",
+          discountType: "rs",
+          discountPercent: "0",
+          discount: 0,
+          advanceAmount: 0,
+          paymentStatus: "paid",
+          milestones: milestoneNames.map((name, idx) => ({ name, completed: name === "Discovery" }))
+        });
+
+        const newProj = {
+          id: savedProjCore.id,
+          name: client.name,
+          service: "General Support & Chat",
+          stage: 1,
+          progress: 20,
+          status: "Active",
+          priority: "Normal",
+          client_id: client.id,
+          client: {
+            id: client.id,
+            name: client.name,
+            email: client.email,
+            phone: client.phone,
+            address: client.address
+          }
+        };
+
+        setBridgeProjects([newProj]);
+        setSelectedBridgeProject(newProj);
+      } catch (err) {
+        console.error("Failed to auto-create support project:", err);
+        alert("Failed to initialize conversation support channel.");
+        setIsBridgeModalOpen(false);
+      } finally {
+        setIsBridgeLoading(false);
+      }
+    }
+  };
+
+  // Real-time Chat Subscription for selected project in bridge modal
+  useEffect(() => {
+    if (!isBridgeModalOpen || !selectedBridgeProject) {
+      setBridgeMessages([]);
+      return;
+    }
+
+    // Load initial chat messages
+    const loadChats = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('project_chats')
+          .select('*')
+          .eq('project_id', selectedBridgeProject.id)
+          .order('created_at', { ascending: true });
+
+        if (!error && data) {
+          setBridgeMessages(data);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    loadChats();
+
+    // Subscribe to realtime updates
+    const channel = supabase
+      .channel(`bridge-project-chat-${selectedBridgeProject.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'project_chats',
+          filter: `project_id=eq.${selectedBridgeProject.id}`
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newMsg = payload.new;
+            setBridgeMessages(prev => {
+              if (prev.some(m => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
+          } else if (payload.eventType === 'DELETE') {
+            const oldMsg = payload.old;
+            setBridgeMessages(prev => prev.filter(m => m.id !== oldMsg.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [selectedBridgeProject, isBridgeModalOpen]);
+
+  // Send message from Admin Bridge
+  const handleSendMessage = async () => {
+    if (!bridgeContent.trim() || !selectedBridgeProject) return;
+    const text = bridgeContent.trim();
+    setBridgeContent("");
+    try {
+      const { data, error } = await supabase
+        .from('project_chats')
+        .insert([
+          {
+            project_id: selectedBridgeProject.id,
+            sender: "admin",
+            message: text
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setBridgeMessages(prev => {
+          if (prev.some(m => m.id === data.id)) return prev;
+          return [...prev, data];
+        });
+      }
+
+      await supabase
+        .from('project_activity_logs')
+        .insert([
+          {
+            project_id: selectedBridgeProject.id,
+            action: `Admin sent message: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`
+          }
+        ]);
+    } catch (err) {
+      console.error("Failed to send message:", err);
+      alert("Failed to send message.");
+    }
+  };
+
+  // Clear Chat history from Admin Bridge
+  const handleClearBridgeChat = async () => {
+    if (!selectedBridgeProject) return;
+    const confirmClear = window.confirm("Are you sure you want to permanently clear the conversation history for this project/channel?");
+    if (!confirmClear) return;
+
+    try {
+      const { error } = await supabase
+        .from('project_chats')
+        .delete()
+        .eq('project_id', selectedBridgeProject.id);
+
+      if (error) throw error;
+
+      setBridgeMessages([]);
+
+      await supabase
+        .from('project_activity_logs')
+        .insert([
+          {
+            project_id: selectedBridgeProject.id,
+            action: `Admin cleared chat history.`
+          }
+        ]);
+    } catch (err) {
+      console.error("Failed to clear chat:", err);
+      alert("Failed to clear conversation history.");
+    }
+  };
 
   const filtered = clients.filter(
     (c) =>
@@ -200,6 +462,36 @@ export default function Clients({
                       </span>
                     </div>
                     <div className="flex gap-1">
+                      {client.pending_profile_update && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Review Pending Changes"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setReviewClient(client);
+                            setIsReviewModalOpen(true);
+                          }}
+                          className="w-6 h-6 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 transition-all relative"
+                        >
+                          <FileText className="w-3 h-3" />
+                          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-amber-500 rounded-full animate-ping" />
+                        </Button>
+                      )}
+
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Conversation Bridge"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenBridge(client);
+                        }}
+                        className="w-6 h-6 rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 transition-all"
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                      </Button>
+
                       <Button
                         size="icon"
                         variant="ghost"
@@ -268,6 +560,286 @@ export default function Clients({
           </div>
         )}
       </motion.div>
+
+      {/* Review Changes Modal */}
+      <AnimatePresence>
+        {isReviewModalOpen && reviewClient && reviewClient.pending_profile_update && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              onClick={() => setIsReviewModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.95, opacity: 0 }} 
+              className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-[#0a0f1e]/95 p-6 shadow-2xl backdrop-blur-md text-left overflow-hidden"
+            >
+              <div className="absolute top-4 right-4">
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  onClick={() => setIsReviewModalOpen(false)}
+                  className="w-8 h-8 rounded-lg text-muted-foreground hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <h3 className="text-lg font-black text-white flex items-center gap-2 mb-2 uppercase tracking-wide">
+                <UserCheck className="w-5 h-5 text-amber-400" />
+                Review Profile Updates
+              </h3>
+              <p className="text-3xs text-muted-foreground uppercase tracking-wider mb-6">
+                Client: {reviewClient.name} ({reviewClient.email})
+              </p>
+
+              <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1">
+                {/* Comparison Grid */}
+                <div className="grid grid-cols-2 gap-4 border-b border-white/5 pb-4 text-xs">
+                  <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">CURRENT INFO</div>
+                  <div className="text-[10px] font-mono text-amber-400 uppercase tracking-wider">PROPOSED INFO</div>
+                </div>
+
+                {/* Name */}
+                {reviewClient.pending_profile_update.name && reviewClient.pending_profile_update.name !== reviewClient.name && (
+                  <div className="grid grid-cols-2 gap-4 border-b border-white/5 pb-3">
+                    <div>
+                      <span className="text-[9px] font-mono text-muted-foreground uppercase block mb-1">Name</span>
+                      <span className="text-xs text-white/50 break-words">{reviewClient.name}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-mono text-amber-400 uppercase block mb-1">Name</span>
+                      <span className="text-xs text-emerald-400 font-bold break-words">{reviewClient.pending_profile_update.name}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Phone */}
+                {reviewClient.pending_profile_update.phone && reviewClient.pending_profile_update.phone !== reviewClient.phone && (
+                  <div className="grid grid-cols-2 gap-4 border-b border-white/5 pb-3">
+                    <div>
+                      <span className="text-[9px] font-mono text-muted-foreground uppercase block mb-1">Phone</span>
+                      <span className="text-xs text-white/50 break-words">{reviewClient.phone || "None"}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-mono text-amber-400 uppercase block mb-1">Phone</span>
+                      <span className="text-xs text-emerald-400 font-bold break-words">{reviewClient.pending_profile_update.phone}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Address */}
+                {reviewClient.pending_profile_update.address && reviewClient.pending_profile_update.address !== reviewClient.address && (
+                  <div className="grid grid-cols-2 gap-4 border-b border-white/5 pb-3">
+                    <div>
+                      <span className="text-[9px] font-mono text-muted-foreground uppercase block mb-1">Address</span>
+                      <span className="text-xs text-white/50 break-words whitespace-pre-line">{reviewClient.address || "None"}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-mono text-amber-400 uppercase block mb-1">Address</span>
+                      <span className="text-xs text-emerald-400 font-bold break-words whitespace-pre-line">{reviewClient.pending_profile_update.address}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mt-8 pt-4 border-t border-white/5">
+                <Button 
+                  onClick={handleReject}
+                  disabled={isActionLoading}
+                  className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-red-400 font-bold py-2 rounded-xl text-xs"
+                >
+                  REJECT CHANGES
+                </Button>
+                <Button 
+                  onClick={handleApprove}
+                  disabled={isActionLoading}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-black font-extrabold py-2 rounded-xl text-xs"
+                >
+                  {isActionLoading ? "APPROVING..." : "APPROVE CHANGES"}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Conversation Bridge Modal */}
+      <AnimatePresence>
+        {isBridgeModalOpen && bridgeClient && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              onClick={() => {
+                setIsBridgeModalOpen(false);
+                setSelectedBridgeProject(null);
+              }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.95, opacity: 0 }} 
+              className="relative w-full max-w-3xl h-[600px] rounded-2xl border border-white/10 bg-[#0a0f1e]/95 shadow-2xl backdrop-blur-md text-left overflow-hidden flex flex-col justify-between"
+            >
+              {/* Header */}
+              <div className="p-4 border-b border-white/5 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-wider">
+                    <MessageSquare className="w-4 h-4 text-cyan-400 animate-pulse" />
+                    Conversation Bridge
+                  </h3>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">
+                    Client: {bridgeClient.name} | Live Real-time Sync
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {bridgeProjects.length > 1 && (
+                    <select
+                      value={selectedBridgeProject?.id || ""}
+                      onChange={(e) => {
+                        const proj = bridgeProjects.find(p => String(p.id) === e.target.value);
+                        if (proj) setSelectedBridgeProject(proj);
+                      }}
+                      className="bg-white/5 border border-white/10 text-2xs text-white rounded-lg px-2 py-1 max-w-[180px] focus:outline-none"
+                    >
+                      {bridgeProjects.map(p => (
+                        <option key={p.id} value={p.id} className="bg-[#0a0f1e] text-white">
+                          {p.service || p.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {selectedBridgeProject && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleClearBridgeChat}
+                      className="h-8 gap-1.5 px-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 rounded-lg text-2xs font-bold transition-all cursor-pointer"
+                      title="Clear Chat History"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      CLEAR
+                    </Button>
+                  )}
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    onClick={() => {
+                      setIsBridgeModalOpen(false);
+                      setSelectedBridgeProject(null);
+                    }}
+                    className="w-8 h-8 rounded-lg text-muted-foreground hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="flex-1 overflow-hidden flex bg-black/20">
+                <div className="flex-grow flex flex-col justify-between h-full p-4 overflow-y-auto">
+                  {isBridgeLoading ? (
+                    <div className="flex-grow flex flex-col items-center justify-center text-muted-foreground text-xs gap-2">
+                      <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+                      <span>Initializing Connection...</span>
+                    </div>
+                  ) : bridgeMessages.length === 0 ? (
+                    <div className="flex-grow flex flex-col items-center justify-center text-muted-foreground/35 text-[10px] uppercase tracking-widest gap-2">
+                      <MessageSquare className="w-8 h-8 opacity-20" />
+                      <span>No messages yet. Start conversation.</span>
+                    </div>
+                  ) : (
+                    <div className="flex-grow overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-white/5">
+                      {bridgeMessages.map((msg) => {
+                        const isAdmin = msg.sender === 'admin' || msg.sender?.toLowerCase() === 'admin';
+                        const isSystem = msg.sender === 'SYSTEM';
+
+                        if (isSystem) {
+                          return (
+                            <div key={msg.id} className="flex justify-center my-2">
+                              <span className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/5 text-[9px] font-mono text-muted-foreground uppercase tracking-widest">
+                                {msg.message}
+                              </span>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div 
+                            key={msg.id} 
+                            className={`flex gap-2.5 max-w-[80%] ${isAdmin ? 'ml-auto flex-row-reverse' : ''}`}
+                          >
+                            <div 
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-extrabold flex-shrink-0 border ${
+                                isAdmin 
+                                  ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400' 
+                                  : 'bg-white/5 border-white/10 text-white'
+                              }`}
+                            >
+                              {isAdmin ? 'AD' : bridgeClient.name.substring(0, 2).toUpperCase()}
+                            </div>
+                            <div className={`space-y-1 ${isAdmin ? 'items-end' : ''}`}>
+                              <div className={`flex items-baseline gap-1.5 ${isAdmin ? 'justify-end' : ''}`}>
+                                <span className="text-[10px] font-bold text-white/70">{isAdmin ? 'Admin' : msg.sender}</span>
+                                <span className="text-[8px] text-muted-foreground font-mono">
+                                  {msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
+                                </span>
+                              </div>
+                              <div 
+                                className={`p-3 rounded-xl text-xs leading-relaxed ${
+                                  isAdmin 
+                                    ? 'bg-cyan-500/10 text-cyan-100 border border-cyan-500/20 rounded-tr-none' 
+                                    : 'bg-white/5 text-white/90 border border-white/5 rounded-tl-none'
+                                }`}
+                              >
+                                <p className="whitespace-pre-wrap">{msg.message}</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div ref={chatEndRef} />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer Input */}
+              <div className="p-4 border-t border-white/5 bg-[#0a0f1e]">
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }}
+                  className="flex gap-2"
+                >
+                  <Input
+                    value={bridgeContent}
+                    onChange={e => setBridgeContent(e.target.value)}
+                    disabled={isBridgeLoading || !selectedBridgeProject}
+                    placeholder={selectedBridgeProject ? "Transmit realtime message..." : "Awaiting support channel..."}
+                    className="bg-white/5 border-white/10 text-xs rounded-xl h-10 text-foreground"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={isBridgeLoading || !bridgeContent.trim() || !selectedBridgeProject}
+                    className="bg-cyan-500 hover:bg-cyan-600 text-black font-extrabold rounded-xl px-4 h-10 flex-shrink-0 cursor-pointer"
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

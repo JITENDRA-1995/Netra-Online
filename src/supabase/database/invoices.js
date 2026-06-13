@@ -48,7 +48,7 @@ export const getInvoices = async () => {
       grandTotal: parseFloat(inv.grand_total),
       clientLink: inv.client_link !== undefined ? inv.client_link : localMeta.client_link,
       invoiceTotal: inv.invoice_total !== undefined ? parseFloat(inv.invoice_total) : (localMeta.invoice_total !== undefined ? parseFloat(localMeta.invoice_total) : parseFloat(inv.grand_total)),
-      paymentStatus: inv.payment_status || localMeta.payment_status || 'Paid',
+      paymentStatus: inv.payment_status || localMeta.payment_status || (inv.project_id ? 'Paid' : 'Pending'),
       microJobIds: inv.micro_job_ids || localMeta.micro_job_ids || [],
       rawProject: inv.projects ? (() => {
         let qty = 1;

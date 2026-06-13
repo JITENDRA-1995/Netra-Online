@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
@@ -18,7 +18,10 @@ import {
   Coins,
   ShieldCheck,
   QrCode,
-  Edit
+  Edit,
+  ArrowUpDown,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,6 +91,19 @@ export default function InvoicesPage({
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [invoiceTab, setInvoiceTab] = useState<"SAVED" | "DRAFT" | "CUSTOM" | "MICRO_JOB">(defaultTab || "SAVED");
 
+  // Sorting state
+  const [sortField, setSortField] = useState<"invoiceNo" | "clientName" | "issueDate" | "paymentStatus" | "grandTotal" | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  const handleToggleSort = (field: "invoiceNo" | "clientName" | "issueDate" | "paymentStatus" | "grandTotal") => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
   // Edit mode tracking state
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
   const [editingInvoiceNo, setEditingInvoiceNo] = useState<string | null>(null);
@@ -123,14 +139,18 @@ export default function InvoicesPage({
         return item;
       }));
 
+      const isMicroJobInvoice = (inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && inv.invoiceNo.startsWith('CMS'));
+
       const cashbookEntry = {
         id: Date.now(),
         date: new Date().toISOString().split("T")[0],
-        desc: `Cumulative Jobs Settlement - ${inv.clientName} (Inv #${inv.invoiceNo})`,
-        category: "Micro-Jobs Revenue",
+        desc: isMicroJobInvoice
+          ? `Cumulative Jobs Settlement - ${inv.clientName} (Inv #${inv.invoiceNo})`
+          : `Custom Invoice Paid: ${inv.projectService} - ${inv.clientName} [${inv.invoiceNo}]`,
+        category: isMicroJobInvoice ? "Micro-Jobs Revenue" : "Service",
         amount: inv.grandTotal,
         mode: settlePaymentMode,
-        type: "INCOME",
+        type: "INCOME" as const,
         invoiceId: inv.id,
         invoiceNo: inv.invoiceNo
       };
@@ -151,6 +171,51 @@ export default function InvoicesPage({
         description: err.message || "An error occurred during database update.",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleCustomStatusChange = async (inv: any, newStatus: string) => {
+    if (newStatus === "Paid") {
+      setSelectedSettleInvoice(inv);
+      setIsSettleOpen(true);
+    } else if (newStatus === "Pending") {
+      const confirmPending = window.confirm(
+        `Mark Custom Invoice ${inv.invoiceNo} as Pending?\n\nNote: This will automatically remove the associated cashbook income entry (if any) to reconcile financials.`
+      );
+      if (!confirmPending) return;
+
+      try {
+        await updateInvoice(inv.id, {
+          ...inv,
+          paymentStatus: "Pending"
+        });
+
+        setInvoices(prev => prev.map(item => {
+          if (item.id === inv.id) {
+            return {
+              ...item,
+              paymentStatus: "Pending"
+            };
+          }
+          return item;
+        }));
+
+        setCashbookEntries(prev => prev.filter(entry => 
+          !(entry.invoiceId === inv.id || entry.invoiceNo === inv.invoiceNo)
+        ));
+
+        toast({
+          title: "Status Reverted to Pending",
+          description: `Invoice ${inv.invoiceNo} status updated to Pending and cashbook entry removed.`
+        });
+      } catch (err: any) {
+        console.error("Failed to update status to Pending:", err);
+        toast({
+          title: "Status Update Failed",
+          description: err.message || "An error occurred during database update.",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -356,76 +421,114 @@ export default function InvoicesPage({
     )
   );
 
-  const filteredInvoices = upToDateInvoices.filter(inv => {
-    // 1. Search filter
-    const matchesSearch = inv.clientName.toLowerCase().includes(search.toLowerCase()) ||
-      (inv.projectService && inv.projectService.toLowerCase().includes(search.toLowerCase())) ||
-      inv.invoiceNo.toLowerCase().includes(search.toLowerCase());
+  const filteredInvoices = useMemo(() => {
+    const filtered = upToDateInvoices.filter(inv => {
+      // 1. Search filter
+      const matchesSearch = inv.clientName.toLowerCase().includes(search.toLowerCase()) ||
+        (inv.projectService && inv.projectService.toLowerCase().includes(search.toLowerCase())) ||
+        inv.invoiceNo.toLowerCase().includes(search.toLowerCase());
 
-    if (!matchesSearch) return false;
+      if (!matchesSearch) return false;
 
-    // 2. Tab filter (Saved vs Draft vs Custom vs Micro-Job)
-    const isMicroJobInvoice = (inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && inv.invoiceNo.startsWith('CMS'));
-    const hasProject = !!(inv.rawProject && inv.rawProject.id);
-    const isStandalone = hasProject && inv.rawProject.isStandalone;
-    const isCustom = !isMicroJobInvoice && (!hasProject || isStandalone || inv.invoiceNo.includes('/C'));
-    
-    // Project with status other than completed goes to draft
-    const isDraft = !isMicroJobInvoice && hasProject && !isCustom && inv.rawProject.status !== 'Completed';
-    
-    let matchesTab = false;
-    if (invoiceTab === "DRAFT") {
-      matchesTab = isDraft;
-    } else if (invoiceTab === "CUSTOM") {
-      matchesTab = isCustom;
-    } else if (invoiceTab === "MICRO_JOB") {
-      matchesTab = isMicroJobInvoice;
-    } else {
-      matchesTab = !isDraft && !isCustom && !isMicroJobInvoice;
-    }
-    if (!matchesTab) return false;
-
-    // 3. Client name filter
-    const matchesClient = filterClient === "all" || inv.clientName.trim().toLowerCase() === filterClient.trim().toLowerCase();
-    if (!matchesClient) return false;
-
-    // 4. Month filter
-    let matchesMonth = true;
-    if (filterMonth !== "all" && inv.issueDate) {
-      const date = new Date(inv.issueDate);
-      if (!isNaN(date.getTime())) {
-        const mStr = date.toLocaleString("en-IN", { month: "long", year: "numeric" });
-        matchesMonth = mStr === filterMonth;
+      // 2. Tab filter (Saved vs Draft vs Custom vs Micro-Job)
+      const isMicroJobInvoice = (inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && inv.invoiceNo.startsWith('CMS'));
+      const hasProject = !!(inv.rawProject && inv.rawProject.id);
+      const isStandalone = hasProject && inv.rawProject.isStandalone;
+      const isCustom = !isMicroJobInvoice && (!hasProject || isStandalone || inv.invoiceNo.includes('/C'));
+      
+      // Project with status other than completed goes to draft
+      const isDraft = !isMicroJobInvoice && hasProject && !isCustom && inv.rawProject.status !== 'Completed';
+      
+      let matchesTab = false;
+      if (invoiceTab === "DRAFT") {
+        matchesTab = isDraft;
+      } else if (invoiceTab === "CUSTOM") {
+        matchesTab = isCustom;
+      } else if (invoiceTab === "MICRO_JOB") {
+        matchesTab = isMicroJobInvoice;
       } else {
-        matchesMonth = false;
+        matchesTab = !isDraft && !isCustom && !isMicroJobInvoice;
       }
-    }
-    if (!matchesMonth) return false;
+      if (!matchesTab) return false;
 
-    // 5. Custom Date Range filter
-    let matchesDateRange = true;
-    if (inv.issueDate) {
-      const date = new Date(inv.issueDate);
-      if (!isNaN(date.getTime())) {
-        const time = date.getTime();
-        if (filterStartDate) {
-          const start = new Date(filterStartDate);
-          start.setHours(0, 0, 0, 0);
-          if (time < start.getTime()) matchesDateRange = false;
+      // 3. Client name filter
+      const matchesClient = filterClient === "all" || inv.clientName.trim().toLowerCase() === filterClient.trim().toLowerCase();
+      if (!matchesClient) return false;
+
+      // 4. Month filter
+      let matchesMonth = true;
+      if (filterMonth !== "all" && inv.issueDate) {
+        const date = new Date(inv.issueDate);
+        if (!isNaN(date.getTime())) {
+          const mStr = date.toLocaleString("en-IN", { month: "long", year: "numeric" });
+          matchesMonth = mStr === filterMonth;
+        } else {
+          matchesMonth = false;
         }
-        if (filterEndDate) {
-          const end = new Date(filterEndDate);
-          end.setHours(23, 59, 59, 999);
-          if (time > end.getTime()) matchesDateRange = false;
-        }
-      } else {
-        matchesDateRange = false;
       }
-    }
-    if (!matchesDateRange) return false;
+      if (!matchesMonth) return false;
 
-    return true;
-  });
+      // 5. Custom Date Range filter
+      let matchesDateRange = true;
+      if (inv.issueDate) {
+        const date = new Date(inv.issueDate);
+        if (!isNaN(date.getTime())) {
+          const time = date.getTime();
+          if (filterStartDate) {
+            const start = new Date(filterStartDate);
+            start.setHours(0, 0, 0, 0);
+            if (time < start.getTime()) matchesDateRange = false;
+          }
+          if (filterEndDate) {
+            const end = new Date(filterEndDate);
+            end.setHours(23, 59, 59, 999);
+            if (time > end.getTime()) matchesDateRange = false;
+          }
+        } else {
+          matchesDateRange = false;
+        }
+      }
+      if (!matchesDateRange) return false;
+
+      return true;
+    });
+
+    if (sortField) {
+      filtered.sort((a, b) => {
+        let valA: any = "";
+        let valB: any = "";
+
+        switch (sortField) {
+          case "invoiceNo":
+            valA = (a.invoiceNo || "").toLowerCase();
+            valB = (b.invoiceNo || "").toLowerCase();
+            break;
+          case "clientName":
+            valA = (a.clientName || "").toLowerCase();
+            valB = (b.clientName || "").toLowerCase();
+            break;
+          case "issueDate":
+            valA = a.issueDate ? new Date(a.issueDate).getTime() : 0;
+            valB = b.issueDate ? new Date(b.issueDate).getTime() : 0;
+            break;
+          case "paymentStatus":
+            valA = (a.paymentStatus || "").toLowerCase();
+            valB = (b.paymentStatus || "").toLowerCase();
+            break;
+          case "grandTotal":
+            valA = a.grandTotal || 0;
+            valB = b.grandTotal || 0;
+            break;
+        }
+
+        if (valA < valB) return sortDirection === "asc" ? -1 : 1;
+        if (valA > valB) return sortDirection === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [upToDateInvoices, search, invoiceTab, filterClient, filterMonth, filterStartDate, filterEndDate, sortField, sortDirection]);
 
   const executeSingleDelete = async () => {
     if (!invoiceToDelete) return;
@@ -646,7 +749,8 @@ export default function InvoicesPage({
       projectService: service,
       issueDate: new Date().toISOString().split('T')[0],
       grandTotal: totalVal,
-      projectId: null
+      projectId: null,
+      paymentStatus: logToCashbook ? "Paid" : "Pending"
     };
 
     let savedInvoice;
@@ -677,6 +781,7 @@ export default function InvoicesPage({
         projectService: service,
         issueDate: new Date(savedInvoice.issue_date || new Date()).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
         grandTotal: totalVal,
+        paymentStatus: logToCashbook ? "Paid" : "Pending",
         rawProject: {
           id: savedInvoice.id || editingInvoiceId || `local-${Date.now()}`,
           name: billingName,
@@ -1455,7 +1560,7 @@ export default function InvoicesPage({
 
               <div className="modal-header border-b border-emerald-500/10 pb-4 mb-5 text-left">
                 <h2 className="font-extrabold text-emerald-400 text-lg flex items-center gap-2">
-                  💳 SETTLE CUMULATIVE INVOICE
+                  💳 {((selectedSettleInvoice.microJobIds && selectedSettleInvoice.microJobIds.length > 0) || (selectedSettleInvoice.invoiceNo && selectedSettleInvoice.invoiceNo.startsWith('CMS'))) ? "SETTLE CUMULATIVE INVOICE" : "SETTLE CUSTOM INVOICE"}
                 </h2>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider">Execute payment settlement and record revenue</p>
               </div>
@@ -1805,11 +1910,56 @@ export default function InvoicesPage({
                     }}
                   />
                 </th>
-                <th className="p-4">Invoice No</th>
-                <th className="p-4">Client / Project</th>
-                <th className="p-4 text-center">Issue Date</th>
-                <th className="p-4 text-center">Status</th>
-                <th className="p-4 text-right">Grand Total</th>
+                <th className="p-4 cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleSort("invoiceNo")}>
+                  <div className="flex items-center gap-1.5">
+                    <span>Invoice No</span>
+                    {sortField === "invoiceNo" ? (
+                      sortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-cyan-400" /> : <ChevronDown className="w-3.5 h-3.5 text-cyan-400" />
+                    ) : (
+                      <ArrowUpDown className="w-3 h-3 text-muted-foreground/30" />
+                    )}
+                  </div>
+                </th>
+                <th className="p-4 cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleSort("clientName")}>
+                  <div className="flex items-center gap-1.5">
+                    <span>Client / Project</span>
+                    {sortField === "clientName" ? (
+                      sortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-cyan-400" /> : <ChevronDown className="w-3.5 h-3.5 text-cyan-400" />
+                    ) : (
+                      <ArrowUpDown className="w-3 h-3 text-muted-foreground/30" />
+                    )}
+                  </div>
+                </th>
+                <th className="p-4 text-center cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleSort("issueDate")}>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span>Issue Date</span>
+                    {sortField === "issueDate" ? (
+                      sortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-cyan-400" /> : <ChevronDown className="w-3.5 h-3.5 text-cyan-400" />
+                    ) : (
+                      <ArrowUpDown className="w-3 h-3 text-muted-foreground/30" />
+                    )}
+                  </div>
+                </th>
+                <th className="p-4 text-center cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleSort("paymentStatus")}>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span>Status</span>
+                    {sortField === "paymentStatus" ? (
+                      sortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-cyan-400" /> : <ChevronDown className="w-3.5 h-3.5 text-cyan-400" />
+                    ) : (
+                      <ArrowUpDown className="w-3 h-3 text-muted-foreground/30" />
+                    )}
+                  </div>
+                </th>
+                <th className="p-4 text-right cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleSort("grandTotal")}>
+                  <div className="flex items-center justify-end gap-1.5">
+                    <span>Grand Total</span>
+                    {sortField === "grandTotal" ? (
+                      sortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-cyan-400" /> : <ChevronDown className="w-3.5 h-3.5 text-cyan-400" />
+                    ) : (
+                      <ArrowUpDown className="w-3 h-3 text-muted-foreground/30" />
+                    )}
+                  </div>
+                </th>
                 <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -1818,6 +1968,8 @@ export default function InvoicesPage({
                 filteredInvoices.map(inv => {
                   const isMicroJobInvoice = (inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && inv.invoiceNo.startsWith('CMS'));
                   const isPaidMicroJob = isMicroJobInvoice && inv.paymentStatus?.toLowerCase() === 'paid';
+                  const isPaidCustomInvoice = invoiceTab === 'CUSTOM' && inv.paymentStatus?.toLowerCase() === 'paid';
+                  const isEditDisabled = isPaidMicroJob || isPaidCustomInvoice;
 
                   return (
                     <tr key={inv.id} className="hover:bg-white/[0.01] transition-colors">
@@ -1845,15 +1997,30 @@ export default function InvoicesPage({
                       </td>
                       <td className="p-4 text-center text-muted-foreground">{inv.issueDate}</td>
                       <td className="p-4 text-center">
-                        <Badge
-                          className={`text-3xs uppercase tracking-wider font-extrabold border-0 px-2.5 py-1 rounded-md ${
-                            inv.paymentStatus?.toLowerCase() === 'paid'
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
-                          }`}
-                        >
-                          {inv.paymentStatus || 'Paid'}
-                        </Badge>
+                        {invoiceTab === 'CUSTOM' ? (
+                          <select
+                            value={inv.paymentStatus || 'Pending'}
+                            onChange={(e) => handleCustomStatusChange(inv, e.target.value)}
+                            className={`text-3xs uppercase tracking-wider font-extrabold px-2.5 py-1 rounded-md bg-[#0a0f1e] border focus:outline-none cursor-pointer ${
+                              inv.paymentStatus?.toLowerCase() === 'paid'
+                                ? 'border-emerald-500/30 text-emerald-400'
+                                : 'border-amber-500/30 text-amber-400 animate-pulse'
+                            }`}
+                          >
+                            <option value="Pending" className="bg-[#0a0f1e] text-amber-400 font-bold">Pending</option>
+                            <option value="Paid" className="bg-[#0a0f1e] text-emerald-400 font-bold">Paid</option>
+                          </select>
+                        ) : (
+                          <Badge
+                            className={`text-3xs uppercase tracking-wider font-extrabold border-0 px-2.5 py-1 rounded-md ${
+                              inv.paymentStatus?.toLowerCase() === 'paid'
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                            }`}
+                          >
+                            {inv.paymentStatus || 'Paid'}
+                          </Badge>
+                        )}
                       </td>
                       <td className="p-4 text-right font-bold text-foreground">₹{inv.grandTotal.toLocaleString()}</td>
                       <td className="p-4 text-right">
@@ -1941,14 +2108,20 @@ export default function InvoicesPage({
                             size="icon"
                             variant="ghost"
                             className={`w-7 h-7 border border-white/5 ${
-                              isPaidMicroJob
+                              isEditDisabled
                                 ? "opacity-30 cursor-not-allowed pointer-events-none"
                                 : "hover:bg-amber-500/10 hover:text-amber-400"
                             }`}
-                            title={isPaidMicroJob ? "Paid Micro-Job invoices cannot be edited" : "Edit Invoice Details"}
-                            disabled={isPaidMicroJob}
+                            title={
+                              isPaidMicroJob 
+                                ? "Paid Micro-Job invoices cannot be edited" 
+                                : isPaidCustomInvoice 
+                                  ? "Paid Custom invoices cannot be edited" 
+                                  : "Edit Invoice Details"
+                            }
+                            disabled={isEditDisabled}
                             onClick={() => {
-                              if (!isPaidMicroJob && onEditInvoice) {
+                              if (!isEditDisabled && onEditInvoice) {
                                 onEditInvoice(inv);
                               }
                             }}

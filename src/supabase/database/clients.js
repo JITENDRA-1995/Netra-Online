@@ -74,3 +74,40 @@ export const updateClientProfile = async (clientId, updates) => {
   if (error) throw error;
   return data;
 };
+
+/**
+ * Approve pending client profile changes
+ */
+export const approveClientProfileUpdate = async (clientId, pendingUpdate) => {
+  const { data, error } = await supabase
+    .from('clients')
+    .update({
+      name: pendingUpdate.name,
+      phone: pendingUpdate.phone,
+      address: pendingUpdate.address,
+      pending_profile_update: null
+    })
+    .eq('id', clientId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+/**
+ * Reject pending client profile changes
+ */
+export const rejectClientProfileUpdate = async (clientId) => {
+  const { data, error } = await supabase
+    .from('clients')
+    .update({
+      pending_profile_update: null
+    })
+    .eq('id', clientId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};

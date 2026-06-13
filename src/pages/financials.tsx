@@ -15,7 +15,10 @@ import {
   CreditCard,
   Percent,
   CheckCircle2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ArrowUpDown,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -129,6 +132,32 @@ export default function Financials({
   const { toast } = useToast();
   const [localSearch, setLocalSearch] = useState("");
   const [cashbookMode, setCashbookMode] = useState<"INCOME" | "EXPENSE">("INCOME");
+
+  // Billings sorting state
+  const [projSortField, setProjSortField] = useState<"service" | "targetValue" | "deadline" | null>(null);
+  const [projSortDirection, setProjSortDirection] = useState<"asc" | "desc">("asc");
+
+  const handleToggleProjSort = (field: "service" | "targetValue" | "deadline") => {
+    if (projSortField === field) {
+      setProjSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setProjSortField(field);
+      setProjSortDirection("asc");
+    }
+  };
+
+  // Cashbook sorting state
+  const [cashbookSortField, setCashbookSortField] = useState<"date" | "desc" | "mode" | "amount" | null>(null);
+  const [cashbookSortDirection, setCashbookSortDirection] = useState<"asc" | "desc">("asc");
+
+  const handleToggleCashbookSort = (field: "date" | "desc" | "mode" | "amount") => {
+    if (cashbookSortField === field) {
+      setCashbookSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setCashbookSortField(field);
+      setCashbookSortDirection("asc");
+    }
+  };
 
   const currentSearch = ledgerSearch !== undefined ? ledgerSearch : localSearch;
   const changeSearch = setLedgerSearch ? setLedgerSearch : setLocalSearch;
@@ -272,7 +301,7 @@ export default function Financials({
 
   // Filter logic
   const filteredProjects = useMemo(() => {
-    return upToDateQueue.filter(p => {
+    const filtered = upToDateQueue.filter(p => {
       // 1. Global text search
       if (currentSearch) {
         const query = currentSearch.toLowerCase();
@@ -294,10 +323,38 @@ export default function Financials({
 
       return true;
     });
-  }, [upToDateQueue, currentSearch, projClient, projService]);
+
+    if (projSortField) {
+      filtered.sort((a, b) => {
+        let valA: any = "";
+        let valB: any = "";
+
+        switch (projSortField) {
+          case "service":
+            valA = (a.service || "").toLowerCase();
+            valB = (b.service || "").toLowerCase();
+            break;
+          case "targetValue":
+            valA = (parseFloat(a.quote) || 0) - (parseFloat(a.discount) || 0);
+            valB = (parseFloat(b.quote) || 0) - (parseFloat(b.discount) || 0);
+            break;
+          case "deadline":
+            valA = a.deadline ? new Date(a.deadline).getTime() : 0;
+            valB = b.deadline ? new Date(b.deadline).getTime() : 0;
+            break;
+        }
+
+        if (valA < valB) return projSortDirection === "asc" ? -1 : 1;
+        if (valA > valB) return projSortDirection === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [upToDateQueue, currentSearch, projClient, projService, projSortField, projSortDirection]);
 
   const filteredIncomeEntries = useMemo(() => {
-    return upToDateCashbookEntries.filter(entry => {
+    const filtered = upToDateCashbookEntries.filter(entry => {
       if (entry.type !== "INCOME") return false;
 
       // 1. Search text
@@ -323,10 +380,42 @@ export default function Financials({
 
       return true;
     });
-  }, [upToDateCashbookEntries, incSearch, incClient, incCategory]);
+
+    if (cashbookSortField) {
+      filtered.sort((a, b) => {
+        let valA: any = "";
+        let valB: any = "";
+
+        switch (cashbookSortField) {
+          case "date":
+            valA = a.date ? new Date(a.date).getTime() : 0;
+            valB = b.date ? new Date(b.date).getTime() : 0;
+            break;
+          case "desc":
+            valA = (a.desc || "").toLowerCase();
+            valB = (b.desc || "").toLowerCase();
+            break;
+          case "mode":
+            valA = (a.mode || "").toLowerCase();
+            valB = (b.mode || "").toLowerCase();
+            break;
+          case "amount":
+            valA = a.amount || 0;
+            valB = b.amount || 0;
+            break;
+        }
+
+        if (valA < valB) return cashbookSortDirection === "asc" ? -1 : 1;
+        if (valA > valB) return cashbookSortDirection === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [upToDateCashbookEntries, incSearch, incClient, incCategory, cashbookSortField, cashbookSortDirection]);
 
   const filteredExpenseEntries = useMemo(() => {
-    return upToDateCashbookEntries.filter(entry => {
+    const filtered = upToDateCashbookEntries.filter(entry => {
       if (entry.type !== "EXPENSE") return false;
 
       // 1. Search text
@@ -352,7 +441,39 @@ export default function Financials({
 
       return true;
     });
-  }, [upToDateCashbookEntries, expSearch, expClient, expCategory]);
+
+    if (cashbookSortField) {
+      filtered.sort((a, b) => {
+        let valA: any = "";
+        let valB: any = "";
+
+        switch (cashbookSortField) {
+          case "date":
+            valA = a.date ? new Date(a.date).getTime() : 0;
+            valB = b.date ? new Date(b.date).getTime() : 0;
+            break;
+          case "desc":
+            valA = (a.desc || "").toLowerCase();
+            valB = (b.desc || "").toLowerCase();
+            break;
+          case "mode":
+            valA = (a.mode || "").toLowerCase();
+            valB = (b.mode || "").toLowerCase();
+            break;
+          case "amount":
+            valA = a.amount || 0;
+            valB = b.amount || 0;
+            break;
+        }
+
+        if (valA < valB) return cashbookSortDirection === "asc" ? -1 : 1;
+        if (valA > valB) return cashbookSortDirection === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [upToDateCashbookEntries, expSearch, expClient, expCategory, cashbookSortField, cashbookSortDirection]);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [modalEntryType, setModalEntryType] = useState<"INCOME" | "EXPENSE">("INCOME");
@@ -820,10 +941,37 @@ export default function Financials({
                         }}
                       />
                     </th>
-                    <th className="p-4">Mission / Client</th>
+                    <th className="p-4 cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleProjSort("service")}>
+                      <div className="flex items-center gap-1.5">
+                        <span>Mission / Client</span>
+                        {projSortField === "service" ? (
+                          projSortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground/30" />
+                        )}
+                      </div>
+                    </th>
                     <th className="p-4 text-left">Milestone Billings (Adv / Bal)</th>
-                    <th className="p-4 text-right">Target Value</th>
-                    <th className="p-4 text-center">Deadline</th>
+                    <th className="p-4 text-right cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleProjSort("targetValue")}>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span>Target Value</span>
+                        {projSortField === "targetValue" ? (
+                          projSortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground/30" />
+                        )}
+                      </div>
+                    </th>
+                    <th className="p-4 text-center cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleProjSort("deadline")}>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span>Deadline</span>
+                        {projSortField === "deadline" ? (
+                          projSortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground/30" />
+                        )}
+                      </div>
+                    </th>
                     <th className="p-4 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1179,10 +1327,46 @@ export default function Financials({
               <table className="w-full text-sm text-left border-collapse">
                 <thead className="sticky top-0 bg-[#0a0f1e] z-10 border-b border-white/5">
                   <tr className="border-b border-white/5 bg-white/[0.01] text-xs text-muted-foreground uppercase tracking-wider font-semibold">
-                    <th className="p-3">Date</th>
-                    <th className="p-3">Description / Category</th>
-                    <th className="p-3">Mode</th>
-                    <th className="p-3 text-right">Amount</th>
+                    <th className="p-3 cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleCashbookSort("date")}>
+                      <div className="flex items-center gap-1.5">
+                        <span>Date</span>
+                        {cashbookSortField === "date" ? (
+                          cashbookSortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground/30" />
+                        )}
+                      </div>
+                    </th>
+                    <th className="p-3 cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleCashbookSort("desc")}>
+                      <div className="flex items-center gap-1.5">
+                        <span>Description / Category</span>
+                        {cashbookSortField === "desc" ? (
+                          cashbookSortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground/30" />
+                        )}
+                      </div>
+                    </th>
+                    <th className="p-3 cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleCashbookSort("mode")}>
+                      <div className="flex items-center gap-1.5">
+                        <span>Mode</span>
+                        {cashbookSortField === "mode" ? (
+                          cashbookSortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground/30" />
+                        )}
+                      </div>
+                    </th>
+                    <th className="p-3 text-right cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleCashbookSort("amount")}>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span>Amount</span>
+                        {cashbookSortField === "amount" ? (
+                          cashbookSortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground/30" />
+                        )}
+                      </div>
+                    </th>
                     <th className="p-3 text-right">Action</th>
                   </tr>
                 </thead>

@@ -3,13 +3,14 @@ import {
   fetchClientProjectDetail, 
   fetchClientProjectChats, 
   sendClientChatMessage, 
-  subscribeToClientChats 
+  subscribeToClientChats,
+  clearClientProjectChats
 } from "../../supabase/database/clientVault";
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Textarea } from "../../components/ui/textarea";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
-import { ArrowLeft, Send, MessageSquare } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 export function ClientProjectMessages({ 
@@ -51,6 +52,10 @@ export function ClientProjectMessages({
 
     // 3. Subscribe to real-time chat updates
     const subscription = subscribeToClientChats(projectId, currentClient?.name, (newMsg) => {
+      if (newMsg.eventType === 'DELETE') {
+        setMessages(prev => prev.filter(m => m.id !== newMsg.id));
+        return;
+      }
       setMessages(prev => {
         // Prevent duplicate messages in the UI list
         if (prev.some(m => m.id === newMsg.id)) return prev;
@@ -75,8 +80,25 @@ export function ClientProjectMessages({
     
     setIsSending(true);
     try {
-      await sendClientChatMessage(projectId, currentClient?.name, content.trim());
+      const data = await sendClientChatMessage(projectId, currentClient?.name, content.trim());
       setContent("");
+      if (data) {
+        setMessages(prev => {
+          const isClient = (data.sender || '').toLowerCase() === 'client' || 
+                           (currentClient?.name && (data.sender || '').toLowerCase() === currentClient.name.toLowerCase());
+          const newMsg = {
+            id: data.id,
+            senderName: data.sender,
+            senderType: isClient ? 'client' : 'admin',
+            content: data.message,
+            createdAt: data.created_at,
+            attachmentUrl: null,
+            attachmentName: null
+          };
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
+      }
     } catch (err) {
       console.error("Failed to send message:", err);
     } finally {
@@ -91,17 +113,40 @@ export function ClientProjectMessages({
     }
   };
 
+  const handleClearChat = async () => {
+    if (!projectId) return;
+    const confirmClear = window.confirm("Are you sure you want to permanently clear the chat history for this project?");
+    if (!confirmClear) return;
+    
+    try {
+      await clearClientProjectChats(projectId, currentClient?.name);
+      setMessages([]);
+    } catch (err) {
+      console.error("Failed to clear chat:", err);
+      alert("Failed to clear chat history. Please try again.");
+    }
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] animate-in fade-in duration-500 client-vault-theme">
-      <div className="mb-4">
-        <button 
-          onClick={() => onTabChange("PROJECT_DETAIL")}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-2 transition-colors bg-transparent border-none cursor-pointer"
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-4">
+        <div>
+          <button 
+            onClick={() => onTabChange("PROJECT_DETAIL")}
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-2 transition-colors bg-transparent border-none cursor-pointer"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to Project
+          </button>
+          <h1 className="text-2xl font-serif font-medium tracking-tight">Messages</h1>
+          <p className="text-muted-foreground text-sm">{project?.title || "..."}</p>
+        </div>
+        <Button
+          variant="ghost"
+          onClick={handleClearChat}
+          className="text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 rounded-xl text-xs font-semibold h-9 gap-1.5 px-4 self-start sm:self-auto cursor-pointer"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to Project
-        </button>
-        <h1 className="text-2xl font-serif font-medium tracking-tight">Messages</h1>
-        <p className="text-muted-foreground text-sm">{project?.title || "..."}</p>
+          <Trash2 className="h-4 w-4" /> Clear History
+        </Button>
       </div>
 
       <Card className="flex-1 flex flex-col overflow-hidden border-border/50 bg-card">
