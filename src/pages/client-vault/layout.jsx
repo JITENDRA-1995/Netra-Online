@@ -13,6 +13,7 @@ import {
 import { 
   LayoutDashboard, 
   FolderKanban, 
+  MessageSquare,
   Receipt, 
   UserCircle,
   LogOut,
@@ -25,6 +26,7 @@ import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 const navItems = [
   { title: "Dashboard", tab: "DASHBOARD", icon: LayoutDashboard },
   { title: "Projects", tab: "PROJECTS", icon: FolderKanban },
+  { title: "Communication", tab: "COMMUNICATION", icon: MessageSquare },
   { title: "Invoices", tab: "INVOICES", icon: Receipt },
   { title: "Profile", tab: "PROFILE", icon: UserCircle },
 ];

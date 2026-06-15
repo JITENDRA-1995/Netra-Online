@@ -27,6 +27,7 @@ import { ClientProjectAssets } from './pages/client-vault/project-assets';
 import { ClientInvoices } from './pages/client-vault/invoices';
 import { ClientInvoiceDetail } from './pages/client-vault/invoice-detail';
 import { ClientProfile } from './pages/client-vault/profile';
+import { ClientCollaboration } from './pages/client-vault/collaboration';
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[400px] w-full bg-[#050508]/20 backdrop-blur-sm rounded-3xl border border-white/5">
@@ -6374,6 +6375,13 @@ function App() {
                   <ClientProjectAssets
                     projectId={selectedClientProjectId}
                     onTabChange={setActiveClientTab}
+                  />
+                )}
+                {activeClientTab === 'COMMUNICATION' && (
+                  <ClientCollaboration
+                    currentClient={currentClient}
+                    selectedProjectId={selectedClientProjectId}
+                    setSelectedProjectId={setSelectedClientProjectId}
                   />
                 )}
                 {activeClientTab === 'INVOICES' && (
