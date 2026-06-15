@@ -12,7 +12,15 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 // Autoplay Slideshow for showcase photos of a service card
-function DynamicSlideshow({ photos }: { photos: { url: string; title: string; duration?: number }[] }) {
+function DynamicSlideshow({ 
+  photos, 
+  serviceTitle,
+  serviceTag
+}: { 
+  photos: { url: string; title: string; duration?: number }[];
+  serviceTitle?: string;
+  serviceTag?: string;
+}) {
   const [index, setIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
@@ -81,16 +89,16 @@ function DynamicSlideshow({ photos }: { photos: { url: string; title: string; du
 
   if (!photos || photos.length === 0) {
     return (
-      <div className="w-full lg:w-2/3 h-[360px] rounded-3xl border border-white/5 bg-white/[0.01] flex flex-col items-center justify-center text-white/20 font-mono text-xs gap-2">
+      <div className="w-full h-[480px] md:h-[540px] rounded-3xl border border-white/5 bg-white/[0.01] flex flex-col items-center justify-center text-white/20 font-mono text-xs gap-2">
         <span className="text-3xl">📷</span>
-        <span>NO PORTFOLIO IMAGES CALIBRATED</span>
+        <span>NO PORTFOLIO IMAGES CALIBRATED FOR {serviceTitle?.toUpperCase()}</span>
       </div>
     );
   }
 
   return (
     <div 
-      className="w-full lg:w-2/3 h-[360px] rounded-3xl border border-white/5 relative overflow-hidden group/slide cursor-pointer"
+      className="w-full h-[480px] md:h-[540px] rounded-3xl border border-white/5 relative overflow-hidden group/slide cursor-pointer shadow-[0_15px_35px_rgba(0,0,0,0.5)]"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={() => setIsLightboxOpen(true)}
@@ -198,29 +206,35 @@ function DynamicSlideshow({ photos }: { photos: { url: string; title: string; du
         </>
       )}
 
-      {/* Text / Caption Container */}
-      <div className="absolute bottom-6 left-6 right-6 z-10 flex justify-between items-end">
-        <div className="backdrop-blur-md bg-black/50 border border-white/10 rounded-2xl px-5 py-3 max-w-[70%]">
-          <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider block mb-1">PORTFOLIO FLAME</span>
-          <h4 className="text-xs md:text-sm font-bold text-white tracking-wide">{currentPhoto.title || "Showcase Asset"}</h4>
-        </div>
-
-        {/* Indicators */}
-        {photos.length > 1 && (
-          <div className="flex gap-2 pb-2">
-            {photos.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIndex(idx);
-                }}
-                className={`h-1.5 rounded-full transition-all duration-300 ${idx === index ? 'w-6 bg-cyan-400 shadow-[0_0_8px_#00e5ff]' : 'w-2 bg-white/30 hover:bg-white/50'}`}
-              />
-            ))}
+      {/* Service Name Header Overlay (Top center with transparent backdrop) */}
+      {serviceTitle && (
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 text-center select-none w-full max-w-[85%] pointer-events-none">
+          <div className="inline-block backdrop-blur-md bg-black/45 border border-white/5 rounded-2xl px-6 py-3 shadow-[0_4px_30px_rgba(0,0,0,0.4)]">
+            <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-widest block mb-0.5">
+              {serviceTag || "PORTFOLIO"}
+            </span>
+            <h3 className="text-sm md:text-base font-extrabold text-white tracking-wider">
+              {serviceTitle}
+            </h3>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Centered Indicators at the bottom */}
+      {photos.length > 1 && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex gap-2">
+          {photos.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIndex(idx);
+              }}
+              className={`h-1.5 rounded-full transition-all duration-300 ${idx === index ? 'w-6 bg-cyan-400 shadow-[0_0_8px_#00e5ff]' : 'w-2 bg-white/30 hover:bg-white/50'}`}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Lightbox Extended Preview Modal */}
       <AnimatePresence>
@@ -352,49 +366,14 @@ function WorkScrollSection({ sections }: { sections: any[] }) {
         </h2>
       </div>
 
-      <div className="flex flex-col gap-20 max-w-7xl mx-auto">
+      <div className="flex flex-col gap-16 max-w-5xl mx-auto">
         {sections.map((section, sIdx) => (
-          <div key={sIdx} className="flex flex-col lg:flex-row gap-8 items-stretch">
-            {/* Left Side: Service Card */}
-            <div 
-              className="w-full lg:w-1/3 flex flex-col justify-between p-8 rounded-3xl border relative overflow-hidden group transition-all duration-500"
-              style={{
-                background: "rgba(5, 5, 8, 0.6)",
-                borderColor: "rgba(255, 255, 255, 0.05)",
-                boxShadow: "inset 0 0 30px rgba(255, 255, 255, 0.01)"
-              }}
-            >
-              <div 
-                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
-                style={{
-                  background: `radial-gradient(circle at 10% 20%, ${section.service.color}15 0%, transparent 60%)`
-                }}
-              />
-              <div>
-                <span 
-                  className="inline-flex items-center gap-1.5 text-[10px] font-mono tracking-widest uppercase px-3 py-1 rounded-full border mb-6"
-                  style={{
-                    color: section.service.accent,
-                    borderColor: `${section.service.accent}30`,
-                    background: `${section.service.color}10`
-                  }}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: section.service.accent }} />
-                  {section.service.tag}
-                </span>
-                <div className="text-3xl mb-4">{section.service.icon}</div>
-                <h3 className="text-2xl font-bold text-white/90 mb-3">{section.service.title}</h3>
-                <p className="text-white/45 font-light text-xs leading-relaxed mb-8">{section.service.desc}</p>
-              </div>
-              <div className="pt-6 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-white/20">
-                <span>DELIVERY IN {section.service.delivery.toUpperCase()}</span>
-                <span style={{ color: section.service.accent }}>{section.service.price}</span>
-              </div>
-            </div>
-
-            {/* Right Side: Dynamic Slideshow */}
-            <DynamicSlideshow photos={section.photos} />
-          </div>
+          <DynamicSlideshow 
+            key={sIdx} 
+            photos={section.photos} 
+            serviceTitle={section.service.title}
+            serviceTag={section.service.tag}
+          />
         ))}
       </div>
     </div>

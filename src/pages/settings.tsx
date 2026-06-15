@@ -742,6 +742,17 @@ export default function SettingsPage({
     durationStr: string;
   } | null>(null);
 
+  // Computed preview service
+  const previewService = useMemo(() => {
+    if (!activePreviewSlide) return null;
+    let sId = activePreviewSlide.serviceId;
+    if (sId === undefined && activePreviewSlide.slotIdx !== undefined) {
+      sId = localVisionSettings[activePreviewSlide.slotIdx]?.serviceId;
+    }
+    return servicesList.find((s: any) => s.id === sId);
+  }, [activePreviewSlide, localVisionSettings, servicesList]);
+
+
   const [slideFit, setSlideFit] = useState<'cover' | 'contain' | 'fill'>('cover');
   const [slideScale, setSlideScale] = useState<number>(1);
   const [slidePositionX, setSlidePositionX] = useState<number>(0);
@@ -1943,7 +1954,7 @@ export default function SettingsPage({
                 </h3>
                 
                 <div 
-                  className="w-full h-[360px] rounded-3xl border border-white/5 relative overflow-hidden bg-[#080810]/80 self-center"
+                  className="w-full h-[400px] rounded-3xl border border-white/5 relative overflow-hidden bg-[#080810]/80 self-center"
                   style={{
                     boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)"
                   }}
@@ -1981,12 +1992,25 @@ export default function SettingsPage({
                   {/* Gradient Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent z-1 pointer-events-none"></div>
                   
-                  {/* Floating Caption Simulation */}
-                  <div className="absolute bottom-6 left-6 right-6 z-10 flex justify-between items-end pointer-events-none">
-                    <div className="backdrop-blur-md bg-black/50 border border-white/10 rounded-2xl px-5 py-3 max-w-[70%] text-left">
-                      <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider block mb-1">PORTFOLIO FLAME</span>
-                      <h4 className="text-xs md:text-sm font-bold text-white tracking-wide truncate">{activePreviewSlide.title || "Showcase Asset"}</h4>
+                  {/* Service Name Header Simulation (Top center with transparent backdrop) */}
+                  {previewService && (
+                    <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 text-center select-none w-full max-w-[85%] pointer-events-none">
+                      <div className="inline-block backdrop-blur-md bg-black/45 border border-white/5 rounded-2xl px-5 py-2 shadow-[0_4px_30px_rgba(0,0,0,0.4)]">
+                        <span className="text-[9px] font-mono text-cyan-400 uppercase tracking-widest block mb-0.5">
+                          {previewService.tag || "PORTFOLIO"}
+                        </span>
+                        <h4 className="text-xs font-bold text-white tracking-wider">
+                          {previewService.title}
+                        </h4>
+                      </div>
                     </div>
+                  )}
+
+                  {/* Centered Indicators Mockup (Bottom center) */}
+                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex gap-2 pointer-events-none">
+                    <div className="h-1.5 w-2 bg-white/30 rounded-full" />
+                    <div className="h-1.5 w-6 bg-cyan-400 rounded-full shadow-[0_0_8px_#00e5ff]" />
+                    <div className="h-1.5 w-2 bg-white/30 rounded-full" />
                   </div>
                 </div>
 
