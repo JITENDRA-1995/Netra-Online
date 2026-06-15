@@ -17,7 +17,20 @@ function DynamicSlideshow({
   serviceTitle,
   serviceTag
 }: { 
-  photos: { url: string; title: string; duration?: number }[];
+  photos: { 
+    url: string; 
+    title: string; 
+    duration?: number;
+    fit?: string;
+    scale?: number;
+    positionX?: number;
+    positionY?: number;
+    brightness?: number;
+    contrast?: number;
+    saturation?: number;
+    grayscale?: number;
+    hueRotate?: number;
+  }[];
   serviceTitle?: string;
   serviceTag?: string;
 }) {
