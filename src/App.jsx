@@ -1755,11 +1755,7 @@ function App() {
     return messages;
   }, [sparks, hasMissedDueDate, hasNewConversation, clients, hasUrgentAlert, isWarningDismissed]);
 
-  useEffect(() => {
-    if (!isAdminGridActive) {
-      setIsWarningDismissed(false);
-    }
-  }, [isAdminGridActive]);
+  // Warning dismissal state is persistent per session and only reset on logout/login reset
 
   const markAllAlertsAsRead = async () => {
     // 1. Mark all flames as read in database and local state
@@ -2816,6 +2812,7 @@ function App() {
     setIsClientVaultActive(false);
     setIsAdminGridActive(false);
     setIsSuccess(false);
+    setIsWarningDismissed(false);
     setShowConstruction(false);
     setSelectedService(null);
     resetForm();
@@ -5246,7 +5243,24 @@ function App() {
                     </div>
                     <div className="vault-content modules-grid-layout">
                       {hasUrgentAlert && (
-                        <div className="flashing-emergency-banner animate-pulse" onClick={() => setIsEmergencyModalOpen(true)}>
+                        <div 
+                          className="flashing-emergency-banner animate-pulse" 
+                          onClick={() => {
+                            if (flames.length > 0) {
+                              setProjectsSearchQuery(flames[0].service || flames[0].name || "");
+                              setActiveAdminModule("PROJECTS");
+                              setIsAdminGridActive(true);
+                              setIsWarningDismissed(true);
+                              pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: true });
+                            } else if (sparks.length > 0) {
+                              setInquiriesSearchQuery(sparks[0].name || sparks[0].clientName || "");
+                              setActiveAdminModule("INQUIRIES");
+                              setIsAdminGridActive(true);
+                              setIsWarningDismissed(true);
+                              pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: true });
+                            }
+                          }}
+                        >
                           <span className="emergency-icon">🚨</span>
                           <span className="emergency-text">EMERGENCY ALERTS DETECTED: {flames.length} DEADLINE{flames.length !== 1 ? 'S' : ''} & {sparks.length} NEW SPARK{sparks.length !== 1 ? 'S' : ''} PENDING CALIBRATION</span>
                           <span className="emergency-action-btn">CLICK TO RESOLVE</span>
@@ -6014,9 +6028,9 @@ function App() {
                                     if (flames.length === 1) {
                                       setProjectsSearchQuery(flames[0].name);
                                       setActiveAdminModule("PROJECTS");
-                                      setIsAdminGridActive(false);
+                                      setIsAdminGridActive(true);
                                       setIsWarningDismissed(true);
-                                      pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: false });
+                                      pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: true });
                                     } else if (flames.length > 1) {
                                       setExpandedWarningTab(expandedWarningTab === 'DEADLINES' ? null : 'DEADLINES');
                                     }
@@ -6031,9 +6045,9 @@ function App() {
                                     if (sparks.length === 1) {
                                       setInquiriesSearchQuery(sparks[0].name || sparks[0].clientName);
                                       setActiveAdminModule("INQUIRIES");
-                                      setIsAdminGridActive(false);
+                                      setIsAdminGridActive(true);
                                       setIsWarningDismissed(true);
-                                      pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: false });
+                                      pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: true });
                                     } else if (sparks.length > 1) {
                                       setExpandedWarningTab(expandedWarningTab === 'INQUIRIES' ? null : 'INQUIRIES');
                                     }
@@ -6055,10 +6069,10 @@ function App() {
                                       onClick={() => {
                                         setProjectsSearchQuery(f.name);
                                         setActiveAdminModule("PROJECTS");
-                                        setIsAdminGridActive(false);
+                                        setIsAdminGridActive(true);
                                         setIsWarningDismissed(true);
                                         setExpandedWarningTab(null);
-                                        pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: false });
+                                        pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: true });
                                       }}
                                     >
                                       <span className="font-semibold">{f.name}</span>
@@ -6077,10 +6091,10 @@ function App() {
                                       onClick={() => {
                                         setInquiriesSearchQuery(s.name || s.clientName);
                                         setActiveAdminModule("INQUIRIES");
-                                        setIsAdminGridActive(false);
+                                        setIsAdminGridActive(true);
                                         setIsWarningDismissed(true);
                                         setExpandedWarningTab(null);
-                                        pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: false });
+                                        pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: true });
                                       }}
                                     >
                                       <span className="font-semibold">{s.name || s.clientName}</span>
@@ -6246,7 +6260,9 @@ function App() {
                                       setProjectsSearchQuery(p.service || p.name || "");
                                       setActiveAdminModule("PROJECTS");
                                       setIsAdminGridActive(true);
+                                      setIsWarningDismissed(true);
                                       setIsEmergencyModalOpen(false);
+                                      pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: true });
                                     }}
                                     title="Go to Project"
                                   >
@@ -6284,7 +6300,9 @@ function App() {
                                       setInquiriesSearchQuery(s.name || "");
                                       setActiveAdminModule("INQUIRIES");
                                       setIsAdminGridActive(true);
+                                      setIsWarningDismissed(true);
                                       setIsEmergencyModalOpen(false);
+                                      pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: true });
                                     }}
                                     title="Go to Spark"
                                   >
