@@ -83,39 +83,44 @@ export function ClientVaultLayout({
               })}
             </SidebarMenu>
           </SidebarContent>
-          <SidebarFooter className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-9 w-9 border border-border">
+          <SidebarFooter className="p-4 border-t border-border/50">
+            <div className="flex flex-col gap-1">
+              {/* 3. User's Profile Name */}
+              <div className="flex items-center gap-3 p-2 rounded-lg bg-secondary/10 border border-border/30 mb-2">
+                <Avatar className="h-9 w-9 border border-border shrink-0">
                   <AvatarFallback className="bg-primary/10 text-primary">
                     {currentClient?.name?.charAt(0).toUpperCase() || "C"}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex flex-col text-sm">
-                  <span className="font-medium text-foreground truncate w-[100px]" title={currentClient?.name}>
+                <div className="flex flex-col text-sm truncate">
+                  <span className="font-semibold text-foreground truncate" title={currentClient?.name}>
                     {currentClient?.name}
                   </span>
-                  <span className="text-xs text-muted-foreground truncate w-[100px]">
+                  <span className="text-xs text-muted-foreground">
                     Client Account
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
-                <button 
-                  onClick={() => setTheme(prev => prev === "light" ? "dark" : "light")}
-                  className="text-muted-foreground hover:text-foreground p-2 rounded-md hover:bg-secondary transition-colors"
-                  title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-                >
-                  {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-                </button>
-                <button 
-                  onClick={onLogout}
-                  className="text-muted-foreground hover:text-foreground p-2 rounded-md hover:bg-secondary transition-colors"
-                  title="Log out"
-                >
-                  <LogOut className="h-4 w-4" />
-                </button>
-              </div>
+
+              {/* 2. Theme Mode */}
+              <button 
+                onClick={() => setTheme(prev => prev === "light" ? "dark" : "light")}
+                className="flex items-center gap-3 w-full text-muted-foreground hover:text-foreground p-2 rounded-lg hover:bg-secondary/50 transition-colors text-sm font-medium cursor-pointer"
+                title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+              >
+                {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                <span>{theme === "light" ? "Dark Mode" : "Light Mode"}</span>
+              </button>
+
+              {/* 1. Log Out */}
+              <button 
+                onClick={onLogout}
+                className="flex items-center gap-3 w-full text-muted-foreground hover:text-foreground p-2 rounded-lg hover:bg-secondary/50 transition-colors text-sm font-medium cursor-pointer"
+                title="Log out"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Log Out</span>
+              </button>
             </div>
           </SidebarFooter>
         </Sidebar>
