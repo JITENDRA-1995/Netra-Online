@@ -1109,9 +1109,9 @@ export default function Financials({
                               )}
 
                               {/* Delivery Retainer Action Button */}
-                              {depPaid && !retPaid && balanceAmt > 0 && (
+                              {depPaid && p.status !== 'Completed' && (
                                 <>
-                                  {!retInvoiced ? (
+                                  {!retInvoiced && p.paymentStatus !== 'paid' && balanceAmt > 0 ? (
                                     <Button
                                       size="sm"
                                       className="bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-400 font-extrabold text-3xs py-1 px-2.5 h-7 rounded-lg"
@@ -1146,7 +1146,7 @@ export default function Financials({
                                 </>
                               )}
 
-                              {depPaid && retPaid && (
+                              {p.status === 'Completed' && (
                                 <span className="text-3xs font-extrabold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 py-1.5 px-3 rounded-lg select-none">
                                   ✓ MISSION SETTLED
                                 </span>
