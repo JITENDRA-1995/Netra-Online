@@ -1969,7 +1969,8 @@ export default function InvoicesPage({
                   const isMicroJobInvoice = (inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && inv.invoiceNo.startsWith('CMS'));
                   const isPaidMicroJob = isMicroJobInvoice && inv.paymentStatus?.toLowerCase() === 'paid';
                   const isPaidCustomInvoice = invoiceTab === 'CUSTOM' && inv.paymentStatus?.toLowerCase() === 'paid';
-                  const isEditDisabled = isPaidMicroJob || isPaidCustomInvoice;
+                  const isSavedInvoice = invoiceTab === 'SAVED' || inv.rawProject?.status === 'Completed';
+                  const isEditDisabled = isPaidMicroJob || isPaidCustomInvoice || isSavedInvoice;
 
                   return (
                     <tr key={inv.id} className="hover:bg-white/[0.01] transition-colors">
@@ -2013,12 +2014,12 @@ export default function InvoicesPage({
                         ) : (
                           <Badge
                             className={`text-3xs uppercase tracking-wider font-extrabold border-0 px-2.5 py-1 rounded-md ${
-                              inv.paymentStatus?.toLowerCase() === 'paid'
+                              inv.paymentStatus?.toLowerCase() === 'paid' || isSavedInvoice
                                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                                 : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
                             }`}
                           >
-                            {inv.paymentStatus || 'Paid'}
+                            {isSavedInvoice ? 'Completed' : (inv.paymentStatus || 'Paid')}
                           </Badge>
                         )}
                       </td>
@@ -2117,7 +2118,9 @@ export default function InvoicesPage({
                                 ? "Paid Micro-Job invoices cannot be edited" 
                                 : isPaidCustomInvoice 
                                   ? "Paid Custom invoices cannot be edited" 
-                                  : "Edit Invoice Details"
+                                  : isSavedInvoice
+                                    ? "Completed project invoices cannot be edited"
+                                    : "Edit Invoice Details"
                             }
                             disabled={isEditDisabled}
                             onClick={() => {
