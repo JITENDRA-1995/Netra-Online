@@ -1272,6 +1272,9 @@ function App() {
   const [unreadSparksCount, setUnreadSparksCount] = useState(0);
   const [showSparkToast, setShowSparkToast] = useState(false);
   const [bellPulse, setBellPulse] = useState(false);
+  const [hasNewConversation, setHasNewConversation] = useState(() => {
+    return localStorage.getItem('netra_new_conversation') === 'true';
+  });
   const [ignitionClientType, setIgnitionClientType] = useState("NEW"); // NEW, EXISTING
   // isProjectEditModalOpen is declared above with edit qty/rate state
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
@@ -1627,6 +1630,8 @@ function App() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'project_chats' }, async (payload) => {
         const newMsg = payload.new;
         if (newMsg && newMsg.sender !== 'admin' && newMsg.sender !== 'SYSTEM' && newMsg.sender?.toLowerCase() !== 'admin') {
+          setHasNewConversation(true);
+          localStorage.setItem('netra_new_conversation', 'true');
           if (adminProfile?.emailNotifications?.newMessages ?? true) {
             toast({
               title: "✉️ Email Notification Dispatched",
@@ -1710,6 +1715,45 @@ function App() {
   useEffect(() => {
     setUnreadSparksCount(sparks.length);
   }, [inquiries, sparks.length]);
+
+  useEffect(() => {
+    if (activeAdminModule === 'CLIENTS') {
+      setHasNewConversation(false);
+      localStorage.removeItem('netra_new_conversation');
+    }
+  }, [activeAdminModule]);
+
+  const hasMissedDueDate = useMemo(() => {
+    return (ignitionQueue || []).some(p => {
+      if (p.status === 'Completed' || p.status === 'Cancelled') return false;
+      if (!p.deadline) return false;
+      const deadlineDate = new Date(p.deadline);
+      deadlineDate.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return deadlineDate < today;
+    });
+  }, [ignitionQueue]);
+
+  const alertStripMessages = useMemo(() => {
+    const messages = [];
+    if (sparks && sparks.length > 0) {
+      messages.push("📥 NEW INQUIRY: A new client inquiry (Spark) has been detected.");
+    }
+    if (hasMissedDueDate) {
+      messages.push("⚠️ OVERDUE DEADLINE: One or more active project deadlines have been missed.");
+    }
+    if (hasNewConversation) {
+      messages.push("✉️ NEW CONVERSATION: A new reply or message stream has been received from the client portal.");
+    }
+    if (clients && clients.some(c => c.pending_profile_update)) {
+      messages.push("👤 PROFILE UPDATE REQUEST: A client has submitted profile modifications pending review.");
+    }
+    if (hasUrgentAlert && isWarningDismissed) {
+      messages.push("🚨 CRITICAL WARNINGS: Unresolved alerts have been acknowledged & proceeded.");
+    }
+    return messages;
+  }, [sparks, hasMissedDueDate, hasNewConversation, clients, hasUrgentAlert, isWarningDismissed]);
 
   useEffect(() => {
     if (!isAdminGridActive) {
@@ -5271,6 +5315,32 @@ function App() {
                       <div className="admin-grid-overlay"></div>
                     </div>
                     <div className="vault-content grid-layout">
+                      {alertStripMessages.length > 0 && (
+                        <div className="w-full overflow-hidden bg-gradient-to-r from-red-950/40 via-amber-950/30 to-red-950/40 border border-red-500/20 rounded-xl px-4 py-2 flex items-center gap-3 relative mb-6 shadow-[0_0_25px_rgba(239,68,68,0.08)] backdrop-blur-md select-none group">
+                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-red-500/15 border border-red-500/30 text-red-400 font-extrabold text-[10px] tracking-wider uppercase shrink-0 animate-pulse">
+                            <span>ALERT FEED</span>
+                          </div>
+                          <div className="relative flex-1 overflow-hidden h-5 flex items-center admin-marquee-container">
+                            <div className="absolute whitespace-nowrap flex font-medium text-[11px] text-red-200/90 tracking-wide admin-marquee-scroll">
+                              <span>{alertStripMessages.join("   •   ") + "   •   "}</span>
+                              <span>{alertStripMessages.join("   •   ") + "   •   "}</span>
+                            </div>
+                          </div>
+                          <style>{`
+                            @keyframes adminMarquee {
+                              0% { transform: translate3d(0, 0, 0); }
+                              100% { transform: translate3d(-50%, 0, 0); }
+                            }
+                            .admin-marquee-scroll {
+                              animation: adminMarquee 35s linear infinite;
+                            }
+                            .admin-marquee-container:hover .admin-marquee-scroll {
+                              animation-play-state: paused;
+                            }
+                          `}</style>
+                        </div>
+                      )}
+
                       <div className="active-module-header">
                         <h2 className="module-title">{activeAdminModule}</h2>
                         <div className="title-underline"></div>
