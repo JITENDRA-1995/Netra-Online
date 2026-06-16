@@ -369,6 +369,9 @@ export default function SettingsPage({
   const [newSlideUrls, setNewSlideUrls] = useState<string[]>(["", "", "", "", ""]);
   const [newSlideTitles, setNewSlideTitles] = useState<string[]>(["", "", "", "", ""]);
   const [newSlideDurations, setNewSlideDurations] = useState<string[]>(["", "", "", "", ""]);
+  const [newSlideClients, setNewSlideClients] = useState<string[]>(["", "", "", "", ""]);
+  const [newSlideYears, setNewSlideYears] = useState<string[]>(["", "", "", "", ""]);
+  const [newSlideBriefs, setNewSlideBriefs] = useState<string[]>(["", "", "", "", ""]);
 
   // State for Banking calibration
   const [bankName, setBankName] = useState(bankingDetails?.bankName || "");
@@ -740,6 +743,9 @@ export default function SettingsPage({
     url: string;
     title: string;
     durationStr: string;
+    client?: string;
+    year?: string;
+    brief?: string;
   } | null>(null);
 
   // Computed preview service
@@ -767,13 +773,19 @@ export default function SettingsPage({
     const url = newSlideUrls[slotIdx].trim();
     const title = newSlideTitles[slotIdx].trim();
     const durationStr = newSlideDurations[slotIdx].trim();
+    const client = newSlideClients[slotIdx].trim();
+    const year = newSlideYears[slotIdx].trim();
+    const brief = newSlideBriefs[slotIdx].trim();
     if (!url) return;
 
     setActivePreviewSlide({
       slotIdx,
       url,
       title: title || "Slideshow Showcase",
-      durationStr
+      durationStr,
+      client,
+      year,
+      brief
     });
 
     // Reset sliders to default values
@@ -790,7 +802,7 @@ export default function SettingsPage({
 
   const handleConfirmAddSlide = async () => {
     if (!activePreviewSlide) return;
-    const { slotIdx, serviceId, url, title, durationStr } = activePreviewSlide;
+    const { slotIdx, serviceId, url, title, durationStr, client, year, brief } = activePreviewSlide;
 
     // Trigger high-tech countdown state tracking
     setAddingSlideStatus({
@@ -814,6 +826,9 @@ export default function SettingsPage({
         url,
         title: title || "Work Showcase",
         duration,
+        client: client || "",
+        year: year || "",
+        brief: brief || "",
         fit: slideFit,
         scale: slideScale,
         positionX: slidePositionX,
@@ -851,6 +866,9 @@ export default function SettingsPage({
       url, 
       title: title || "Slideshow Showcase",
       duration,
+      client: client || "",
+      year: year || "",
+      brief: brief || "",
       fit: slideFit,
       scale: slideScale,
       positionX: slidePositionX,
@@ -881,6 +899,18 @@ export default function SettingsPage({
     const durations = [...newSlideDurations];
     durations[slotIdx] = "";
     setNewSlideDurations(durations);
+
+    const clients = [...newSlideClients];
+    clients[slotIdx] = "";
+    setNewSlideClients(clients);
+
+    const years = [...newSlideYears];
+    years[slotIdx] = "";
+    setNewSlideYears(years);
+
+    const briefs = [...newSlideBriefs];
+    briefs[slotIdx] = "";
+    setNewSlideBriefs(briefs);
 
     setAddingSlideStatus(prev => ({ ...prev, isAdding: false }));
   };
@@ -1259,6 +1289,18 @@ export default function SettingsPage({
                                       const titles = [...newSlideTitles];
                                       titles[slotIdx] = "";
                                       setNewSlideTitles(titles);
+                                      const durations = [...newSlideDurations];
+                                      durations[slotIdx] = "";
+                                      setNewSlideDurations(durations);
+                                      const clients = [...newSlideClients];
+                                      clients[slotIdx] = "";
+                                      setNewSlideClients(clients);
+                                      const years = [...newSlideYears];
+                                      years[slotIdx] = "";
+                                      setNewSlideYears(years);
+                                      const briefs = [...newSlideBriefs];
+                                      briefs[slotIdx] = "";
+                                      setNewSlideBriefs(briefs);
                                     }}
                                     className="text-[9px] font-mono text-red-400 hover:text-red-300 uppercase cursor-pointer flex items-center gap-1 hover:underline bg-transparent border-0 p-0 outline-none"
                                   >
@@ -1332,6 +1374,50 @@ export default function SettingsPage({
                               }}
                               placeholder="e.g., Luxe Branding Showcase"
                               className="bg-black/40 border-white/10 text-xs rounded-lg py-1 px-3 text-white placeholder:text-white/20"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">Client Name</label>
+                              <Input
+                                value={newSlideClients[slotIdx]}
+                                onChange={(e) => {
+                                  const clients = [...newSlideClients];
+                                  clients[slotIdx] = e.target.value;
+                                  setNewSlideClients(clients);
+                                }}
+                                placeholder="e.g., Aurora Wellness"
+                                className="bg-black/40 border-white/10 text-xs rounded-lg py-1 px-3 text-white placeholder:text-white/20"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">Project Year</label>
+                              <Input
+                                value={newSlideYears[slotIdx]}
+                                onChange={(e) => {
+                                  const years = [...newSlideYears];
+                                  years[slotIdx] = e.target.value;
+                                  setNewSlideYears(years);
+                                }}
+                                placeholder="e.g., 2024"
+                                className="bg-black/40 border-white/10 text-xs rounded-lg py-1 px-3 text-white placeholder:text-white/20"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">Project Brief / Description</label>
+                            <textarea
+                              value={newSlideBriefs[slotIdx]}
+                              onChange={(e) => {
+                                const briefs = [...newSlideBriefs];
+                                briefs[slotIdx] = e.target.value;
+                                setNewSlideBriefs(briefs);
+                              }}
+                              placeholder="e.g., A comprehensive visual identity for a luxury wellness brand..."
+                              rows={2}
+                              className="w-full bg-black/40 border border-white/10 text-xs rounded-lg py-1.5 px-3 text-white placeholder:text-white/20 outline-none focus:border-indigo-400 transition-colors"
                             />
                           </div>
 
@@ -2034,6 +2120,40 @@ export default function SettingsPage({
                       onChange={(e) => setActivePreviewSlide({ ...activePreviewSlide, title: e.target.value })}
                       placeholder="e.g., Luxe Branding Showcase"
                       className="bg-black/40 border-white/10 text-xs rounded-lg py-1 px-3 text-white"
+                    />
+                  </div>
+
+                  {/* Client & Year */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">Client Name</label>
+                      <Input
+                        value={activePreviewSlide.client || ""}
+                        onChange={(e) => setActivePreviewSlide({ ...activePreviewSlide, client: e.target.value })}
+                        placeholder="e.g., Aurora Wellness"
+                        className="bg-black/40 border-white/10 text-xs rounded-lg py-1 px-3 text-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">Project Year</label>
+                      <Input
+                        value={activePreviewSlide.year || ""}
+                        onChange={(e) => setActivePreviewSlide({ ...activePreviewSlide, year: e.target.value })}
+                        placeholder="e.g., 2024"
+                        className="bg-black/40 border-white/10 text-xs rounded-lg py-1 px-3 text-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Project Brief */}
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">Project Brief / Description</label>
+                    <textarea
+                      value={activePreviewSlide.brief || ""}
+                      onChange={(e) => setActivePreviewSlide({ ...activePreviewSlide, brief: e.target.value })}
+                      placeholder="e.g., A comprehensive visual identity..."
+                      rows={3}
+                      className="w-full bg-black/40 border border-white/10 text-xs rounded-lg py-1.5 px-3 text-white placeholder:text-white/20 outline-none focus:border-indigo-400 transition-colors"
                     />
                   </div>
 

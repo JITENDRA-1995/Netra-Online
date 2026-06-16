@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, ArrowLeft } from "lucide-react";
 
 const CATEGORY_COLORS: Record<string, string> = {
   BRANDING: "#00d4ff",
@@ -355,7 +355,17 @@ function DynamicSlideshow({
   );
 }
 
-function WorkScrollSection({ sections }: { sections: any[] }) {
+function WorkScrollSection({ 
+  sections,
+  onPhotoSelect,
+  selectedCategory,
+  setSelectedCategory
+}: { 
+  sections: any[]; 
+  onPhotoSelect: (photo: any) => void;
+  selectedCategory: string;
+  setSelectedCategory: (cat: string) => void;
+}) {
   if (!sections || sections.length === 0) {
     return (
       <div className="py-32 text-center text-white/30 font-mono text-xs uppercase tracking-widest bg-[#050508] border-y border-white/5">
@@ -364,6 +374,25 @@ function WorkScrollSection({ sections }: { sections: any[] }) {
     );
   }
 
+  // Flatten photos when ALL is active, or filter by category
+  const displayedPhotos = (() => {
+    if (selectedCategory === "ALL") {
+      return sections.flatMap((section: any) => 
+        section.photos.map((photo: any) => ({
+          ...photo,
+          section
+        }))
+      );
+    } else {
+      const section = sections.find((s: any) => s.service.id.toString() === selectedCategory);
+      if (!section) return [];
+      return section.photos.map((photo: any) => ({
+        ...photo,
+        section
+      }));
+    }
+  })();
+
   return (
     <div className="py-24 px-6 md:px-12 bg-[#050508]">
       <div className="max-w-7xl mx-auto mb-16">
@@ -371,7 +400,7 @@ function WorkScrollSection({ sections }: { sections: any[] }) {
           <div className="h-px w-8 bg-gradient-to-r from-violet-500 to-fuchsia-500" />
           <span className="text-xs font-mono text-violet-400/70 tracking-widest uppercase">Selected Work</span>
         </div>
-        <h2 className="text-4xl md:text-5xl font-bold text-white/90 leading-tight">
+        <h2 className="text-4xl md:text-5xl font-bold text-white/90 leading-tight text-left">
           The Work That{" "}
           <span style={{ background: "linear-gradient(90deg, #a78bfa, #f472b6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
             Defines Us
@@ -379,16 +408,92 @@ function WorkScrollSection({ sections }: { sections: any[] }) {
         </h2>
       </div>
 
-      <div className="flex flex-col gap-16 max-w-5xl mx-auto">
-        {sections.map((section, sIdx) => (
-          <DynamicSlideshow 
-            key={sIdx} 
-            photos={section.photos} 
-            serviceTitle={section.service.title}
-            serviceTag={section.service.tag}
-          />
+      {/* Category Tabs Menu */}
+      <div className="max-w-7xl mx-auto mb-12 flex flex-wrap gap-3 justify-start select-none category-menu-bar">
+        <button
+          onClick={() => setSelectedCategory("ALL")}
+          className={`px-6 py-2.5 rounded-full text-xs font-semibold tracking-wider transition-all duration-300 border cursor-pointer ${
+            selectedCategory === "ALL"
+              ? "bg-[#8b5cf6] border-[#8b5cf6] text-white shadow-[0_0_15px_rgba(139,92,246,0.3)]"
+              : "bg-transparent border-white/10 text-white/60 hover:text-white hover:border-white/30"
+          }`}
+        >
+          All
+        </button>
+        {sections.map((section: any) => (
+          <button
+            key={section.service.id}
+            onClick={() => setSelectedCategory(section.service.id.toString())}
+            className={`px-6 py-2.5 rounded-full text-xs font-semibold tracking-wider transition-all duration-300 border cursor-pointer ${
+              selectedCategory === section.service.id.toString()
+                ? "bg-[#8b5cf6] border-[#8b5cf6] text-white shadow-[0_0_15px_rgba(139,92,246,0.3)]"
+                : "bg-transparent border-white/10 text-white/60 hover:text-white hover:border-white/30"
+            }`}
+          >
+            {section.service.title}
+          </button>
         ))}
       </div>
+
+      {/* Card Grid */}
+      {displayedPhotos.length > 0 ? (
+        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 portfolio-card-grid">
+          {displayedPhotos.map((photo: any, idx: number) => {
+            const isVideo = photo.url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || photo.url.includes("video") || photo.url.startsWith("data:video/");
+            return (
+              <div
+                key={idx}
+                onClick={() => onPhotoSelect(photo)}
+                className="group/card relative h-[300px] md:h-[380px] rounded-3xl overflow-hidden border border-white/5 bg-white/[0.01] cursor-pointer hover:border-white/15 hover:shadow-[0_15px_30px_rgba(0,0,0,0.4)] transition-all duration-500 hover:-translate-y-1"
+              >
+                <div className="absolute inset-0 z-0">
+                  {isVideo ? (
+                    <video
+                      src={photo.url}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-105"
+                      muted
+                      loop
+                      autoPlay
+                      playsInline
+                      style={{
+                        objectFit: photo.fit || 'cover',
+                        objectPosition: `${(photo.positionX ?? 0) + 50}% ${(photo.positionY ?? 0) + 50}%`,
+                        filter: `brightness(${photo.brightness ?? 100}%) contrast(${photo.contrast ?? 100}%) saturate(${photo.saturation ?? 100}%) grayscale(${photo.grayscale ?? 0}%) hue-rotate(${photo.hueRotate ?? 0}deg)`
+                      }}
+                    />
+                  ) : (
+                    <img
+                      src={photo.url}
+                      alt={photo.title}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-105"
+                      style={{
+                        objectFit: photo.fit || 'cover',
+                        objectPosition: `${(photo.positionX ?? 0) + 50}% ${(photo.positionY ?? 0) + 50}%`,
+                        filter: `brightness(${photo.brightness ?? 100}%) contrast(${photo.contrast ?? 100}%) saturate(${photo.saturation ?? 100}%) grayscale(${photo.grayscale ?? 0}%) hue-rotate(${photo.hueRotate ?? 0}deg)`
+                      }}
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent"></div>
+                </div>
+
+                {/* Card Header Overlay */}
+                <div className="absolute bottom-6 left-6 right-6 z-10 text-left">
+                  <span className="text-[9px] font-mono text-cyan-400 uppercase tracking-widest block mb-1">
+                    {photo.section?.service?.tag || "SHOWCASE"}
+                  </span>
+                  <h3 className="text-lg font-bold text-white tracking-wide">
+                    {photo.title}
+                  </h3>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="max-w-7xl mx-auto h-[250px] border border-white/5 border-dashed rounded-3xl flex flex-col items-center justify-center text-white/20 text-xs font-mono uppercase tracking-widest">
+          <span>No portfolio works match the selected criteria</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -735,6 +840,59 @@ function CTASection({ onContactClick }: { onContactClick?: () => void }) {
   );
 }
 
+const getPhotoMetadata = (photo: any, service: any) => {
+  const title = photo.title || "Showcase Asset";
+  const serviceName = service?.title || "Creative Design";
+  
+  // Extract client name from photo title if client field is empty
+  let client = photo.client || "";
+  if (!client) {
+    const words = title.split(' ');
+    if (words.length > 1) {
+      const firstWord = words[0];
+      const secondWord = words[1];
+      if (firstWord.toLowerCase() === 'terra' && secondWord.toLowerCase() === 'café') {
+        client = "Terra Café";
+      } else if (firstWord.toLowerCase() === 'nexus' && secondWord.toLowerCase() === 'tech') {
+        client = "Nexus Tech";
+      } else {
+        const lowerWord = firstWord.toLowerCase();
+        if (lowerWord === 'aurora') client = "Aurora Wellness";
+        else if (lowerWord === 'prism') client = "Prism Media";
+        else if (lowerWord === 'velvet') client = "Velvet Magazine";
+        else if (lowerWord === 'helix') client = "Helix App";
+        else if (lowerWord === 'nexus') client = "Nexus Tech";
+        else client = firstWord + " Co.";
+      }
+    } else {
+      client = title + " Client";
+    }
+  }
+
+  // Extract year
+  const year = photo.year || "2024";
+
+  // Extract brief
+  let brief = photo.brief || "";
+  if (!brief) {
+    if (client.startsWith("Aurora")) {
+      brief = "A comprehensive visual identity for a luxury wellness brand focusing on serenity, balance, and modern elegance. The project involved creating a new logo mark, color palette, typography system, and packaging guidelines.";
+    } else if (client.startsWith("Velvet")) {
+      brief = "An editorial and print publication design for Velvet Magazine, showcasing visual excellence, editorial layout design, and refined typography hierarchies that resonate with modern art and style enthusiasts.";
+    } else if (client.startsWith("Prism")) {
+      brief = "A futuristic motion identity and brand trailer utilizing sleek 3D dynamics and glowing neon aesthetics to communicate high-tech intelligence and computational velocity.";
+    } else if (client.startsWith("Terra")) {
+      brief = "An organic, tactile packaging design and branding execution for Terra Café, reflecting earthly elements, sustainable materials, and a hand-crafted sensory brand experience.";
+    } else if (client.startsWith("Helix")) {
+      brief = "A high-fidelity interactive user interface and design system for the Helix mobile application, optimizing micro-interactions, layout ergonomics, and a premium neon-dark aesthetic.";
+    } else {
+      brief = `A comprehensive creative direction and execution for ${client}. The project focused on aligning visual touchpoints, enhancing modern brand value, and establishing a cohesive design system across all active marketing channels.`;
+    }
+  }
+
+  return { client, service: serviceName, year, brief };
+};
+
 export function Portfolio({ 
   onContactClick,
   visionSettings,
@@ -817,6 +975,232 @@ export function Portfolio({
     };
   }).filter(Boolean);
 
+  const activeSections = dynamicSections.filter((s: any) => s.photos && s.photos.length > 0);
+
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+  const [selectedPhoto, setSelectedPhoto] = useState<any | null>(null);
+
+  // Scroll to top when selected photo changes
+  useEffect(() => {
+    if (selectedPhoto) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [selectedPhoto]);
+
+  // Sibling photos
+  const siblingPhotos = useMemo(() => {
+    if (!selectedPhoto || !selectedPhoto.section) return [];
+    return selectedPhoto.section.photos.filter((p: any) => p.url !== selectedPhoto.url);
+  }, [selectedPhoto]);
+
+  // Next section
+  const nextSection = useMemo(() => {
+    if (!selectedPhoto || !selectedPhoto.section || activeSections.length <= 1) return null;
+    const currentIdx = activeSections.findIndex((s: any) => s.service.id === selectedPhoto.section.service.id);
+    if (currentIdx === -1) return null;
+    const nextIdx = (currentIdx + 1) % activeSections.length;
+    return activeSections[nextIdx];
+  }, [selectedPhoto, activeSections]);
+
+  const meta = useMemo(() => {
+    if (!selectedPhoto) return null;
+    return getPhotoMetadata(selectedPhoto, selectedPhoto.section?.service);
+  }, [selectedPhoto]);
+
+  const handleSiblingClick = (sibling: any) => {
+    setSelectedPhoto({
+      ...sibling,
+      section: selectedPhoto.section
+    });
+  };
+
+  const handleUpNextClick = () => {
+    if (!nextSection || !nextSection.photos || nextSection.photos.length === 0) return;
+    setSelectedPhoto({
+      ...nextSection.photos[0],
+      section: nextSection
+    });
+  };
+
+  if (selectedPhoto) {
+    const isVideo = selectedPhoto.url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || selectedPhoto.url.includes("video") || selectedPhoto.url.startsWith("data:video/");
+    return (
+      <div className="min-h-screen text-white bg-[#050508]" style={{ cursor: "none", overflowX: "clip" }}>
+        <style>{`
+          @keyframes scanline { 0% { top: -2px; } 100% { top: 100%; } }
+          @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-12px); } }
+          @keyframes pulseRing { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(1.8); opacity: 0; } }
+          @keyframes rotateSlow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+          @keyframes rotateReverse { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+          @keyframes fadeSlideUp { 0% { opacity: 0; transform: translateY(30px); } 100% { opacity: 1; transform: translateY(0); } }
+          @keyframes hologram { 0%, 100% { opacity: 1; } 50% { opacity: 0.85; } }
+          @keyframes tickerScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+          .cursor-ring { position: fixed; top: 0; left: 0; width: 32px; height: 32px; border: 1px solid rgba(167,139,250,0.6); border-radius: 50%; pointer-events: none; z-index: 9999; mix-blend-mode: difference; }
+          .cursor-dot { position: fixed; top: 0; left: 0; width: 6px; height: 6px; background: #a78bfa; border-radius: 50%; pointer-events: none; z-index: 9999; }
+          .noise-overlay { position: fixed; inset: 0; z-index: 1; opacity: 0.025; pointer-events: none; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E"); }
+          .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        `}</style>
+
+        <div ref={cursorRef} className="cursor-ring" />
+        <div ref={cursorDotRef} className="cursor-dot" />
+        <ScanLine />
+        <div className="noise-overlay" />
+
+        <div className="py-24 px-6 md:px-12 max-w-7xl mx-auto detail-page-container">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12">
+            <div className="text-left">
+              <button 
+                onClick={() => setSelectedPhoto(null)}
+                className="flex items-center gap-2 text-xs font-mono text-white/50 hover:text-white uppercase tracking-wider mb-6 group/back bg-transparent border-0 cursor-pointer p-0 outline-none"
+              >
+                <ArrowLeft className="w-4 h-4 transition-transform group-hover/back:-translate-x-1" />
+                Back to Archive
+              </button>
+              
+              <h1 className="text-4xl md:text-6xl font-extrabold text-white leading-tight">
+                {selectedPhoto.title || "Showcase Project"}
+              </h1>
+            </div>
+
+            {/* Metadata Table */}
+            <div className="flex gap-12 text-left md:text-right border-l md:border-l-0 md:border-r border-white/10 pl-6 md:pl-0 md:pr-6 py-2 shrink-0">
+              <div className="space-y-4">
+                <div>
+                  <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest block">Client</span>
+                  <span className="text-sm font-bold text-white mt-1 block">{meta?.client}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest block">Services</span>
+                  <span className="text-sm font-bold text-white mt-1 block">{meta?.service}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest block">Year</span>
+                  <span className="text-sm font-bold text-white mt-1 block">{meta?.year}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Large Media */}
+          <div 
+            className="w-full h-[450px] md:h-[600px] rounded-3xl border border-white/5 relative overflow-hidden bg-black/60 shadow-[0_20px_50px_rgba(0,0,0,0.6)] mb-16"
+          >
+            {isVideo ? (
+              <video 
+                src={selectedPhoto.url} 
+                autoPlay
+                controls
+                loop
+                muted
+                playsInline
+                className="w-full h-full"
+                style={{
+                  objectFit: selectedPhoto.fit || 'cover',
+                  objectPosition: `${(selectedPhoto.positionX ?? 0) + 50}% ${(selectedPhoto.positionY ?? 0) + 50}%`,
+                  transform: `scale(${selectedPhoto.scale ?? 1})`,
+                  filter: `brightness(${selectedPhoto.brightness ?? 100}%) contrast(${selectedPhoto.contrast ?? 100}%) saturate(${selectedPhoto.saturation ?? 100}%) grayscale(${selectedPhoto.grayscale ?? 0}%) hue-rotate(${selectedPhoto.hueRotate ?? 0}deg)`
+                }}
+              />
+            ) : (
+              <img 
+                src={selectedPhoto.url} 
+                alt={selectedPhoto.title || "Showcase image"} 
+                className="w-full h-full"
+                style={{
+                  objectFit: selectedPhoto.fit || 'cover',
+                  objectPosition: `${(selectedPhoto.positionX ?? 0) + 50}% ${(selectedPhoto.positionY ?? 0) + 50}%`,
+                  transform: `scale(${selectedPhoto.scale ?? 1})`,
+                  filter: `brightness(${selectedPhoto.brightness ?? 100}%) contrast(${selectedPhoto.contrast ?? 100}%) saturate(${selectedPhoto.saturation ?? 100}%) grayscale(${selectedPhoto.grayscale ?? 0}%) hue-rotate(${selectedPhoto.hueRotate ?? 0}deg)`
+                }}
+              />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"></div>
+          </div>
+
+          {/* The Brief & Project Description */}
+          <div className="max-w-3xl text-left mb-24">
+            <h2 className="text-2xl md:text-3xl font-bold text-white mb-6">The Brief</h2>
+            <p className="text-white/70 text-base md:text-lg leading-relaxed font-light">
+              {meta?.brief}
+            </p>
+          </div>
+
+          {/* Sibling Photos Grid */}
+          {siblingPhotos.length > 0 && (
+            <div className="border-t border-white/5 pt-16 mb-24 text-left">
+              <h3 className="text-xl font-bold text-white text-left mb-8 uppercase tracking-wider">
+                More from {meta?.service}
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {siblingPhotos.map((sibling: any, idx: number) => (
+                  <div 
+                    key={idx}
+                    onClick={() => handleSiblingClick(sibling)}
+                    className="group/sibling relative h-[250px] md:h-[300px] rounded-2xl overflow-hidden border border-white/5 bg-white/[0.01] cursor-pointer hover:border-white/15 transition-all duration-300 shadow-md hover:shadow-lg"
+                  >
+                    <div className="absolute inset-0 z-0">
+                      {sibling.url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || sibling.url.includes("video") || sibling.url.startsWith("data:video/") ? (
+                        <video 
+                          src={sibling.url} 
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover/sibling:scale-105"
+                          muted
+                          loop
+                          autoPlay
+                          playsInline
+                          style={{
+                            objectFit: sibling.fit || 'cover',
+                            objectPosition: `${(sibling.positionX ?? 0) + 50}% ${(sibling.positionY ?? 0) + 50}%`,
+                            filter: `brightness(${sibling.brightness ?? 100}%) contrast(${sibling.contrast ?? 100}%) saturate(${sibling.saturation ?? 100}%) grayscale(${sibling.grayscale ?? 0}%) hue-rotate(${sibling.hueRotate ?? 0}deg)`
+                          }}
+                        />
+                      ) : (
+                        <img 
+                          src={sibling.url} 
+                          alt={sibling.title} 
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover/sibling:scale-105"
+                          style={{
+                            objectFit: sibling.fit || 'cover',
+                            objectPosition: `${(sibling.positionX ?? 0) + 50}% ${(sibling.positionY ?? 0) + 50}%`,
+                            filter: `brightness(${sibling.brightness ?? 100}%) contrast(${sibling.contrast ?? 100}%) saturate(${sibling.saturation ?? 100}%) grayscale(${sibling.grayscale ?? 0}%) hue-rotate(${sibling.hueRotate ?? 0}deg)`
+                          }}
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent"></div>
+                    </div>
+                    
+                    <div className="absolute bottom-4 left-4 right-4 z-10 text-left">
+                      <h4 className="text-sm font-bold text-white tracking-wide">{sibling.title}</h4>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Up Next Redirection */}
+          {nextSection && (
+            <div className="border-t border-white/5 pt-16 pb-8 text-center flex flex-col items-center">
+              <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest block mb-4">Up Next</span>
+              <button
+                onClick={handleUpNextClick}
+                className="group/upnext text-3xl md:text-5xl font-black text-white hover:text-cyan-400 transition-colors duration-300 bg-transparent border-0 cursor-pointer p-0 outline-none flex items-center gap-4"
+              >
+                {nextSection.service.title}
+                <span className="transition-transform duration-300 group-hover/upnext:translate-x-3">→</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        <footer className="py-10 px-10 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 bg-[#050508]">
+          <span className="font-mono text-xs text-white/25 tracking-wider">© 2024 Netra Graphics. All rights reserved.</span>
+          <span className="font-mono text-xs text-white/15 tracking-widest">NG — MMXXIV</span>
+        </footer>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen text-white" style={{ background: "#050508", cursor: "none", overflowX: "clip" }}>
       <style>{`
@@ -879,7 +1263,12 @@ export function Portfolio({
         </div>
       </section>
 
-      <WorkScrollSection sections={dynamicSections} />
+      <WorkScrollSection 
+        sections={activeSections} 
+        onPhotoSelect={setSelectedPhoto}
+        selectedCategory={selectedCategory}
+        setSelectedCategory={setSelectedCategory}
+      />
 
       <PhilosophySection />
       <ProcessSection />
