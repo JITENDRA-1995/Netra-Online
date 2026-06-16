@@ -33,6 +33,7 @@ interface Inquiry {
   status: string;
   date: string;
   createdAt?: string;
+  created_at?: string;
   description?: string;
 }
 
@@ -87,7 +88,7 @@ export default function Inquiries({
   // Dynamically resolve 5-day expiration for "New Spark" status, format dates and fallbacks
   const resolvedInquiries = useMemo(() => {
     return inquiries.map((inq) => {
-      const createdDate = new Date(inq.createdAt || inq.date || Date.now());
+      const createdDate = new Date(inq.created_at || inq.createdAt || inq.date || Date.now());
       const diffTime = Date.now() - createdDate.getTime();
       const diffDays = diffTime / (1000 * 60 * 60 * 24);
       
