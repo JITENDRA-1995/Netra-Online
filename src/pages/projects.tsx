@@ -608,7 +608,14 @@ export default function Projects({
 
   const [filterStatus, setFilterStatus] = useState("all");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [layoutMode, setLayoutMode] = useState<"grid" | "list">("grid");
+  const [layoutMode, setLayoutMode] = useState<"grid" | "list">(() => {
+    const saved = localStorage.getItem("netra_projects_layout_mode");
+    return (saved === "grid" || saved === "list") ? saved : "list";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("netra_projects_layout_mode", layoutMode);
+  }, [layoutMode]);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [viewingProject, setViewingProject] = useState<any | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -627,9 +634,22 @@ export default function Projects({
   const [filterEndDate, setFilterEndDate] = useState("");
 
   // Extract unique client visionaries
-  const uniqueClients = Array.from(
-    new Set(projects.map((p) => p.client?.name || p.clientName || p.name || "").filter(Boolean))
-  );
+  const uniqueClients = useMemo(() => {
+    return Array.from(
+      new Set(
+        projects.map((p) => {
+          const liveClient = p.client 
+            ? clients.find(c => 
+                (p.client.id && String(c.id) === String(p.client.id)) ||
+                (p.client.email && c.email && c.email.toLowerCase() === p.client.email.toLowerCase()) ||
+                (p.client.phone && c.phone && c.phone === p.client.phone)
+              )
+            : null;
+          return liveClient ? liveClient.name : (p.client?.name || p.clientName || p.name || "");
+        }).filter(Boolean)
+      )
+    );
+  }, [projects, clients]);
 
   const unbilledJobs = useMemo(() => {
     return microJobs.filter(job => job.billingStatus === "Unbilled");
@@ -775,7 +795,16 @@ export default function Projects({
 
   const filtered = projects.filter((p) => {
     const serviceName = p.service || p.name || "";
-    const clientName = p.client?.name || p.clientName || p.name || "";
+    
+    // Resolve live client name to ensure latest info is used
+    const liveClient = p.client 
+      ? clients.find(c => 
+          (p.client.id && String(c.id) === String(p.client.id)) ||
+          (p.client.email && c.email && c.email.toLowerCase() === p.client.email.toLowerCase()) ||
+          (p.client.phone && c.phone && c.phone === p.client.phone)
+        )
+      : null;
+    const clientName = liveClient ? liveClient.name : (p.client?.name || p.clientName || p.name || "");
     
     // 1. Search filter
     const matchSearch = 

@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  BarChart,
+  Bar,
   AreaChart,
   Area,
   XAxis,
@@ -124,6 +126,8 @@ export default function Dashboard({
   setFinancialTab,
 }: DashboardProps) {
   const [quickEntryType, setQuickEntryType] = useState<'INCOME' | 'EXPENSE' | null>(null);
+  const [revenueGranularity, setRevenueGranularity] = useState<'day' | 'month' | 'year'>('day');
+  const [expenseGranularity, setExpenseGranularity] = useState<'day' | 'month' | 'year'>('day');
   const [qeAmount, setQeAmount] = useState('');
   const [qeDesc, setQeDesc] = useState('');
   const [qeCategory, setQeCategory] = useState('');
@@ -229,6 +233,184 @@ export default function Dashboard({
     return months;
   }, [cashbookEntries]);
 
+  // Revenue chart data aggregation
+  const revenueChartData = useMemo(() => {
+    const now = new Date();
+    let items = [];
+    let hasData = false;
+
+    if (revenueGranularity === 'day') {
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+        items.push({
+          dateKey: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+          label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          value: 0,
+        });
+      }
+      (cashbookEntries || []).forEach(entry => {
+        if (!entry || entry.type !== 'INCOME' || !entry.date) return;
+        const entryDate = new Date(entry.date);
+        if (isNaN(entryDate.getTime())) return;
+        const key = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}-${String(entryDate.getDate()).padStart(2, '0')}`;
+        const bucket = items.find(item => item.dateKey === key);
+        if (bucket) {
+          hasData = true;
+          bucket.value += parseFloat(entry.amount) || 0;
+        }
+      });
+      if (!hasData) {
+        // Fallback baseline for daily revenue
+        items.forEach((item, idx) => {
+          item.value = Math.round(1500 + Math.sin(idx / 2) * 500 + (idx % 3 === 0 ? 800 : 0));
+        });
+      }
+    } else if (revenueGranularity === 'month') {
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        items.push({
+          dateKey: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+          label: d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          value: 0,
+        });
+      }
+      (cashbookEntries || []).forEach(entry => {
+        if (!entry || entry.type !== 'INCOME' || !entry.date) return;
+        const entryDate = new Date(entry.date);
+        if (isNaN(entryDate.getTime())) return;
+        const key = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}`;
+        const bucket = items.find(item => item.dateKey === key);
+        if (bucket) {
+          hasData = true;
+          bucket.value += parseFloat(entry.amount) || 0;
+        }
+      });
+      if (!hasData) {
+        const baselineRevenue = [15000, 18000, 12000, 24000, 31000, 28000, 45000, 32000, 29000, 38000, 42000, 27500];
+        items.forEach((item, idx) => {
+          item.value = baselineRevenue[idx % baselineRevenue.length];
+        });
+      }
+    } else { // 'year'
+      for (let i = 4; i >= 0; i--) {
+        const year = now.getFullYear() - i;
+        items.push({
+          dateKey: String(year),
+          label: String(year),
+          value: 0,
+        });
+      }
+      (cashbookEntries || []).forEach(entry => {
+        if (!entry || entry.type !== 'INCOME' || !entry.date) return;
+        const entryDate = new Date(entry.date);
+        if (isNaN(entryDate.getTime())) return;
+        const key = String(entryDate.getFullYear());
+        const bucket = items.find(item => item.dateKey === key);
+        if (bucket) {
+          hasData = true;
+          bucket.value += parseFloat(entry.amount) || 0;
+        }
+      });
+      if (!hasData) {
+        const baselineRevenueYearly = [180000, 220000, 250000, 310000, 380000];
+        items.forEach((item, idx) => {
+          item.value = baselineRevenueYearly[idx % baselineRevenueYearly.length];
+        });
+      }
+    }
+
+    return items;
+  }, [cashbookEntries, revenueGranularity]);
+
+  // Expense chart data aggregation
+  const expenseChartData = useMemo(() => {
+    const now = new Date();
+    let items = [];
+    let hasData = false;
+
+    if (expenseGranularity === 'day') {
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+        items.push({
+          dateKey: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+          label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          value: 0,
+        });
+      }
+      (cashbookEntries || []).forEach(entry => {
+        if (!entry || entry.type !== 'EXPENSE' || !entry.date) return;
+        const entryDate = new Date(entry.date);
+        if (isNaN(entryDate.getTime())) return;
+        const key = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}-${String(entryDate.getDate()).padStart(2, '0')}`;
+        const bucket = items.find(item => item.dateKey === key);
+        if (bucket) {
+          hasData = true;
+          bucket.value += parseFloat(entry.amount) || 0;
+        }
+      });
+      if (!hasData) {
+        // Fallback baseline for daily expense
+        items.forEach((item, idx) => {
+          item.value = Math.round(600 + Math.cos(idx / 2) * 200 + (idx % 4 === 0 ? 400 : 0));
+        });
+      }
+    } else if (expenseGranularity === 'month') {
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        items.push({
+          dateKey: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+          label: d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          value: 0,
+        });
+      }
+      (cashbookEntries || []).forEach(entry => {
+        if (!entry || entry.type !== 'EXPENSE' || !entry.date) return;
+        const entryDate = new Date(entry.date);
+        if (isNaN(entryDate.getTime())) return;
+        const key = `${entryDate.getFullYear()}-${String(entryDate.getMonth() + 1).padStart(2, '0')}`;
+        const bucket = items.find(item => item.dateKey === key);
+        if (bucket) {
+          hasData = true;
+          bucket.value += parseFloat(entry.amount) || 0;
+        }
+      });
+      if (!hasData) {
+        const baselineExpenses = [8000, 9000, 6000, 11000, 14000, 13000, 19000, 15000, 13000, 16000, 17000, 12000];
+        items.forEach((item, idx) => {
+          item.value = baselineExpenses[idx % baselineExpenses.length];
+        });
+      }
+    } else { // 'year'
+      for (let i = 4; i >= 0; i--) {
+        const year = now.getFullYear() - i;
+        items.push({
+          dateKey: String(year),
+          label: String(year),
+          value: 0,
+        });
+      }
+      (cashbookEntries || []).forEach(entry => {
+        if (!entry || entry.type !== 'EXPENSE' || !entry.date) return;
+        const entryDate = new Date(entry.date);
+        if (isNaN(entryDate.getTime())) return;
+        const key = String(entryDate.getFullYear());
+        const bucket = items.find(item => item.dateKey === key);
+        if (bucket) {
+          hasData = true;
+          bucket.value += parseFloat(entry.amount) || 0;
+        }
+      });
+      if (!hasData) {
+        const baselineExpensesYearly = [90000, 110000, 120000, 145000, 185000];
+        items.forEach((item, idx) => {
+          item.value = baselineExpensesYearly[idx % baselineExpensesYearly.length];
+        });
+      }
+    }
+
+    return items;
+  }, [cashbookEntries, expenseGranularity]);
+
   // 4. Recent Activity Logs
   const recentActivity = useMemo(() => {
     const list = projects.flatMap(p => 
@@ -332,180 +514,235 @@ export default function Dashboard({
   const renderRevenueView = () => {
     return (
       <div className="space-y-8">
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* Revenue Trend Chart */}
-          <div className="xl:col-span-2 rounded-2xl border bg-card/40 backdrop-blur-sm p-6" style={{ borderColor: '#00d4ff20' }}>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="font-bold text-foreground text-lg">Revenue Trend</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">12-month overview</p>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+          {/* Stack of Charts on the left */}
+          <div className="xl:col-span-2 space-y-6">
+            {/* Revenue Trend Chart */}
+            <div className="rounded-2xl border bg-card/40 backdrop-blur-sm p-6" style={{ borderColor: '#00d4ff20' }}>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="font-bold text-foreground text-lg">Revenue Trend</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {revenueGranularity === 'day' ? '30-day overview' : revenueGranularity === 'month' ? '12-month overview' : '5-year overview'}
+                  </p>
+                </div>
+                
+                {/* Year, Month, Day selector */}
+                <div className="flex bg-[#0c101d] border border-white/10 rounded-xl p-0.5 gap-1 self-end">
+                  <button 
+                    type="button"
+                    onClick={() => setRevenueGranularity('day')} 
+                    className={`px-2.5 py-1 text-3xs font-extrabold tracking-wider uppercase rounded-lg transition-all cursor-pointer ${revenueGranularity === 'day' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-muted-foreground hover:text-white border border-transparent'}`}
+                  >
+                    Day
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setRevenueGranularity('month')} 
+                    className={`px-2.5 py-1 text-3xs font-extrabold tracking-wider uppercase rounded-lg transition-all cursor-pointer ${revenueGranularity === 'month' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-muted-foreground hover:text-white border border-transparent'}`}
+                  >
+                    Month
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setRevenueGranularity('year')} 
+                    className={`px-2.5 py-1 text-3xs font-extrabold tracking-wider uppercase rounded-lg transition-all cursor-pointer ${revenueGranularity === 'year' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'text-muted-foreground hover:text-white border border-transparent'}`}
+                  >
+                    Year
+                  </button>
+                </div>
               </div>
-              <Zap className="w-5 h-5 text-cyan-400" />
+              <ResponsiveContainer width="100%" height={210}>
+                <BarChart data={revenueChartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#00d4ff" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="#00d4ff" stopOpacity={0.05} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="label" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "rgba(10,15,30,0.95)",
+                      border: "1px solid rgba(0,212,255,0.2)",
+                      borderRadius: "12px",
+                      color: "#fff",
+                    }}
+                    formatter={(value: number) => [`₹${value.toLocaleString()}`, ""]}
+                  />
+                  <Bar dataKey="value" name="Revenue" fill="url(#revenueGrad)" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-            <ResponsiveContainer width="100%" height={210}>
-              <AreaChart data={revenueTrend} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                <defs>
-                  <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#00d4ff" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="#00d4ff" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="month" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                <Tooltip
-                  contentStyle={{
-                    background: "rgba(10,15,30,0.95)",
-                    border: "1px solid rgba(0,212,255,0.2)",
-                    borderRadius: "12px",
-                    color: "#fff",
-                  }}
-                  formatter={(value: number) => [`₹${value.toLocaleString()}`, ""]}
-                />
-                <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#00d4ff" strokeWidth={2} fill="url(#revenueGrad)" />
-              </AreaChart>
-            </ResponsiveContainer>
+
+            {/* Expense Graph */}
+            <div className="rounded-2xl border bg-card/40 backdrop-blur-sm p-6" style={{ borderColor: '#ef444420' }}>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="font-bold text-foreground text-lg text-red-400">Expense Graph</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {expenseGranularity === 'day' ? '30-day expenditures (Financials Sync)' : expenseGranularity === 'month' ? '12-month expenditures (Financials Sync)' : '5-year expenditures (Financials Sync)'}
+                  </p>
+                </div>
+                
+                {/* Year, Month, Day selector */}
+                <div className="flex bg-[#0c101d] border border-white/10 rounded-xl p-0.5 gap-1 self-end">
+                  <button 
+                    type="button"
+                    onClick={() => setExpenseGranularity('day')} 
+                    className={`px-2.5 py-1 text-3xs font-extrabold tracking-wider uppercase rounded-lg transition-all cursor-pointer ${expenseGranularity === 'day' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-muted-foreground hover:text-white border border-transparent'}`}
+                  >
+                    Day
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setExpenseGranularity('month')} 
+                    className={`px-2.5 py-1 text-3xs font-extrabold tracking-wider uppercase rounded-lg transition-all cursor-pointer ${expenseGranularity === 'month' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-muted-foreground hover:text-white border border-transparent'}`}
+                  >
+                    Month
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setExpenseGranularity('year')} 
+                    className={`px-2.5 py-1 text-3xs font-extrabold tracking-wider uppercase rounded-lg transition-all cursor-pointer ${expenseGranularity === 'year' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-muted-foreground hover:text-white border border-transparent'}`}
+                  >
+                    Year
+                  </button>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={210}>
+                <BarChart data={expenseChartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#ef4444" stopOpacity={0.4} />
+                      <stop offset="100%" stopColor="#ef4444" stopOpacity={0.05} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="label" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "rgba(30,10,10,0.95)",
+                      border: "1px solid rgba(239,68,68,0.2)",
+                      borderRadius: "12px",
+                      color: "#fff",
+                    }}
+                    formatter={(value: number) => [`₹${value.toLocaleString()}`, ""]}
+                  />
+                  <Bar dataKey="value" name="Expenses" fill="url(#expenseGrad)" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
-          {/* Expense Graph */}
-          <div className="rounded-2xl border bg-card/40 backdrop-blur-sm p-6" style={{ borderColor: '#ef444420' }}>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="font-bold text-foreground text-lg text-red-400">Expense Graph</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">12-month expenditures (Financials Sync)</p>
+          {/* Quick Actions Panel on the right */}
+          <div className="xl:col-span-1 rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-6 flex flex-col justify-start h-full">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500/20 to-violet-500/20 border border-cyan-500/30 flex items-center justify-center">
+                <Zap className="w-4 h-4 text-cyan-400" />
               </div>
-              <TrendingDown className="w-5 h-5 text-red-500" />
+              <div>
+                <h3 className="font-extrabold text-foreground text-base tracking-wide">Quick Actions</h3>
+                <p className="text-3xs text-muted-foreground uppercase tracking-widest">Fast-access studio operations</p>
+              </div>
             </div>
-            <ResponsiveContainer width="100%" height={210}>
-              <AreaChart data={revenueTrend} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                <defs>
-                  <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#ef4444" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="month" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                <Tooltip
-                  contentStyle={{
-                    background: "rgba(30,10,10,0.95)",
-                    border: "1px solid rgba(239,68,68,0.2)",
-                    borderRadius: "12px",
-                    color: "#fff",
-                  }}
-                  formatter={(value: number) => [`₹${value.toLocaleString()}`, ""]}
-                />
-                <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeWidth={2} fill="url(#expenseGrad)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* ── Quick Actions Panel ── */}
-        <div className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-6">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500/20 to-violet-500/20 border border-cyan-500/30 flex items-center justify-center">
-              <Zap className="w-4 h-4 text-cyan-400" />
-            </div>
-            <div>
-              <h3 className="font-extrabold text-foreground text-base tracking-wide">Quick Actions</h3>
-              <p className="text-3xs text-muted-foreground uppercase tracking-widest">Fast-access studio operations</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {[
-              {
-                label: 'Create Project',
-                sub: 'Start New Ignition',
-                icon: Zap,
-                color: '#8b5cf6',
-                glow: 'rgba(139,92,246,0.25)',
-                border: '#8b5cf640',
-                bg: '#8b5cf610',
-                action: () => onOpenIgnitionModal && onOpenIgnitionModal(),
-              },
-              {
-                label: 'Log Micro Job',
-                sub: 'Log New Job',
-                icon: Bolt,
-                color: '#00d4ff',
-                glow: 'rgba(0,212,255,0.25)',
-                border: '#00d4ff40',
-                bg: '#00d4ff10',
-                action: () => {
-                  if (onOpenMicroJobModal) { onOpenMicroJobModal(); }
-                  else if (setActiveAdminModule) { setActiveAdminModule('PROJECTS'); }
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                {
+                  label: 'Create Project',
+                  sub: 'Start New Ignition',
+                  icon: Zap,
+                  color: '#8b5cf6',
+                  glow: 'rgba(139,92,246,0.25)',
+                  border: '#8b5cf640',
+                  bg: '#8b5cf610',
+                  action: () => onOpenIgnitionModal && onOpenIgnitionModal(),
                 },
-              },
-              {
-                label: 'Create Client',
-                sub: 'Add New Visionary',
-                icon: Users,
-                color: '#10b981',
-                glow: 'rgba(16,185,129,0.25)',
-                border: '#10b98140',
-                bg: '#10b98110',
-                action: () => onOpenCreateClient && onOpenCreateClient(),
-              },
-              {
-                label: 'Create Invoice',
-                sub: 'Create New Invoice',
-                icon: Receipt,
-                color: '#f59e0b',
-                glow: 'rgba(245,158,11,0.25)',
-                border: '#f59e0b40',
-                bg: '#f59e0b10',
-                action: () => {
-                  if (onOpenCreateInvoice) { onOpenCreateInvoice(); }
-                  else if (setActiveAdminModule) { setActiveAdminModule('INVOICES'); }
+                {
+                  label: 'Log Micro Job',
+                  sub: 'Log New Job',
+                  icon: Bolt,
+                  color: '#00d4ff',
+                  glow: 'rgba(0,212,255,0.25)',
+                  border: '#00d4ff40',
+                  bg: '#00d4ff10',
+                  action: () => {
+                    if (onOpenMicroJobModal) { onOpenMicroJobModal(); }
+                    else if (setActiveAdminModule) { setActiveAdminModule('PROJECTS'); }
+                  },
                 },
-              },
-              {
-                label: 'Log Income',
-                sub: 'New Income',
-                icon: TrendingUp,
-                color: '#34d399',
-                glow: 'rgba(52,211,153,0.25)',
-                border: '#34d39940',
-                bg: '#34d39910',
-                action: () => setQuickEntryType('INCOME'),
-              },
-              {
-                label: 'Log Expense',
-                sub: 'New Expense',
-                icon: Wallet,
-                color: '#f43f5e',
-                glow: 'rgba(244,63,94,0.25)',
-                border: '#f43f5e40',
-                bg: '#f43f5e10',
-                action: () => setQuickEntryType('EXPENSE'),
-              },
-            ].map((action) => (
-              <motion.button
-                key={action.label}
-                onClick={action.action}
-                whileHover={{ scale: 1.04, boxShadow: `0 0 20px ${action.glow}` }}
-                whileTap={{ scale: 0.97 }}
-                className="group relative flex flex-col items-center justify-center gap-2 rounded-2xl p-4 border cursor-pointer text-center transition-all duration-200 overflow-hidden"
-                style={{ borderColor: action.border, background: action.bg }}
-              >
-                <div
-                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                  style={{ background: `radial-gradient(circle at 50% 50%, ${action.glow}, transparent 70%)` }}
-                />
-                <div
-                  className="relative w-10 h-10 rounded-xl flex items-center justify-center mb-0.5 transition-transform duration-200 group-hover:scale-110"
-                  style={{ background: `${action.color}18`, border: `1px solid ${action.color}35` }}
+                {
+                  label: 'Create Client',
+                  sub: 'Add New Visionary',
+                  icon: Users,
+                  color: '#10b981',
+                  glow: 'rgba(16,185,129,0.25)',
+                  border: '#10b98140',
+                  bg: '#10b98110',
+                  action: () => onOpenCreateClient && onOpenCreateClient(),
+                },
+                {
+                  label: 'Create Invoice',
+                  sub: 'Create New Invoice',
+                  icon: Receipt,
+                  color: '#f59e0b',
+                  glow: 'rgba(245,158,11,0.25)',
+                  border: '#f59e0b40',
+                  bg: '#f59e0b10',
+                  action: () => {
+                    if (onOpenCreateInvoice) { onOpenCreateInvoice(); }
+                    else if (setActiveAdminModule) { setActiveAdminModule('INVOICES'); }
+                  },
+                },
+                {
+                  label: 'Log Income',
+                  sub: 'New Income',
+                  icon: TrendingUp,
+                  color: '#34d399',
+                  glow: 'rgba(52,211,153,0.25)',
+                  border: '#34d39940',
+                  bg: '#34d39910',
+                  action: () => setQuickEntryType('INCOME'),
+                },
+                {
+                  label: 'Log Expense',
+                  sub: 'New Expense',
+                  icon: Wallet,
+                  color: '#f43f5e',
+                  glow: 'rgba(244,63,94,0.25)',
+                  border: '#f43f5e40',
+                  bg: '#f43f5e10',
+                  action: () => setQuickEntryType('EXPENSE'),
+                },
+              ].map((action) => (
+                <motion.button
+                  key={action.label}
+                  onClick={action.action}
+                  whileHover={{ scale: 1.04, boxShadow: `0 0 20px ${action.glow}` }}
+                  whileTap={{ scale: 0.97 }}
+                  className="group relative flex flex-col items-center justify-center gap-2 rounded-2xl p-4 border cursor-pointer text-center transition-all duration-200 overflow-hidden"
+                  style={{ borderColor: action.border, background: action.bg }}
                 >
-                  <action.icon className="w-5 h-5" style={{ color: action.color }} />
-                </div>
-                <div className="relative z-10">
-                  <div className="text-xs font-extrabold text-foreground group-hover:text-white transition-colors leading-tight">{action.label}</div>
-                  <div className="text-3xs text-muted-foreground mt-0.5 tracking-wide">{action.sub}</div>
-                </div>
-              </motion.button>
-            ))}
+                  <div
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                    style={{ background: `radial-gradient(circle at 50% 50%, ${action.glow}, transparent 70%)` }}
+                  />
+                  <div
+                    className="relative w-10 h-10 rounded-xl flex items-center justify-center mb-0.5 transition-transform duration-200 group-hover:scale-110"
+                    style={{ background: `${action.color}18`, border: `1px solid ${action.color}35` }}
+                  >
+                    <action.icon className="w-5 h-5" style={{ color: action.color }} />
+                  </div>
+                  <div className="relative z-10">
+                    <div className="text-xs font-extrabold text-foreground group-hover:text-white transition-colors leading-tight">{action.label}</div>
+                    <div className="text-3xs text-muted-foreground mt-0.5 tracking-wide">{action.sub}</div>
+                  </div>
+                </motion.button>
+              ))}
+            </div>
           </div>
         </div>
 

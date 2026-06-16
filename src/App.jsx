@@ -1805,6 +1805,18 @@ function App() {
     toast({ title: "All emergency alerts acknowledged" });
   };
 
+  const getProjectClientName = (project) => {
+    if (!project) return "Unknown Client";
+    const liveClient = project.client 
+      ? clients.find(c => 
+          (project.client.id && String(c.id) === String(project.client.id)) ||
+          (project.client.email && c.email && c.email.toLowerCase() === project.client.email.toLowerCase()) ||
+          (project.client.phone && c.phone && c.phone === project.client.phone)
+        )
+      : null;
+    return liveClient ? liveClient.name : (project.client?.name || project.clientName || project.name || "Unknown Client");
+  };
+
   const getFlameNotifText = (project) => {
     if (!project.deadline) return "Project Calibration Required";
     const today = new Date();
@@ -5248,7 +5260,7 @@ function App() {
                           className="flashing-emergency-banner animate-pulse" 
                           onClick={() => {
                             if (flames.length > 0) {
-                              setProjectsSearchQuery(flames[0].service || flames[0].name || "");
+                              setProjectsSearchQuery(flames[0].service || getProjectClientName(flames[0]) || "");
                               setActiveAdminModule("PROJECTS");
                               setIsAdminGridActive(true);
                               setIsWarningDismissed(true);
@@ -5382,7 +5394,7 @@ function App() {
                             }}
                             onRedirectToFinancialsProject={(p) => {
                               setLedgerSearch('');
-                              setRedirectFilterClient(p.name || '');
+                              setRedirectFilterClient(getProjectClientName(p) || '');
                               setRedirectFilterService(p.service || '');
                               setFinancialTab("PROJECTS");
                               setActiveAdminModule("FINANCIALS");
@@ -6027,7 +6039,7 @@ function App() {
                                   className={`warning-details-card cursor-pointer hover:bg-white/5 transition-colors ${expandedWarningTab === 'DEADLINES' ? 'border-[#ff5e00]/40 bg-[#ff5e00]/5' : ''}`}
                                   onClick={() => {
                                     if (flames.length === 1) {
-                                      setProjectsSearchQuery(flames[0].name);
+                                      setProjectsSearchQuery(getProjectClientName(flames[0]));
                                       setActiveAdminModule("PROJECTS");
                                       setIsAdminGridActive(true);
                                       setIsWarningDismissed(true);
@@ -6068,7 +6080,7 @@ function App() {
                                       key={f.id} 
                                       className="p-2 hover:bg-white/5 rounded-xl cursor-pointer transition-colors text-xs flex justify-between items-center text-foreground"
                                       onClick={() => {
-                                        setProjectsSearchQuery(f.name);
+                                        setProjectsSearchQuery(getProjectClientName(f));
                                         setActiveAdminModule("PROJECTS");
                                         setIsAdminGridActive(true);
                                         setIsWarningDismissed(true);
@@ -6076,7 +6088,7 @@ function App() {
                                         pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: true });
                                       }}
                                     >
-                                      <span className="font-semibold">{f.name}</span>
+                                      <span className="font-semibold">{getProjectClientName(f)}</span>
                                       <span className="text-3xs text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">Due {new Date(f.deadline).toLocaleDateString()}</span>
                                     </div>
                                   ))}
@@ -6244,7 +6256,7 @@ function App() {
                               <div key={p.id} className="emergency-item">
                                 <div className="emergency-item-info">
                                   <span className="emergency-item-title">{p.service}</span>
-                                  <span className="emergency-item-detail">Visionary: {p.clientName || p.client?.name || p.name}</span>
+                                  <span className="emergency-item-detail">Visionary: {getProjectClientName(p)}</span>
                                   <span className="emergency-item-status overdue">{getFlameNotifText(p)}</span>
                                 </div>
                                 <div className="emergency-item-actions">
@@ -6258,7 +6270,7 @@ function App() {
                                   <button 
                                     className="emergency-item-btn go"
                                     onClick={() => {
-                                      setProjectsSearchQuery(p.service || p.name || "");
+                                      setProjectsSearchQuery(p.service || getProjectClientName(p) || "");
                                       setActiveAdminModule("PROJECTS");
                                       setIsAdminGridActive(true);
                                       setIsWarningDismissed(true);
@@ -6641,7 +6653,7 @@ function App() {
                       <div className="notif-list">
                         {flames.length > 0 && flames.map(f => (
                           <div key={f.id} className="notif-card flame flex justify-between items-center" onClick={() => {
-                            setProjectsSearchQuery(f.name);
+                            setProjectsSearchQuery(getProjectClientName(f));
                             setActiveAdminModule("PROJECTS");
                             setIsAdminGridActive(false);
                             setIsNotificationOpen(false);
@@ -6652,7 +6664,7 @@ function App() {
                               <div className="notif-info">
                                 <p className="notif-msg">
                                   {new Date(f.deadline) - new Date() < 0 ? "Project Overdue: " : "Deadline approaching for "}
-                                  <strong>{f.name}</strong>
+                                  <strong>{getProjectClientName(f)}</strong>
                                 </p>
                                 <span className="notif-time">{getFlameNotifText(f)}</span>
                               </div>
@@ -6675,7 +6687,7 @@ function App() {
                             <h4 className="text-3xs uppercase tracking-widest text-muted-foreground font-bold mb-2 px-2">History</h4>
                             {flamesHistory.map(f => (
                               <div key={f.id} className="notif-card flame history opacity-65 flex justify-between items-center" onClick={() => {
-                                setProjectsSearchQuery(f.name);
+                                setProjectsSearchQuery(getProjectClientName(f));
                                 setActiveAdminModule("PROJECTS");
                                 setIsAdminGridActive(false);
                                 setIsNotificationOpen(false);
@@ -6686,7 +6698,7 @@ function App() {
                                   <div className="notif-info">
                                     <p className="notif-msg">
                                       {new Date(f.deadline) - new Date() < 0 ? "Project Overdue: " : "Deadline approached: "}
-                                      <strong>{f.name}</strong>
+                                      <strong>{getProjectClientName(f)}</strong>
                                     </p>
                                     <span className="notif-time">{getFlameNotifText(f)}</span>
                                   </div>
