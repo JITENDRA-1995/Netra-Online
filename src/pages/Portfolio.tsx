@@ -378,18 +378,22 @@ function WorkScrollSection({
   const displayedPhotos = (() => {
     if (selectedCategory === "ALL") {
       return sections.flatMap((section: any) => 
-        section.photos.map((photo: any) => ({
-          ...photo,
-          section
-        }))
+        (section?.photos || [])
+          .filter((photo: any) => photo && typeof photo === 'object')
+          .map((photo: any) => ({
+            ...photo,
+            section
+          }))
       );
     } else {
-      const section = sections.find((s: any) => s.service.id.toString() === selectedCategory);
-      if (!section) return [];
-      return section.photos.map((photo: any) => ({
-        ...photo,
-        section
-      }));
+      const section = sections.find((s: any) => s?.service?.id?.toString() === selectedCategory);
+      if (!section || !section.photos) return [];
+      return section.photos
+        .filter((photo: any) => photo && typeof photo === 'object')
+        .map((photo: any) => ({
+          ...photo,
+          section
+        }));
     }
   })();
 
@@ -439,7 +443,7 @@ function WorkScrollSection({
       {displayedPhotos.length > 0 ? (
         <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 portfolio-card-grid">
           {displayedPhotos.map((photo: any, idx: number) => {
-            const isVideo = photo.url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || photo.url.includes("video") || photo.url.startsWith("data:video/");
+            const isVideo = photo.url ? (photo.url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || photo.url.includes("video") || photo.url.startsWith("data:video/")) : false;
             return (
               <div
                 key={idx}
@@ -952,6 +956,7 @@ export function Portfolio({
   const activeVisionSettings = visionSettings || [];
 
   const dynamicSections = activeVisionSettings.map((vSetting: any) => {
+    if (!vSetting) return null;
     const svc = activeServicesList.find((s: any) => s.id === vSetting.serviceId);
     if (!svc) return null;
 
@@ -975,7 +980,7 @@ export function Portfolio({
     };
   }).filter(Boolean);
 
-  const activeSections = dynamicSections.filter((s: any) => s.photos && s.photos.length > 0);
+  const activeSections = dynamicSections.filter((s: any) => s && s.photos && s.photos.length > 0);
 
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [selectedPhoto, setSelectedPhoto] = useState<any | null>(null);
@@ -989,14 +994,14 @@ export function Portfolio({
 
   // Sibling photos
   const siblingPhotos = useMemo(() => {
-    if (!selectedPhoto || !selectedPhoto.section) return [];
-    return selectedPhoto.section.photos.filter((p: any) => p.url !== selectedPhoto.url);
+    if (!selectedPhoto || !selectedPhoto.section || !selectedPhoto.section.photos) return [];
+    return selectedPhoto.section.photos.filter((p: any) => p && p.url && p.url !== selectedPhoto.url);
   }, [selectedPhoto]);
 
   // Next section
   const nextSection = useMemo(() => {
-    if (!selectedPhoto || !selectedPhoto.section || activeSections.length <= 1) return null;
-    const currentIdx = activeSections.findIndex((s: any) => s.service.id === selectedPhoto.section.service.id);
+    if (!selectedPhoto || !selectedPhoto.section || !selectedPhoto.section.service || activeSections.length <= 1) return null;
+    const currentIdx = activeSections.findIndex((s: any) => s && s.service && s.service.id === selectedPhoto.section.service.id);
     if (currentIdx === -1) return null;
     const nextIdx = (currentIdx + 1) % activeSections.length;
     return activeSections[nextIdx];
@@ -1023,7 +1028,7 @@ export function Portfolio({
   };
 
   if (selectedPhoto) {
-    const isVideo = selectedPhoto.url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || selectedPhoto.url.includes("video") || selectedPhoto.url.startsWith("data:video/");
+    const isVideo = selectedPhoto.url ? (selectedPhoto.url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || selectedPhoto.url.includes("video") || selectedPhoto.url.startsWith("data:video/")) : false;
     return (
       <div className="min-h-screen text-white bg-[#050508]" style={{ cursor: "none", overflowX: "clip" }}>
         <style>{`
@@ -1140,32 +1145,35 @@ export function Portfolio({
                     className="group/sibling relative h-[250px] md:h-[300px] rounded-2xl overflow-hidden border border-white/5 bg-white/[0.01] cursor-pointer hover:border-white/15 transition-all duration-300 shadow-md hover:shadow-lg"
                   >
                     <div className="absolute inset-0 z-0">
-                      {sibling.url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || sibling.url.includes("video") || sibling.url.startsWith("data:video/") ? (
-                        <video 
-                          src={sibling.url} 
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover/sibling:scale-105"
-                          muted
-                          loop
-                          autoPlay
-                          playsInline
-                          style={{
-                            objectFit: sibling.fit || 'cover',
-                            objectPosition: `${(sibling.positionX ?? 0) + 50}% ${(sibling.positionY ?? 0) + 50}%`,
-                            filter: `brightness(${sibling.brightness ?? 100}%) contrast(${sibling.contrast ?? 100}%) saturate(${sibling.saturation ?? 100}%) grayscale(${sibling.grayscale ?? 0}%) hue-rotate(${sibling.hueRotate ?? 0}deg)`
-                          }}
-                        />
-                      ) : (
-                        <img 
-                          src={sibling.url} 
-                          alt={sibling.title} 
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover/sibling:scale-105"
-                          style={{
-                            objectFit: sibling.fit || 'cover',
-                            objectPosition: `${(sibling.positionX ?? 0) + 50}% ${(sibling.positionY ?? 0) + 50}%`,
-                            filter: `brightness(${sibling.brightness ?? 100}%) contrast(${sibling.contrast ?? 100}%) saturate(${sibling.saturation ?? 100}%) grayscale(${sibling.grayscale ?? 0}%) hue-rotate(${sibling.hueRotate ?? 0}deg)`
-                          }}
-                        />
-                      )}
+                      {(() => {
+                        const isSiblingVideo = sibling.url ? (sibling.url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || sibling.url.includes("video") || sibling.url.startsWith("data:video/")) : false;
+                        return isSiblingVideo ? (
+                          <video 
+                            src={sibling.url} 
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover/sibling:scale-105"
+                            muted
+                            loop
+                            autoPlay
+                            playsInline
+                            style={{
+                              objectFit: sibling.fit || 'cover',
+                              objectPosition: `${(sibling.positionX ?? 0) + 50}% ${(sibling.positionY ?? 0) + 50}%`,
+                              filter: `brightness(${sibling.brightness ?? 100}%) contrast(${sibling.contrast ?? 100}%) saturate(${sibling.saturation ?? 100}%) grayscale(${sibling.grayscale ?? 0}%) hue-rotate(${sibling.hueRotate ?? 0}deg)`
+                            }}
+                          />
+                        ) : (
+                          <img 
+                            src={sibling.url} 
+                            alt={sibling.title} 
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover/sibling:scale-105"
+                            style={{
+                              objectFit: sibling.fit || 'cover',
+                              objectPosition: `${(sibling.positionX ?? 0) + 50}% ${(sibling.positionY ?? 0) + 50}%`,
+                              filter: `brightness(${sibling.brightness ?? 100}%) contrast(${sibling.contrast ?? 100}%) saturate(${sibling.saturation ?? 100}%) grayscale(${sibling.grayscale ?? 0}%) hue-rotate(${sibling.hueRotate ?? 0}deg)`
+                            }}
+                          />
+                        );
+                      })()}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent"></div>
                     </div>
                     
