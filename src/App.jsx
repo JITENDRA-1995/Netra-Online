@@ -5,7 +5,7 @@ import './Login.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
-import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ChevronLeft, X, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail, Menu, Volume2, VolumeX, Coins } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ChevronLeft, X, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail, Menu, Volume2, VolumeX, Coins, Phone, MapPin } from 'lucide-react';
 
 // Lazy loaded page components to optimize bundle size and load performance
 const Dashboard = React.lazy(() => import('@/pages/dashboard'));
@@ -1091,8 +1091,11 @@ function App() {
   const [isServicesActive, setIsServicesActive] = useState(false);
   const isNavVertical = isVaultActive && !isContactActive && !isServicesActive;
   const [isSuccess, setIsSuccess] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [successTimerId, setSuccessTimerId] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState("");
+
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -4277,6 +4280,15 @@ function App() {
     }
   };
 
+  const handleCloseSuccessDialog = () => {
+    if (successTimerId) {
+      clearTimeout(successTimerId);
+      setSuccessTimerId(null);
+    }
+    setShowSuccessDialog(false);
+    goHome();
+  };
+
   const handleSendSpark = async (e) => {
     e.preventDefault();
     const nameVal = document.getElementById('name').value;
@@ -4302,15 +4314,26 @@ function App() {
       });
       const dbInquiries = await getInquiries();
       setInquiries(dbInquiries);
+
+      // Clear input elements
+      document.getElementById('name').value = '';
+      document.getElementById('email').value = '';
+      document.getElementById('phone').value = '';
+      document.getElementById('vision').value = '';
+      setSelectedProject("");
     } catch (err) {
       console.error("Error creating inquiry spark:", err);
     }
 
-    setIsSuccess(true);
-    setTimeout(() => {
+    setShowSuccessDialog(true);
+    const timer = setTimeout(() => {
+      // Use the function directly to close dialog after 10s
+      setShowSuccessDialog(false);
       goHome();
-    }, 4000);
+    }, 10000);
+    setSuccessTimerId(timer);
   };
+
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -4781,160 +4804,190 @@ function App() {
                 </div>
 
                 <div className="contact-content">
-                  <div className="split-narrative">
-                    {/* Left Side: The Human Connection */}
-                    <div className="connection-side">
-                      <motion.div
-                        className="connection-reveal"
-                        initial={false}
-                        animate={isContactActive ? "visible" : "hidden"}
-                        variants={{
-                          visible: { transition: { staggerChildren: 0.2 } },
-                          hidden: {}
-                        }}
-                      >
-                        <motion.h2
-                          className="contact-title"
-                          variants={{
-                            hidden: { opacity: 0, x: -50 },
-                            visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: "easeOut" } }
-                          }}
-                        >
-                          LET'S IGNITE
-                        </motion.h2>
-                        <motion.div
-                          className="contact-details"
-                          variants={{
-                            hidden: { opacity: 0, x: -30 },
-                            visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: "easeOut" } }
-                          }}
-                        >
-                          <p className="detail-item email">{adminProfile?.email || "savanhirapra@netragraphics.com"}</p>
-                          <p className="detail-item phone">{adminProfile?.phone || "73590 93035"}</p>
-                          <p className="detail-item address">{adminProfile?.address || "Shreeji Complex, Opp. AaramGruh, Mendarda-Sasan Road, Mendarda-362260"}</p>
-                        </motion.div>
-                        <motion.div
-                          className="social-links"
-                          variants={{
-                            hidden: { opacity: 0, x: -20 },
-                            visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: "easeOut" } }
-                          }}
-                        >
-                          <a href={adminProfile?.instagram ? `https://www.instagram.com/${adminProfile.instagram}` : "https://www.instagram.com/"} target="_blank" rel="noopener noreferrer" className="social-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
-                          </a>
-                          <a href={`https://wa.me/${(adminProfile?.phone || "917359093035").replace(/[^0-9]/g, "")}?text=I am interested in starting a visual revolution with Netra Graphics.`} target="_blank" rel="noopener noreferrer" className="social-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.455 5.703 1.458h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
-                          </a>
-                        </motion.div>
-                      </motion.div>
-                    </div>
+                  <motion.div
+                    className="contact-header-reveal"
+                    initial="hidden"
+                    animate={isContactActive ? "visible" : "hidden"}
+                    variants={{
+                      visible: { transition: { staggerChildren: 0.1 } },
+                      hidden: {}
+                    }}
+                  >
+                    <motion.h1
+                      className="new-contact-title"
+                      variants={{
+                        hidden: { opacity: 0, y: -20 },
+                        visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+                      }}
+                    >
+                      LET'S <span className="title-accent">IGNITE</span>
+                    </motion.h1>
+                    <motion.p
+                      className="contact-subtitle"
+                      variants={{
+                        hidden: { opacity: 0, y: -10 },
+                        visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+                      }}
+                    >
+                      Whether you have a fully formed brief or just a concept, we're ready to collaborate. Reach out and let's craft something extraordinary.
+                    </motion.p>
+                  </motion.div>
 
-                    {/* Right Side: The Spark Interaction */}
-                    <div className="spark-side">
-                      {!isSuccess ? (
-                        <form className="inquiry-form" onSubmit={handleSendSpark}>
-                          <div className="form-group">
-                            <input type="text" id="name" required placeholder=" " />
-                            <label htmlFor="name">Name</label>
-                            <div className="input-line"></div>
+                  <div className="contact-grid-container">
+                    {/* Left Column: Form Card */}
+                    <div className="contact-form-card">
+                      <h2 className="card-title">Send an Inquiry</h2>
+                      
+                      <form className="inquiry-form-new" onSubmit={handleSendSpark}>
+                        <div className="form-row">
+                          <div className="form-group-new">
+                            <label htmlFor="name">FULL NAME</label>
+                            <input type="text" id="name" required placeholder="John Doe" />
                           </div>
-                          <div className="form-group">
-                            <input type="email" id="email" required placeholder=" " />
-                            <label htmlFor="email">Email</label>
-                            <div className="input-line"></div>
+                          <div className="form-group-new">
+                            <label htmlFor="email">EMAIL ADDRESS</label>
+                            <input type="email" id="email" required placeholder="john@company.com" />
                           </div>
-                          <div className="form-group">
-                            <input type="tel" id="phone" required placeholder=" " />
-                            <label htmlFor="phone">Mobile / WhatsApp</label>
-                            <div className="input-line"></div>
+                        </div>
+                        
+                        <div className="form-row">
+                          <div className="form-group-new">
+                            <label htmlFor="phone">MOBILE / WHATSAPP</label>
+                            <input type="tel" id="phone" required placeholder="e.g. 73590 93035" />
                           </div>
-                          <div className="form-group custom-dropdown-wrapper" ref={dropdownRef}>
+                          
+                          <div className="form-group-new dropdown-group" ref={dropdownRef}>
+                            <label>PROJECT TYPE</label>
                             <div
-                              className={`custom-dropdown ${selectedProject ? 'has-value' : ''}`}
+                              className={`custom-dropdown-new ${selectedProject ? 'has-value' : ''}`}
                               onClick={() => setDropdownOpen(!dropdownOpen)}
                             >
-                              <span className="selected-value">{selectedProject || " "}</span>
-                              <label>Project Type</label>
+                              <span className="selected-value">{selectedProject || "Select project type..."}</span>
                               <div className="dropdown-arrow">
                                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path d="M6 9l6 6 6-6" />
                                 </svg>
                               </div>
-                              <div className="input-line"></div>
                             </div>
-
+                            
                             <AnimatePresence>
                               {dropdownOpen && (
                                 <motion.div
-                                  className="dropdown-list"
+                                  className="dropdown-list-new"
                                   initial={{ height: 0, opacity: 0 }}
                                   animate={{ height: "auto", opacity: 1 }}
                                   exit={{ height: 0, opacity: 0 }}
                                   transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                                 >
                                   {services.map((s, i) => (
-                                    <motion.div
+                                    <div
                                       key={s.id}
-                                      className="dropdown-item"
-                                      initial={{ opacity: 0, x: -10 }}
-                                      animate={{ opacity: 1, x: 0 }}
-                                      transition={{ delay: i * 0.03 }}
-                                      onClick={() => {
+                                      className="dropdown-item-new"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
                                         setSelectedProject(s.title);
                                         setDropdownOpen(false);
                                       }}
                                     >
                                       {s.title}
-                                    </motion.div>
+                                    </div>
                                   ))}
                                 </motion.div>
                               )}
                             </AnimatePresence>
                           </div>
-                          <div className="form-group">
-                            <textarea id="vision" required placeholder=" " rows="1"></textarea>
-                            <label htmlFor="vision">Your Vision</label>
-                            <div className="input-line"></div>
-                          </div>
-                          <button type="submit" className="magnetic-button">
-                            <span className="btn-text">SEND SPARK</span>
-                            <div className="btn-glow"></div>
-                          </button>
-                        </form>
-                      ) : (
-                        <div className="success-sequence">
-                          <div className="light-speed-particles">
-                            {[...Array(50)].map((_, i) => (
-                              <div
-                                key={i}
-                                className="particle"
-                                style={{
-                                  '--tx': `${(Math.random() - 0.5) * 1000}px`,
-                                  '--ty': `${(Math.random() - 0.5) * 1000}px`,
-                                  '--delay': `${Math.random() * 0.5}s`
-                                }}
-                              ></div>
-                            ))}
-                          </div>
-                          <motion.div
-                            className="success-logo-container"
-                            initial={{ opacity: 0, scale: 0.5 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ duration: 1.2, ease: "easeOut" }}
-                          >
-                            <div className="logo-formation">
-                              <img src="/logo.png" alt="Netra Logo" className="success-brand-logo" />
-                              <div className="cyan-bloom-pulse"></div>
-                            </div>
-                          </motion.div>
-                          <h3 className="success-msg">VISION RECEIVED. PREPARING FOR REVOLUTION.</h3>
                         </div>
-                      )}
+                        
+                        <div className="form-group-new full-width">
+                          <label htmlFor="vision">PROJECT DETAILS</label>
+                          <textarea
+                            id="vision"
+                            required
+                            placeholder="Tell us about your timeline, budget, and vision..."
+                            rows={4}
+                          ></textarea>
+                        </div>
+                        
+                        <button type="submit" className="submit-btn-new">
+                          Submit Inquiry
+                        </button>
+                      </form>
+
+                    </div>
+
+                    {/* Right Column: Contact Info */}
+                    <div className="contact-info-panel">
+                      <h2 className="panel-title">Contact Info</h2>
+                      
+                      <div className="info-items">
+                        <div className="info-item-box">
+                          <div className="icon-circle">
+                            <Mail className="info-icon" />
+                          </div>
+                          <div className="info-text">
+                            <span className="info-label">EMAIL</span>
+                            <a href={`mailto:${adminProfile?.email || "savanhirapra@netragraphics.com"}`} className="info-value hover:underline">
+                              {adminProfile?.email || "savanhirapra@netragraphics.com"}
+                            </a>
+                            <a href="mailto:careers@netragraphics.com" className="info-value hover:underline">
+                              careers@netragraphics.com
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="info-item-box">
+                          <div className="icon-circle">
+                            <MapPin className="info-icon" />
+                          </div>
+                          <div className="info-text">
+                            <span className="info-label">STUDIO</span>
+                            {(() => {
+                              const addressParts = (adminProfile?.address || "Shreeji Complex, Opp. AaramGruh, Mendarda-Sasan Road, Mendarda-362260").split(',');
+                              const addressLine1 = addressParts.slice(0, 2).join(',').trim();
+                              const addressLine2 = addressParts.slice(2).join(',').trim();
+                              return (
+                                <>
+                                  <span className="info-value font-medium">{addressLine1}</span>
+                                  <span className="info-value text-gray-400 text-sm">{addressLine2}</span>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
+
+                        <div className="info-item-box">
+                          <div className="icon-circle">
+                            <Phone className="info-icon" />
+                          </div>
+                          <div className="info-text">
+                            <span className="info-label">PHONE</span>
+                            <a href={`tel:${(adminProfile?.phone || "7359093035").replace(/[^0-9+]/g, "")}`} className="info-value hover:underline">
+                              {adminProfile?.phone || "+91 73590 93035"}
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* New Business Box */}
+                      <div className="new-business-box">
+                        <h3 className="new-business-title">New Business</h3>
+                        <p className="new-business-desc">
+                          We are currently accepting new projects for Q3 2026.
+                        </p>
+                      </div>
+
+                      {/* Social Links (Dynamic Instagram / Whatsapp) */}
+                      <div className="contact-social-row">
+                        <a href={adminProfile?.instagram ? `https://www.instagram.com/${adminProfile.instagram}` : "https://www.instagram.com/"} target="_blank" rel="noopener noreferrer" className="social-icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                        </a>
+                        <a href={`https://wa.me/${(adminProfile?.phone || "917359093035").replace(/[^0-9]/g, "")}?text=I am interested in starting a visual revolution with Netra Graphics.`} target="_blank" rel="noopener noreferrer" className="social-icon">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.455 5.703 1.458h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
+                        </a>
+                      </div>
                     </div>
                   </div>
                 </div>
-
                 <footer className="contact-footer">
                   <div className="footer-watermark">
                     <img src="/image_0.png" alt="Watermark" />
@@ -8161,7 +8214,58 @@ function App() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Futuristic Success Dialogue Modal */}
+          <AnimatePresence>
+            {showSuccessDialog && (
+              <motion.div
+                className="futuristic-modal-overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <motion.div
+                  className="futuristic-modal-content"
+                  initial={{ scale: 0.8, opacity: 0, y: 50 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.8, opacity: 0, y: 50 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                >
+                  <div className="modal-glow-border"></div>
+                  
+                  <div className="success-icon-wrapper">
+                    <div className="success-icon-pulse"></div>
+                    <Sparkles className="success-icon-glow" />
+                  </div>
+                  
+                  <span className="modal-transmission-label">TRANSMISSION RECEIVED</span>
+                  <h3 className="modal-message-title">
+                    Your inquiry submitted successfully! We get back to you soon!
+                  </h3>
+                  
+                  <div className="countdown-bar-container">
+                    <motion.div
+                      className="countdown-bar-fill"
+                      initial={{ width: "100%" }}
+                      animate={{ width: "0%" }}
+                      transition={{ duration: 10, ease: "linear" }}
+                    />
+                  </div>
+                  
+                  <button
+                    type="button"
+                    className="modal-ok-btn"
+                    onClick={handleCloseSuccessDialog}
+                  >
+                    OK
+                  </button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
+
       </TooltipProvider>
     </QueryClientProvider>
   );
