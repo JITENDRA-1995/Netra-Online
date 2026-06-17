@@ -528,12 +528,30 @@ function useMouse() {
 function useScrollProgress() {
   const [progress, setProgress] = useState(0);
   useEffect(() => {
+    const getVault = (): HTMLElement | null =>
+      document.querySelector('.vault-page.active') as HTMLElement | null;
     const h = () => {
-      const el = document.documentElement;
-      setProgress(el.scrollTop / (el.scrollHeight - el.clientHeight) || 0);
+      const el = getVault();
+      if (el && el.scrollHeight > el.clientHeight) {
+        setProgress(el.scrollTop / (el.scrollHeight - el.clientHeight));
+      } else {
+        const doc = document.documentElement;
+        setProgress(doc.scrollTop / (doc.scrollHeight - doc.clientHeight) || 0);
+      }
     };
-    window.addEventListener("scroll", h, { passive: true });
-    return () => window.removeEventListener("scroll", h);
+    // Vault-page is the scroll container — listen on it directly
+    const attachListeners = () => {
+      const el = getVault();
+      if (el) el.addEventListener('scroll', h, { passive: true });
+      window.addEventListener('scroll', h, { passive: true });
+    };
+    const removeListeners = () => {
+      const el = getVault();
+      if (el) el.removeEventListener('scroll', h);
+      window.removeEventListener('scroll', h);
+    };
+    attachListeners();
+    return removeListeners;
   }, []);
   return progress;
 }
@@ -1069,7 +1087,12 @@ export function Portfolio({
   // Scroll to top when selected photo changes
   useEffect(() => {
     if (selectedPhoto) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      const vaultEl = document.querySelector('.vault-page.active') as HTMLElement | null;
+      if (vaultEl) {
+        vaultEl.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     }
   }, [selectedPhoto]);
 

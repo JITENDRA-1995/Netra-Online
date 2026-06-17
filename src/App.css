@@ -67,14 +67,12 @@ input[type="number"] {
   background: #00E5FF; 
   box-shadow: 0 0 10px #00E5FF, 0 0 20px rgba(0, 229, 255, 0.5);
 }
-.vault-page.active { 
+.vault-page.active {
   position: relative !important;
-  height: auto !important;
-  opacity: 1 !important; 
-  pointer-events: all !important; 
-  overflow-y: visible !important;
-  overflow-x: visible !important;
-  z-index: 5 !important;
+  height: 100vh !important;
+  opacity: 1 !important;
+  pointer-events: all !important;
+  overflow-y: auto !important;
 }
 .vault-page.active.transitioning {
   position: fixed !important;
@@ -7837,9 +7835,4 @@ input[type="number"] {
   font-family: 'Outfit', 'Montserrat', sans-serif;
 }
 
-/* Force body/html scrollbar and auto height when vault-page is active */
-html:has(.app-container.vault-active),
-body:has(.app-container.vault-active) {
-  overflow-y: auto !important;
-  height: auto !important;
-}
+

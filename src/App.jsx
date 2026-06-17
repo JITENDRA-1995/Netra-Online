@@ -2863,7 +2863,7 @@ function App() {
   };
 
   useEffect(() => {
-    if (isVaultActive || isServicesActive || isContactActive) {
+    if (isServicesActive || isContactActive) {
       document.body.style.overflow = 'auto';
       document.documentElement.style.overflow = 'auto';
     } else {
@@ -2874,7 +2874,7 @@ function App() {
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
     };
-  }, [isVaultActive, isServicesActive, isContactActive]);
+  }, [isServicesActive, isContactActive]);
 
   useEffect(() => {
     if (isContactActive) {
