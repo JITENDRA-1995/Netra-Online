@@ -2749,12 +2749,9 @@ function App() {
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-    // Only register wheel/touch listeners for hero→vault transition (not when vault is already active)
-    if (!isVaultActive) {
-      window.addEventListener('wheel', handleWheel, { passive: false });
-      window.addEventListener('touchend', handleTouchEnd, { passive: true });
-    }
+    window.addEventListener('wheel', handleWheel, { passive: false });
     window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd, { passive: true });
     document.addEventListener('mousedown', handleClickOutside);
 
     return () => {
@@ -2805,8 +2802,6 @@ function App() {
       window.scrollTo({ top: 0, behavior: 'instant' });
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
-      const vaultEl = document.querySelector('.vault-page.active');
-      if (vaultEl) vaultEl.scrollTop = 0;
     }, 2000);
 
     setTimeout(() => setHeadlineActive(true), 2600);
@@ -2829,8 +2824,6 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'instant' });
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
-    const vaultElI = document.querySelector('.vault-page.active');
-    if (vaultElI) vaultElI.scrollTop = 0;
   };
 
   const resetForm = () => {
@@ -2851,19 +2844,12 @@ function App() {
     setShowConstruction(false);
     setSelectedService(null);
     setActiveServiceSlideshow(null);
-    setIsIgnitionModalOpen(false);
-    setIsClientModalOpen(false);
-    setIsProjectEditModalOpen(false);
-    setIsCalibrationModalOpen(false);
-    setIsInvoicePreviewOpen(false);
     resetForm();
     window.scrollTo({ top: 0, behavior: 'instant' });
-    const vaultElC = document.querySelector('.vault-page');
-    if (vaultElC) vaultElC.scrollTop = 0;
   };
 
   useEffect(() => {
-    if (isServicesActive || isContactActive) {
+    if ((isVaultActive && !isTransitioning) || isServicesActive || isContactActive) {
       document.body.style.overflow = 'auto';
       document.documentElement.style.overflow = 'auto';
     } else {
@@ -2874,7 +2860,7 @@ function App() {
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
     };
-  }, [isServicesActive, isContactActive]);
+  }, [isVaultActive, isServicesActive, isContactActive, isTransitioning]);
 
   useEffect(() => {
     if (isContactActive) {
@@ -2922,65 +2908,36 @@ function App() {
   useEffect(() => {
     const handlePopState = (event) => {
       const state = event.state;
-      
-      // Close all modals by default on transition unless specified by state
-      setShowConstruction(false);
+      // Always dismiss service card popup and slideshow on any back navigation
       setSelectedService(null);
+      setShowConstruction(false);
       setActiveServiceSlideshow(null);
-      
       if (state && state.page) {
-        if (state.page === 'admin') {
-          const isAdminLoggedIn = localStorage.getItem('netra_admin_active') === 'true';
-          if (!isAdminLoggedIn) {
-            setIsVaultActive(false);
-            setIsServicesActive(false);
-            setIsContactActive(false);
-            setIsLoginActive(true);
-            setIsCommandCenterActive(false);
-            setIsClientVaultActive(false);
-            setIsAdminGridActive(false);
-            window.history.replaceState({ page: 'login' }, '');
-            return;
-          }
-        }
-        if (state.page === 'client-vault') {
-          const isClientLoggedIn = localStorage.getItem('netra_client_active') === 'true';
-          if (!isClientLoggedIn) {
-            setIsVaultActive(false);
-            setIsServicesActive(false);
-            setIsContactActive(false);
-            setIsLoginActive(true);
-            setIsCommandCenterActive(false);
-            setIsClientVaultActive(false);
-            setIsAdminGridActive(false);
-            window.history.replaceState({ page: 'login' }, '');
-            return;
-          }
-        }
-        
-        setIsVaultActive(state.page === 'vision' || state.page === 'vision-detail');
-        setIsServicesActive(state.page === 'services' || state.page === 'services-popup' || state.page === 'services-slideshow');
+        const isAdminAuthenticated = localStorage.getItem('netra_admin_active') === 'true';
+        const isClientAuthenticated = localStorage.getItem('netra_client_active') === 'true';
+        setIsVaultActive(state.page === 'vision');
+        setIsServicesActive(state.page === 'services');
         setIsContactActive(state.page === 'contact');
-        setIsLoginActive(state.page === 'login');
-        setIsCommandCenterActive(state.page === 'admin');
-        setIsClientVaultActive(state.page === 'client-vault');
-        setIsAdminGridActive(state.page === 'admin' ? (state.isAdminGridActive !== undefined ? state.isAdminGridActive : false) : !!state.isAdminGridActive);
-        if (state.activeAdminModule) {
+        
+        // Only restore admin/client pages if user is still authenticated
+        const canRestoreAdmin = state.page === 'admin' && isAdminAuthenticated;
+        const canRestoreClient = state.page === 'client-vault' && isClientAuthenticated;
+        setIsCommandCenterActive(canRestoreAdmin);
+        setIsClientVaultActive(canRestoreClient);
+        setIsAdminGridActive(canRestoreAdmin || !!state.isAdminGridActive);
+        if (state.activeAdminModule && canRestoreAdmin) {
           setActiveAdminModule(state.activeAdminModule);
         }
         
-        // Restore popup/slideshow states
-        if (state.page === 'services-popup' && state.serviceId) {
-          const svc = servicesList.find(s => s.id === state.serviceId);
-          if (svc) {
-            setSelectedService(svc);
-            setShowConstruction(true);
-          }
-        } else if (state.page === 'services-slideshow' && state.serviceId) {
-          const svc = servicesList.find(s => s.id === state.serviceId);
-          if (svc) {
-            setActiveServiceSlideshow(svc);
-          }
+        // If the history has an authenticated page but auth is gone, redirect to login page
+        if ((state.page === 'admin' && !isAdminAuthenticated) ||
+            (state.page === 'client-vault' && !isClientAuthenticated)) {
+          setIsLoginActive(true);
+          // Replace this history entry with login so it won't repeat
+          window.history.replaceState({ page: 'login' }, '');
+        } else {
+          // Only restore login page if not already authenticated
+          setIsLoginActive(state.page === 'login' && !isAdminAuthenticated && !isClientAuthenticated);
         }
       } else {
         setIsVaultActive(false);
@@ -2996,12 +2953,10 @@ function App() {
     window.addEventListener('popstate', handlePopState);
     if (!window.history.state) {
       window.history.replaceState({ page: 'home' }, '');
-    } else {
-      handlePopState({ state: window.history.state });
     }
 
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [servicesList]);
+  }, []);
 
   const goHome = () => triggerInstantTransition(() => {
     clearAllPages();
@@ -3123,13 +3078,9 @@ function App() {
     }
   };
 
-  const handleLogout = async (e) => {
+  const handleLogout = (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    try {
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.warn("Supabase auth signOut error:", err);
-    }
+    // Clear all authentication tokens first
     localStorage.removeItem('netra_admin_active');
     localStorage.removeItem('netra_client_active');
     localStorage.removeItem('netra_active_admin_module');
@@ -3140,9 +3091,18 @@ function App() {
     localStorage.removeItem('netra_selected_client_invoice_id');
     setCurrentClient(null);
     setIsClientVaultActive(false);
+    setIsCommandCenterActive(false);
+    setIsAdminGridActive(false);
+    // Wipe the entire browser history stack and replace with a clean home state
+    // so that the back button cannot navigate back into authenticated pages
+    const historyDepth = window.history.length;
+    for (let i = 0; i < historyDepth; i++) {
+      window.history.replaceState({ page: 'home' }, '');
+    }
     triggerInstantTransition(() => {
       clearAllPages();
-      pushPageToHistory('home');
+      // Use replaceState here (not pushState) to ensure a clean single home entry
+      window.history.replaceState({ page: 'home' }, '');
     });
   };
 
@@ -4749,12 +4709,8 @@ function App() {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     onClick={() => {
-                      if (window.history.state && window.history.state.page === 'services-popup') {
-                        window.history.back();
-                      } else {
-                        setShowConstruction(false);
-                        setSelectedService(null);
-                      }
+                      setShowConstruction(false);
+                      setSelectedService(null);
                     }}
                   >
                     <motion.div
@@ -4769,12 +4725,8 @@ function App() {
                       <button
                         className="popup-close-btn"
                         onClick={() => {
-                          if (window.history.state && window.history.state.page === 'services-popup') {
-                            window.history.back();
-                          } else {
-                            setShowConstruction(false);
-                            setSelectedService(null);
-                          }
+                          setShowConstruction(false);
+                          setSelectedService(null);
                         }}
                         aria-label="Close details"
                       >
@@ -4829,7 +4781,6 @@ function App() {
                             className="popup-cta-btn secondary"
                             onClick={() => {
                               setActiveServiceSlideshow(selectedService);
-                              pushPageToHistory('services-slideshow', { serviceId: selectedService.id });
                             }}
                           >
                             View Our Work
@@ -4868,7 +4819,6 @@ function App() {
                         onClick={() => {
                           setSelectedService(s);
                           setShowConstruction(true);
-                          pushPageToHistory('services-popup', { serviceId: s.id });
                         }}
                       >
                         {s.tag && (
@@ -8298,23 +8248,11 @@ function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => {
-                  if (window.history.state && window.history.state.page === 'services-slideshow') {
-                    window.history.back();
-                  } else {
-                    setActiveServiceSlideshow(null);
-                  }
-                }}
+                onClick={() => setActiveServiceSlideshow(null)}
               >
                 <ServiceSlideshowContent 
                   service={activeServiceSlideshow} 
-                  onClose={() => {
-                    if (window.history.state && window.history.state.page === 'services-slideshow') {
-                      window.history.back();
-                    } else {
-                      setActiveServiceSlideshow(null);
-                    }
-                  }} 
+                  onClose={() => setActiveServiceSlideshow(null)} 
                 />
               </motion.div>
             )}

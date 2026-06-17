@@ -67,12 +67,12 @@ input[type="number"] {
   background: #00E5FF; 
   box-shadow: 0 0 10px #00E5FF, 0 0 20px rgba(0, 229, 255, 0.5);
 }
-.vault-page.active {
-  position: relative !important;
-  height: 100vh !important;
-  opacity: 1 !important;
-  pointer-events: all !important;
-  overflow-y: auto !important;
+.vault-page.active { 
+  position: relative;
+  height: auto;
+  opacity: 1; 
+  pointer-events: all; 
+  overflow-y: visible;
 }
 .vault-page.active.transitioning {
   position: fixed !important;
@@ -7834,5 +7834,7 @@ input[type="number"] {
 .detail-page-container button {
   font-family: 'Outfit', 'Montserrat', sans-serif;
 }
+
+
 
 
