@@ -2900,7 +2900,12 @@ function App() {
 
   const pushPageToHistory = (pageName, additional = {}) => {
     const currentState = window.history.state;
-    if (!currentState || currentState.page !== pageName || (pageName === 'admin' && currentState.activeAdminModule !== additional.activeAdminModule)) {
+    const hasChanged = !currentState || 
+      currentState.page !== pageName || 
+      (pageName === 'admin' && currentState.activeAdminModule !== additional.activeAdminModule) ||
+      currentState.serviceId !== additional.serviceId ||
+      currentState.viewWork !== additional.viewWork;
+    if (hasChanged) {
       window.history.pushState({ page: pageName, ...additional }, '');
     }
   };
@@ -2908,10 +2913,12 @@ function App() {
   useEffect(() => {
     const handlePopState = (event) => {
       const state = event.state;
-      // Always dismiss service card popup and slideshow on any back navigation
+      
+      // Default reset
       setSelectedService(null);
       setShowConstruction(false);
       setActiveServiceSlideshow(null);
+      
       if (state && state.page) {
         const isAdminAuthenticated = localStorage.getItem('netra_admin_active') === 'true';
         const isClientAuthenticated = localStorage.getItem('netra_client_active') === 'true';
@@ -2919,6 +2926,22 @@ function App() {
         setIsServicesActive(state.page === 'services');
         setIsContactActive(state.page === 'contact');
         
+        // Handle services page popup states
+        if (state.page === 'services') {
+          if (state.serviceId) {
+            const rawServices = localStorage.getItem('netra_services');
+            const parsedServices = rawServices ? JSON.parse(rawServices) : services;
+            const foundService = parsedServices.find(s => s.id === state.serviceId);
+            if (foundService) {
+              setSelectedService(foundService);
+              setShowConstruction(true);
+              if (state.viewWork) {
+                setActiveServiceSlideshow(foundService);
+              }
+            }
+          }
+        }
+
         // Only restore admin/client pages if user is still authenticated
         const canRestoreAdmin = state.page === 'admin' && isAdminAuthenticated;
         const canRestoreClient = state.page === 'client-vault' && isClientAuthenticated;
@@ -4711,6 +4734,10 @@ function App() {
                     onClick={() => {
                       setShowConstruction(false);
                       setSelectedService(null);
+                      const currentState = window.history.state;
+                      if (currentState && currentState.page === 'services' && currentState.serviceId) {
+                        window.history.back();
+                      }
                     }}
                   >
                     <motion.div
@@ -4727,6 +4754,10 @@ function App() {
                         onClick={() => {
                           setShowConstruction(false);
                           setSelectedService(null);
+                          const currentState = window.history.state;
+                          if (currentState && currentState.page === 'services' && currentState.serviceId) {
+                            window.history.back();
+                          }
                         }}
                         aria-label="Close details"
                       >
@@ -4781,6 +4812,7 @@ function App() {
                             className="popup-cta-btn secondary"
                             onClick={() => {
                               setActiveServiceSlideshow(selectedService);
+                              pushPageToHistory('services', { serviceId: selectedService.id, viewWork: true });
                             }}
                           >
                             View Our Work
@@ -4819,6 +4851,7 @@ function App() {
                         onClick={() => {
                           setSelectedService(s);
                           setShowConstruction(true);
+                          pushPageToHistory('services', { serviceId: s.id });
                         }}
                       >
                         {s.tag && (
@@ -8248,11 +8281,25 @@ function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => setActiveServiceSlideshow(null)}
+                onClick={() => {
+                  const currentState = window.history.state;
+                  if (currentState && currentState.page === 'services' && currentState.viewWork) {
+                    window.history.back();
+                  } else {
+                    setActiveServiceSlideshow(null);
+                  }
+                }}
               >
                 <ServiceSlideshowContent 
                   service={activeServiceSlideshow} 
-                  onClose={() => setActiveServiceSlideshow(null)} 
+                  onClose={() => {
+                    const currentState = window.history.state;
+                    if (currentState && currentState.page === 'services' && currentState.viewWork) {
+                      window.history.back();
+                    } else {
+                      setActiveServiceSlideshow(null);
+                    }
+                  }} 
                 />
               </motion.div>
             )}
