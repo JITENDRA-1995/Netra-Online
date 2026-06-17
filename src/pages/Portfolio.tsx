@@ -491,11 +491,10 @@ function WorkScrollSection({
                       }}
                     />
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent"></div>
                 </div>
 
                 {/* Card Header Overlay */}
-                <div className="absolute bottom-6 left-6 right-6 z-10 text-left">
+                <div className="absolute bottom-6 left-6 right-6 z-10 text-left drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
                   <span className="text-[9px] font-mono text-cyan-400 uppercase tracking-widest block mb-1">
                     {photo.section?.service?.tag || "SHOWCASE"}
                   </span>
@@ -1134,7 +1133,6 @@ export function Portfolio({
                 }}
               />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"></div>
           </div>
 
           {/* The Brief & Project Description */}
@@ -1188,10 +1186,9 @@ export function Portfolio({
                           />
                         );
                       })()}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent"></div>
                     </div>
                     
-                    <div className="absolute bottom-4 left-4 right-4 z-10 text-left">
+                    <div className="absolute bottom-4 left-4 right-4 z-10 text-left drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
                       <h4 className="text-sm font-bold text-white tracking-wide">{sibling.title}</h4>
                     </div>
                   </div>
