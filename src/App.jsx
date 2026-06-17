@@ -2987,6 +2987,8 @@ function App() {
     window.addEventListener('popstate', handlePopState);
     if (!window.history.state) {
       window.history.replaceState({ page: 'home' }, '');
+    } else {
+      handlePopState({ state: window.history.state });
     }
 
     return () => window.removeEventListener('popstate', handlePopState);
