@@ -68,18 +68,17 @@ input[type="number"] {
   box-shadow: 0 0 10px #00E5FF, 0 0 20px rgba(0, 229, 255, 0.5);
 }
 .vault-page.active { 
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  height: 100vh !important;
+  position: relative !important;
+  height: auto !important;
   opacity: 1 !important; 
   pointer-events: all !important; 
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
+  overflow-y: visible !important;
+  overflow-x: visible !important;
   z-index: 5 !important;
 }
 .vault-page.active.transitioning {
+  position: fixed !important;
+  height: 100vh !important;
   overflow: hidden !important;
 }
 @media (min-width: 769px) {

@@ -2749,9 +2749,12 @@ function App() {
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('wheel', handleWheel, { passive: false });
+    // Only register wheel/touch listeners for hero→vault transition (not when vault is already active)
+    if (!isVaultActive) {
+      window.addEventListener('wheel', handleWheel, { passive: false });
+      window.addEventListener('touchend', handleTouchEnd, { passive: true });
+    }
     window.addEventListener('touchstart', handleTouchStart, { passive: true });
-    window.addEventListener('touchend', handleTouchEnd, { passive: true });
     document.addEventListener('mousedown', handleClickOutside);
 
     return () => {
@@ -2860,7 +2863,7 @@ function App() {
   };
 
   useEffect(() => {
-    if (isServicesActive || isContactActive) {
+    if (isVaultActive || isServicesActive || isContactActive) {
       document.body.style.overflow = 'auto';
       document.documentElement.style.overflow = 'auto';
     } else {
@@ -2871,7 +2874,7 @@ function App() {
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
     };
-  }, [isServicesActive, isContactActive]);
+  }, [isVaultActive, isServicesActive, isContactActive]);
 
   useEffect(() => {
     if (isContactActive) {
