@@ -394,6 +394,7 @@ function ServiceSlideshowContent({ service, onClose }) {
   const [isHovered, setIsHovered] = useState(false);
   const [videoDuration, setVideoDuration] = useState(null);
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
 
   const currentPhoto = photos && photos[index];
   const isVideo = currentPhoto && (
@@ -482,9 +483,20 @@ function ServiceSlideshowContent({ service, onClose }) {
       )}
 
       {/* Close Button */}
-      <button className="service-slideshow-close" onClick={onClose}>
+      <button className="service-slideshow-close" onClick={onClose} title="Close Slideshow">
         <X className="w-5 h-5" />
       </button>
+
+      {/* Mute/Unmute Toggle Button */}
+      {isVideo && (
+        <button 
+          className="service-slideshow-mute" 
+          onClick={() => setIsMuted(!isMuted)}
+          title={isMuted ? "Unmute" : "Mute"}
+        >
+          {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+        </button>
+      )}
 
       {/* Media Viewport */}
       <div className="service-slideshow-viewport">
@@ -495,7 +507,7 @@ function ServiceSlideshowContent({ service, onClose }) {
               src={currentPhoto.url}
               autoPlay
               loop={photos.length === 1 || hasCustomDuration}
-              muted
+              muted={isMuted}
               playsInline
               onTimeUpdate={(e) => {
                 const video = e.currentTarget;

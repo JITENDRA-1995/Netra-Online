@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, X, ArrowLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, ArrowLeft, Volume2, VolumeX } from "lucide-react";
 
 const CATEGORY_COLORS: Record<string, string> = {
   BRANDING: "#00d4ff",
@@ -39,6 +39,7 @@ function DynamicSlideshow({
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [videoCurrentTime, setVideoCurrentTime] = useState<number>(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
 
   // Reset video progress state whenever the slide changes
   useEffect(() => {
@@ -149,7 +150,7 @@ function DynamicSlideshow({
               src={currentPhoto.url}
               autoPlay
               loop={photos.length === 1 || hasCustomDuration}
-              muted
+              muted={isMuted}
               playsInline
               onTimeUpdate={(e) => {
                 const video = e.currentTarget;
@@ -192,8 +193,21 @@ function DynamicSlideshow({
             />
           )}
         </AnimatePresence>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent z-1"></div>
       </div>
+
+      {/* Mute/Unmute Toggle Button */}
+      {isVideo && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsMuted(!isMuted);
+          }}
+          className="absolute right-4 top-4 z-30 w-10 h-10 rounded-full border border-white/10 bg-black/60 text-white flex items-center justify-center hover:bg-white hover:text-black transition-all hover:scale-105 duration-200 cursor-pointer"
+          title={isMuted ? "Unmute" : "Mute"}
+        >
+          {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+        </button>
+      )}
 
       {/* Interactive Controls (Arrows shown on hover) */}
       {photos.length > 1 && (

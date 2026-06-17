@@ -2075,9 +2075,6 @@ export default function SettingsPage({
                     />
                   )}
                   
-                  {/* Gradient Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent z-1 pointer-events-none"></div>
-                  
                   {/* Service Name Header Simulation (Top center with transparent backdrop) */}
                   {previewService && (
                     <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 text-center select-none w-full max-w-[85%] pointer-events-none">
