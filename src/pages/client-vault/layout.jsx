@@ -128,7 +128,7 @@ export function ClientVaultLayout({
         </Sidebar>
 
         <main className="flex-1 flex flex-col min-h-screen relative overflow-hidden">
-          <header className="h-16 flex items-center px-6 border-b border-border/50 sticky top-0 bg-background/80 backdrop-blur-sm z-10 lg:hidden">
+          <header className="h-16 flex items-center px-6 border-b border-border/50 sticky top-0 bg-background/80 backdrop-blur-sm z-10 md:hidden">
             <SidebarTrigger />
           </header>
           <div className="flex-1 overflow-y-auto p-6 lg:p-10 max-w-6xl mx-auto w-full">
