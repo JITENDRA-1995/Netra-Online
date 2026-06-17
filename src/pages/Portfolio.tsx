@@ -998,6 +998,74 @@ export function Portfolio({
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [selectedPhoto, setSelectedPhoto] = useState<any | null>(null);
 
+  // Synchronize category filters and selected photos on popstate events
+  useEffect(() => {
+    const handlePop = (e: PopStateEvent) => {
+      const state = e.state;
+      if (state) {
+        if (state.page === 'vision') {
+          setSelectedCategory(state.category || "ALL");
+          setSelectedPhoto(null);
+        } else if (state.page === 'vision-detail') {
+          setSelectedCategory(state.category || "ALL");
+          const photoUrl = state.photoUrl;
+          if (photoUrl) {
+            let foundPhoto = null;
+            for (const section of activeSections) {
+              const match = section.photos.find((p: any) => p.url === photoUrl);
+              if (match) {
+                foundPhoto = { ...match, section };
+                break;
+              }
+            }
+            setSelectedPhoto(foundPhoto);
+          }
+        }
+      }
+    };
+    window.addEventListener('popstate', handlePop);
+
+    // Initial check on mount/render in case they navigated directly here
+    const currentState = window.history.state;
+    if (currentState) {
+      if (currentState.page === 'vision') {
+        setSelectedCategory(currentState.category || "ALL");
+        setSelectedPhoto(null);
+      } else if (currentState.page === 'vision-detail') {
+        setSelectedCategory(currentState.category || "ALL");
+        const photoUrl = currentState.photoUrl;
+        if (photoUrl) {
+          let foundPhoto = null;
+          for (const section of activeSections) {
+            const match = section.photos.find((p: any) => p.url === photoUrl);
+            if (match) {
+              foundPhoto = { ...match, section };
+              break;
+            }
+          }
+          setSelectedPhoto(foundPhoto);
+        }
+      }
+    }
+
+    return () => window.removeEventListener('popstate', handlePop);
+  }, [activeSections]);
+
+  const handleCategoryChange = (cat: string) => {
+    setSelectedCategory(cat);
+    const currentState = window.history.state;
+    if (!currentState || currentState.page !== 'vision' || currentState.category !== cat) {
+      window.history.pushState({ page: 'vision', category: cat }, '');
+    }
+  };
+
+  const handlePhotoChange = (photo: any) => {
+    setSelectedPhoto(photo);
+    if (photo) {
+      window.history.pushState({ page: 'vision-detail', category: selectedCategory, photoUrl: photo.url }, '');
+    }
+  };
+
   // Scroll to top when selected photo changes
   useEffect(() => {
     if (selectedPhoto) {
@@ -1026,18 +1094,22 @@ export function Portfolio({
   }, [selectedPhoto]);
 
   const handleSiblingClick = (sibling: any) => {
-    setSelectedPhoto({
+    const nextPhoto = {
       ...sibling,
       section: selectedPhoto.section
-    });
+    };
+    setSelectedPhoto(nextPhoto);
+    window.history.pushState({ page: 'vision-detail', category: selectedCategory, photoUrl: sibling.url }, '');
   };
 
   const handleUpNextClick = () => {
     if (!nextSection || !nextSection.photos || nextSection.photos.length === 0) return;
-    setSelectedPhoto({
+    const nextPhoto = {
       ...nextSection.photos[0],
       section: nextSection
-    });
+    };
+    setSelectedPhoto(nextPhoto);
+    window.history.pushState({ page: 'vision-detail', category: selectedCategory, photoUrl: nextSection.photos[0].url }, '');
   };
 
   if (selectedPhoto) {
@@ -1069,7 +1141,13 @@ export function Portfolio({
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12">
             <div className="text-left">
               <button 
-                onClick={() => setSelectedPhoto(null)}
+                onClick={() => {
+                  if (window.history.state && window.history.state.page === 'vision-detail') {
+                    window.history.back();
+                  } else {
+                    setSelectedPhoto(null);
+                  }
+                }}
                 className="flex items-center gap-2 text-xs font-mono text-white/50 hover:text-white uppercase tracking-wider mb-6 group/back bg-transparent border-0 cursor-pointer p-0 outline-none"
               >
                 <ArrowLeft className="w-4 h-4 transition-transform group-hover/back:-translate-x-1" />
@@ -1284,9 +1362,9 @@ export function Portfolio({
 
       <WorkScrollSection 
         sections={activeSections} 
-        onPhotoSelect={setSelectedPhoto}
+        onPhotoSelect={handlePhotoChange}
         selectedCategory={selectedCategory}
-        setSelectedCategory={setSelectedCategory}
+        setSelectedCategory={handleCategoryChange}
       />
 
       <PhilosophySection />

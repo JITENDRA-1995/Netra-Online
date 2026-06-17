@@ -2843,6 +2843,12 @@ function App() {
     setIsWarningDismissed(false);
     setShowConstruction(false);
     setSelectedService(null);
+    setActiveServiceSlideshow(null);
+    setIsIgnitionModalOpen(false);
+    setIsClientModalOpen(false);
+    setIsProjectEditModalOpen(false);
+    setIsCalibrationModalOpen(false);
+    setIsInvoicePreviewOpen(false);
     resetForm();
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
@@ -2907,16 +2913,65 @@ function App() {
   useEffect(() => {
     const handlePopState = (event) => {
       const state = event.state;
+      
+      // Close all modals by default on transition unless specified by state
+      setShowConstruction(false);
+      setSelectedService(null);
+      setActiveServiceSlideshow(null);
+      
       if (state && state.page) {
-        setIsVaultActive(state.page === 'vision');
-        setIsServicesActive(state.page === 'services');
+        if (state.page === 'admin') {
+          const isAdminLoggedIn = localStorage.getItem('netra_admin_active') === 'true';
+          if (!isAdminLoggedIn) {
+            setIsVaultActive(false);
+            setIsServicesActive(false);
+            setIsContactActive(false);
+            setIsLoginActive(true);
+            setIsCommandCenterActive(false);
+            setIsClientVaultActive(false);
+            setIsAdminGridActive(false);
+            window.history.replaceState({ page: 'login' }, '');
+            return;
+          }
+        }
+        if (state.page === 'client-vault') {
+          const isClientLoggedIn = localStorage.getItem('netra_client_active') === 'true';
+          if (!isClientLoggedIn) {
+            setIsVaultActive(false);
+            setIsServicesActive(false);
+            setIsContactActive(false);
+            setIsLoginActive(true);
+            setIsCommandCenterActive(false);
+            setIsClientVaultActive(false);
+            setIsAdminGridActive(false);
+            window.history.replaceState({ page: 'login' }, '');
+            return;
+          }
+        }
+        
+        setIsVaultActive(state.page === 'vision' || state.page === 'vision-detail');
+        setIsServicesActive(state.page === 'services' || state.page === 'services-popup' || state.page === 'services-slideshow');
         setIsContactActive(state.page === 'contact');
         setIsLoginActive(state.page === 'login');
         setIsCommandCenterActive(state.page === 'admin');
         setIsClientVaultActive(state.page === 'client-vault');
-        setIsAdminGridActive(state.page === 'admin' || !!state.isAdminGridActive);
+        setIsAdminGridActive(state.page === 'admin' ? (state.isAdminGridActive !== undefined ? state.isAdminGridActive : false) : !!state.isAdminGridActive);
         if (state.activeAdminModule) {
           setActiveAdminModule(state.activeAdminModule);
+        }
+        
+        // Restore popup/slideshow states
+        if (state.page === 'services-popup' && state.serviceId) {
+          const svc = servicesList.find(s => s.id === state.serviceId);
+          if (svc) {
+            setSelectedService(svc);
+            setShowConstruction(true);
+          }
+        } else if (state.page === 'services-slideshow' && state.serviceId) {
+          const svc = servicesList.find(s => s.id === state.serviceId);
+          if (svc) {
+            setActiveServiceSlideshow(svc);
+          }
         }
       } else {
         setIsVaultActive(false);
@@ -2935,7 +2990,7 @@ function App() {
     }
 
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [servicesList]);
 
   const goHome = () => triggerInstantTransition(() => {
     clearAllPages();
@@ -3057,8 +3112,13 @@ function App() {
     }
   };
 
-  const handleLogout = (e) => {
+  const handleLogout = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.warn("Supabase auth signOut error:", err);
+    }
     localStorage.removeItem('netra_admin_active');
     localStorage.removeItem('netra_client_active');
     localStorage.removeItem('netra_active_admin_module');
@@ -4678,8 +4738,12 @@ function App() {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     onClick={() => {
-                      setShowConstruction(false);
-                      setSelectedService(null);
+                      if (window.history.state && window.history.state.page === 'services-popup') {
+                        window.history.back();
+                      } else {
+                        setShowConstruction(false);
+                        setSelectedService(null);
+                      }
                     }}
                   >
                     <motion.div
@@ -4694,8 +4758,12 @@ function App() {
                       <button
                         className="popup-close-btn"
                         onClick={() => {
-                          setShowConstruction(false);
-                          setSelectedService(null);
+                          if (window.history.state && window.history.state.page === 'services-popup') {
+                            window.history.back();
+                          } else {
+                            setShowConstruction(false);
+                            setSelectedService(null);
+                          }
                         }}
                         aria-label="Close details"
                       >
@@ -4750,6 +4818,7 @@ function App() {
                             className="popup-cta-btn secondary"
                             onClick={() => {
                               setActiveServiceSlideshow(selectedService);
+                              pushPageToHistory('services-slideshow', { serviceId: selectedService.id });
                             }}
                           >
                             View Our Work
@@ -4788,6 +4857,7 @@ function App() {
                         onClick={() => {
                           setSelectedService(s);
                           setShowConstruction(true);
+                          pushPageToHistory('services-popup', { serviceId: s.id });
                         }}
                       >
                         {s.tag && (
@@ -8217,11 +8287,23 @@ function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                onClick={() => setActiveServiceSlideshow(null)}
+                onClick={() => {
+                  if (window.history.state && window.history.state.page === 'services-slideshow') {
+                    window.history.back();
+                  } else {
+                    setActiveServiceSlideshow(null);
+                  }
+                }}
               >
                 <ServiceSlideshowContent 
                   service={activeServiceSlideshow} 
-                  onClose={() => setActiveServiceSlideshow(null)} 
+                  onClose={() => {
+                    if (window.history.state && window.history.state.page === 'services-slideshow') {
+                      window.history.back();
+                    } else {
+                      setActiveServiceSlideshow(null);
+                    }
+                  }} 
                 />
               </motion.div>
             )}
