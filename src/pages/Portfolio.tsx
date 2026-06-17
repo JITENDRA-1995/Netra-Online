@@ -1005,6 +1005,42 @@ export function Portfolio({
     }
   }, [selectedPhoto]);
 
+  // Handle browser back button for portfolio slides
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const state = event.state;
+      if (state && state.page === 'vision' && state.photoUrl) {
+        const found = activeSections
+          .flatMap((s: any) => s.photos.map((p: any) => ({ ...p, section: s })))
+          .find((p: any) => p.url === state.photoUrl);
+        if (found) setSelectedPhoto(found);
+        else setSelectedPhoto(null);
+      } else {
+        setSelectedPhoto(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeSections]);
+
+  // Restore active slide on mount/refresh if deep linked
+  useEffect(() => {
+    const state = window.history.state;
+    if (state && state.page === 'vision' && state.photoUrl) {
+      const found = activeSections
+        .flatMap((s: any) => s.photos.map((p: any) => ({ ...p, section: s })))
+        .find((p: any) => p.url === state.photoUrl);
+      if (found && (!selectedPhoto || selectedPhoto.url !== found.url)) {
+        setSelectedPhoto(found);
+      }
+    }
+  }, [activeSections]);
+
+  const handlePhotoSelect = (photo: any) => {
+    setSelectedPhoto(photo);
+    window.history.pushState({ page: 'vision', photoUrl: photo.url }, '');
+  };
+
   // Sibling photos
   const siblingPhotos = useMemo(() => {
     if (!selectedPhoto || !selectedPhoto.section || !selectedPhoto.section.photos) return [];
@@ -1026,18 +1062,22 @@ export function Portfolio({
   }, [selectedPhoto]);
 
   const handleSiblingClick = (sibling: any) => {
-    setSelectedPhoto({
+    const photo = {
       ...sibling,
       section: selectedPhoto.section
-    });
+    };
+    setSelectedPhoto(photo);
+    window.history.replaceState({ page: 'vision', photoUrl: photo.url }, '');
   };
 
   const handleUpNextClick = () => {
     if (!nextSection || !nextSection.photos || nextSection.photos.length === 0) return;
-    setSelectedPhoto({
+    const photo = {
       ...nextSection.photos[0],
       section: nextSection
-    });
+    };
+    setSelectedPhoto(photo);
+    window.history.replaceState({ page: 'vision', photoUrl: photo.url }, '');
   };
 
   if (selectedPhoto) {
@@ -1069,7 +1109,14 @@ export function Portfolio({
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12">
             <div className="text-left">
               <button 
-                onClick={() => setSelectedPhoto(null)}
+                onClick={() => {
+                  const state = window.history.state;
+                  if (state && state.page === 'vision' && state.photoUrl) {
+                    window.history.back();
+                  } else {
+                    setSelectedPhoto(null);
+                  }
+                }}
                 className="flex items-center gap-2 text-xs font-mono text-white/50 hover:text-white uppercase tracking-wider mb-6 group/back bg-transparent border-0 cursor-pointer p-0 outline-none"
               >
                 <ArrowLeft className="w-4 h-4 transition-transform group-hover/back:-translate-x-1" />
@@ -1284,7 +1331,7 @@ export function Portfolio({
 
       <WorkScrollSection 
         sections={activeSections} 
-        onPhotoSelect={setSelectedPhoto}
+        onPhotoSelect={handlePhotoSelect}
         selectedCategory={selectedCategory}
         setSelectedCategory={setSelectedCategory}
       />
