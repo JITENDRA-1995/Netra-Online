@@ -2709,6 +2709,7 @@ function App() {
       ) {
         setIsTransitioning(true);
         setIsVaultActive(true);
+        pushPageToHistory('vision');
         setTimeout(() => setIsTransitioning(false), 1200);
         return;
       }
@@ -2738,6 +2739,7 @@ function App() {
       ) {
         setIsTransitioning(true);
         setIsVaultActive(true);
+        pushPageToHistory('vision');
         setTimeout(() => setIsTransitioning(false), 1200);
       }
     };
