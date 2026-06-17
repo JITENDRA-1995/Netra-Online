@@ -2802,6 +2802,8 @@ function App() {
       window.scrollTo({ top: 0, behavior: 'instant' });
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
+      const vaultEl = document.querySelector('.vault-page.active');
+      if (vaultEl) vaultEl.scrollTop = 0;
     }, 2000);
 
     setTimeout(() => setHeadlineActive(true), 2600);
@@ -2824,6 +2826,8 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'instant' });
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
+    const vaultElI = document.querySelector('.vault-page.active');
+    if (vaultElI) vaultElI.scrollTop = 0;
   };
 
   const resetForm = () => {
@@ -2851,10 +2855,12 @@ function App() {
     setIsInvoicePreviewOpen(false);
     resetForm();
     window.scrollTo({ top: 0, behavior: 'instant' });
+    const vaultElC = document.querySelector('.vault-page');
+    if (vaultElC) vaultElC.scrollTop = 0;
   };
 
   useEffect(() => {
-    if ((isVaultActive && !isTransitioning) || isServicesActive || isContactActive) {
+    if (isServicesActive || isContactActive) {
       document.body.style.overflow = 'auto';
       document.documentElement.style.overflow = 'auto';
     } else {
@@ -2865,7 +2871,7 @@ function App() {
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
     };
-  }, [isVaultActive, isServicesActive, isContactActive, isTransitioning]);
+  }, [isServicesActive, isContactActive]);
 
   useEffect(() => {
     if (isContactActive) {
