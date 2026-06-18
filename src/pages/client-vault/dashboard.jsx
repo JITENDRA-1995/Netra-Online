@@ -136,7 +136,7 @@ export function ClientDashboard({ currentClient, onTabChange, setSelectedProject
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">
                         <div className="space-y-1">
-                          <h3 className="font-medium text-lg group-hover:text-primary transition-colors">{project.title}</h3>
+                          <h3 className="font-medium text-lg group-hover:text-primary transition-colors">{project.service || project.title}</h3>
                           <div className="flex items-center gap-3 text-sm text-muted-foreground">
                             {project.category && <span className="bg-secondary px-2 py-0.5 rounded-md text-xs">{project.category}</span>}
                             {project.deadline && (

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Search, Pencil, Trash2, Building2, Mail, Phone, Calendar, Key, Copy, Share2, UserCheck, MessageSquare, Send, FileText, X, AlertCircle } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Building2, Mail, Phone, Calendar, Key, Copy, Share2, UserCheck, MessageSquare, Send, FileText, X, AlertCircle, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "../supabase/client";
+import { ClientAssetVault } from "../components/ClientAssetVault";
 import { igniteProject } from "../supabase/database/projects";
 import { approveClientProfileUpdate, rejectClientProfileUpdate } from "../supabase/database/clients";
 
@@ -62,6 +63,8 @@ export default function Clients({
   const [bridgeMessages, setBridgeMessages] = useState<any[]>([]);
   const [bridgeContent, setBridgeContent] = useState("");
   const [isBridgeLoading, setIsBridgeLoading] = useState(false);
+  const [isVaultModalOpen, setIsVaultModalOpen] = useState(false);
+  const [vaultClient, setVaultClient] = useState<any | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Scroll chat to bottom
@@ -495,6 +498,19 @@ export default function Clients({
                       <Button
                         size="icon"
                         variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setVaultClient(client);
+                          setIsVaultModalOpen(true);
+                        }}
+                        className="w-6 h-6 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 transition-all"
+                      >
+                        <FolderOpen className="w-3 h-3" />
+                      </Button>
+
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         title="Copy Login Credentials"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -838,6 +854,12 @@ export default function Clients({
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isVaultModalOpen && vaultClient && (
+          <ClientAssetVault client={vaultClient} onClose={() => setIsVaultModalOpen(false)} />
         )}
       </AnimatePresence>
     </motion.div>

@@ -24,9 +24,11 @@ import { ClientProjects } from './pages/client-vault/projects';
 import { ClientProjectDetail } from './pages/client-vault/project-detail';
 import { ClientProjectMessages } from './pages/client-vault/project-messages';
 import { ClientProjectAssets } from './pages/client-vault/project-assets';
+import { ClientGlobalAssets } from './pages/client-vault/global-assets';
 import { ClientInvoices } from './pages/client-vault/invoices';
 import { ClientInvoiceDetail } from './pages/client-vault/invoice-detail';
 import { ClientProfile } from './pages/client-vault/profile';
+import { WhatsNewBulb } from './components/WhatsNewBulb';
 import { ClientCollaboration } from './pages/client-vault/collaboration';
 
 const PageLoader = () => (
@@ -1134,9 +1136,7 @@ function App() {
   const [isClientVaultActive, setIsClientVaultActive] = useState(() => {
     return localStorage.getItem('netra_client_active') === 'true';
   });
-  const [activeClientTab, setActiveClientTab] = useState(() => {
-    return localStorage.getItem('netra_active_client_tab') || 'DASHBOARD';
-  });
+  const [activeClientTab, setActiveClientTab] = useState('DASHBOARD');
   const [selectedClientProjectId, setSelectedClientProjectId] = useState(() => {
     const id = localStorage.getItem('netra_selected_client_project_id');
     return id ? parseInt(id) : null;
@@ -1275,8 +1275,9 @@ function App() {
   const [prefillData, setPrefillData] = useState(null);
   const [passphrase, setPassphrase] = useState("");
   const [showPassphrase, setShowPassphrase] = useState(false);
-  const [activeAdminModule, setActiveAdminModule] = useState(() => {
-    return localStorage.getItem('netra_active_admin_module') || "DASHBOARD";
+  const [activeAdminModule, setActiveAdminModule] = useState("DASHBOARD");
+  const [remindedFlames, setRemindedFlames] = useState(() => {
+    return JSON.parse(localStorage.getItem('netra_reminded_flames') || '{}');
   });
   const [showInquiryBadge, setShowInquiryBadge] = useState(false);
   const [isAdminGridActive, setIsAdminGridActive] = useState(() => {
@@ -1697,6 +1698,7 @@ function App() {
     return diffDays < 5;
   });
   const flames = ignitionQueue.filter(q => {
+    if (remindedFlames[q.id] && Date.now() < remindedFlames[q.id]) return false;
     if (q.status === "Completed" || q.status === "Cancelled") return false;
     if (!q.deadline) return false;
     const deadline = new Date(q.deadline);
@@ -1772,6 +1774,17 @@ function App() {
   }, [sparks, hasMissedDueDate, hasNewConversation, clients, hasUrgentAlert, isWarningDismissed]);
 
   // Warning dismissal state is persistent per session and only reset on logout/login reset
+
+  const handleSnooze = (id, amount, unit) => {
+    const timeToSnooze = amount * (unit === 'HOURS' ? 60 * 60 * 1000 : 60 * 1000);
+    const resumeTime = Date.now() + timeToSnooze;
+    const updated = { ...remindedFlames, [id]: resumeTime };
+    setRemindedFlames(updated);
+    localStorage.setItem('netra_reminded_flames', JSON.stringify(updated));
+    if (flames.length <= 1) {
+      setIsWarningDismissed(true);
+    }
+  };
 
   const markAllAlertsAsRead = async () => {
     // 1. Mark all flames as read in database and local state
@@ -5410,9 +5423,12 @@ function App() {
                           <span className="emergency-action-btn">CLICK TO RESOLVE</span>
                         </div>
                       )}
-                      <div className="modules-header">
-                        <span className="header-bar"></span>
-                        <h2>ADMINISTRATIVE MODULES</h2>
+                      <div className="modules-header w-full justify-between pr-4">
+                        <div className="flex items-center gap-4">
+                          <span className="header-bar"></span>
+                          <h2>ADMINISTRATIVE MODULES</h2>
+                        </div>
+                        <WhatsNewBulb isClientPortal={false} />
                       </div>
 
                       <div className="admin-cards-grid">
@@ -6171,6 +6187,7 @@ function App() {
                                   onClick={() => {
                                     if (flames.length === 1) {
                                       setProjectsSearchQuery(getProjectClientName(flames[0]));
+                                      setSelectedProjectTab(flames[0].id);
                                       setActiveAdminModule("PROJECTS");
                                       setIsAdminGridActive(true);
                                       setIsWarningDismissed(true);
@@ -6204,29 +6221,44 @@ function App() {
 
                               {/* Expanded List Selection */}
                               {expandedWarningTab === 'DEADLINES' && flames.length > 0 && (
-                                <div className="expanded-warning-list border border-white/5 rounded-2xl p-4 bg-black/40 max-h-48 overflow-y-auto space-y-1.5 text-left w-full max-w-md my-4">
+                                <div className="expanded-warning-list flex-shrink-0 border border-white/5 rounded-2xl p-4 bg-black/40 max-h-48 overflow-y-auto space-y-1.5 text-left w-full max-w-md my-4">
                                   <h4 className="text-3xs uppercase tracking-widest text-[#ff5e00] font-bold mb-2 border-b border-white/5 pb-1">Select Project to Redirect:</h4>
                                   {flames.map(f => (
                                     <div 
                                       key={f.id} 
-                                      className="p-2 hover:bg-white/5 rounded-xl cursor-pointer transition-colors text-xs flex justify-between items-center text-foreground"
-                                      onClick={() => {
+                                      className="p-2 hover:bg-white/5 rounded-xl transition-colors text-xs flex justify-between items-center text-foreground"
+                                    >
+                                      <div className="flex-1 cursor-pointer flex flex-col items-start gap-1 min-w-0" onClick={() => {
                                         setProjectsSearchQuery(getProjectClientName(f));
+                                        setSelectedProjectTab(f.id);
                                         setActiveAdminModule("PROJECTS");
                                         setIsAdminGridActive(true);
                                         setIsWarningDismissed(true);
                                         setExpandedWarningTab(null);
                                         pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: true });
-                                      }}
-                                    >
-                                      <span className="font-semibold">{getProjectClientName(f)}</span>
-                                      <span className="text-3xs text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">Due {new Date(f.deadline).toLocaleDateString()}</span>
+                                      }}>
+                                        <span className="font-semibold truncate w-full pr-2">{getProjectClientName(f)}</span>
+                                        <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">Due {new Date(f.deadline).toLocaleDateString()}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1 ml-2">
+                                        <input type="number" min="1" className="w-12 bg-black/50 border border-white/10 rounded px-1 py-0.5 text-center text-xs text-white" defaultValue="1" id={`snooze-amt-${f.id}`} onClick={e => e.stopPropagation()} />
+                                        <select className="bg-black/50 border border-white/10 rounded px-1 py-0.5 text-xs text-muted-foreground cursor-pointer outline-none" id={`snooze-unit-${f.id}`} onClick={e => e.stopPropagation()}>
+                                          <option value="HOURS">Hrs</option>
+                                          <option value="MINUTES">Min</option>
+                                        </select>
+                                        <button className="text-3xs bg-[#ff5e00]/20 text-[#ff5e00] px-2 py-1 rounded hover:bg-[#ff5e00]/40 transition-colors uppercase font-bold" onClick={(e) => {
+                                          e.stopPropagation();
+                                          const amt = document.getElementById(`snooze-amt-${f.id}`).value;
+                                          const unit = document.getElementById(`snooze-unit-${f.id}`).value;
+                                          handleSnooze(f.id, Number(amt), unit);
+                                        }}>Snooze</button>
+                                      </div>
                                     </div>
                                   ))}
                                 </div>
                               )}
                               {expandedWarningTab === 'INQUIRIES' && sparks.length > 0 && (
-                                <div className="expanded-warning-list border border-white/5 rounded-2xl p-4 bg-black/40 max-h-48 overflow-y-auto space-y-1.5 text-left w-full max-w-md my-4">
+                                <div className="expanded-warning-list flex-shrink-0 border border-white/5 rounded-2xl p-4 bg-black/40 max-h-48 overflow-y-auto space-y-1.5 text-left w-full max-w-md my-4">
                                   <h4 className="text-3xs uppercase tracking-widest text-[#00E5FF] font-bold mb-2 border-b border-white/5 pb-1">Select Inquiry to Redirect:</h4>
                                   {sparks.map(s => (
                                     <div 
@@ -6520,6 +6552,12 @@ function App() {
                     onTabChange={setActiveClientTab}
                   />
                 )}
+                {activeClientTab === 'GLOBAL_ASSETS' && (
+                  <ClientGlobalAssets
+                    client={currentClient}
+                    setActiveClientTab={setActiveClientTab}
+                  />
+                )}
                 {activeClientTab === 'COMMUNICATION' && (
                   <ClientCollaboration
                     currentClient={currentClient}
@@ -6714,6 +6752,12 @@ function App() {
                       URGENT FLAMES
                       {flames.length > 0 && <span className="tab-badge orange">{flames.length}</span>}
                     </button>
+                    <button
+                      className={`tab-btn ${notifTab === 'CLIENT' ? 'active' : ''}`}
+                      onClick={() => setNotifTab('CLIENT')}
+                    >
+                      CLIENT PORTAL
+                    </button>
                   </div>
 
                   <div className="drawer-content">
@@ -6723,9 +6767,9 @@ function App() {
                           <div key={s.id} className="notif-card spark flex justify-between items-center" onClick={() => {
                             setInquiriesSearchQuery(s.name || s.clientName);
                             setActiveAdminModule("INQUIRIES");
-                            setIsAdminGridActive(false);
+                            setIsAdminGridActive(true);
                             setIsNotificationOpen(false);
-                            pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: false });
+                            pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: true });
                           }}>
                             <div className="flex items-center gap-3">
                               <div className="notif-icon-box cyan">✦</div>
@@ -6754,9 +6798,9 @@ function App() {
                               <div key={s.id} className="notif-card spark history opacity-65 flex justify-between items-center" onClick={() => {
                                 setInquiriesSearchQuery(s.name || s.clientName);
                                 setActiveAdminModule("INQUIRIES");
-                                setIsAdminGridActive(false);
+                                setIsAdminGridActive(true);
                                 setIsNotificationOpen(false);
-                                pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: false });
+                                pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: true });
                               }}>
                                 <div className="flex items-center gap-3">
                                   <div className="notif-icon-box grayscale">✦</div>
@@ -6780,15 +6824,16 @@ function App() {
                           </div>
                         )}
                       </div>
-                    ) : (
+                    ) : notifTab === 'FLAMES' ? (
                       <div className="notif-list">
                         {flames.length > 0 && flames.map(f => (
                           <div key={f.id} className="notif-card flame flex justify-between items-center" onClick={() => {
                             setProjectsSearchQuery(getProjectClientName(f));
+                            setSelectedProjectTab(f.id);
                             setActiveAdminModule("PROJECTS");
-                            setIsAdminGridActive(false);
+                            setIsAdminGridActive(true);
                             setIsNotificationOpen(false);
-                            pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: false });
+                            pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: true });
                           }}>
                             <div className="flex items-center gap-3">
                               <div className="notif-icon-box orange">🔥</div>
@@ -6819,10 +6864,11 @@ function App() {
                             {flamesHistory.map(f => (
                               <div key={f.id} className="notif-card flame history opacity-65 flex justify-between items-center" onClick={() => {
                                 setProjectsSearchQuery(getProjectClientName(f));
+                                setSelectedProjectTab(f.id);
                                 setActiveAdminModule("PROJECTS");
-                                setIsAdminGridActive(false);
+                                setIsAdminGridActive(true);
                                 setIsNotificationOpen(false);
-                                pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: false });
+                                pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: true });
                               }}>
                                 <div className="flex items-center gap-3">
                                   <div className="notif-icon-box grayscale">🔥</div>
@@ -6849,7 +6895,14 @@ function App() {
                           </div>
                         )}
                       </div>
-                    )}
+                    ) : notifTab === 'CLIENT' ? (
+                      <div className="notif-list">
+                        <div className="text-center text-muted-foreground/30 py-20 flex flex-col items-center gap-4">
+                          <span className="text-3xs uppercase tracking-widest text-indigo-400 font-bold">Awaiting Client Activity...</span>
+                          <span className="text-[10px] text-muted-foreground max-w-[200px] leading-relaxed">Profile updates, messages, and dropped assets will appear here when Supabase realtime syncing is deployed.</span>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </motion.div>
               </div>

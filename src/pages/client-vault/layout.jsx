@@ -19,13 +19,16 @@ import {
   LogOut,
   Hexagon,
   Sun,
-  Moon
+  Moon,
+  FolderOpen
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
+import { WhatsNewBulb } from "../../components/WhatsNewBulb";
 
 const navItems = [
   { title: "Dashboard", tab: "DASHBOARD", icon: LayoutDashboard },
   { title: "Projects", tab: "PROJECTS", icon: FolderKanban },
+  { title: "Global Vault", tab: "GLOBAL_ASSETS", icon: FolderOpen },
   { title: "Communication", tab: "COMMUNICATION", icon: MessageSquare },
   { title: "Invoices", tab: "INVOICES", icon: Receipt },
   { title: "Profile", tab: "PROFILE", icon: UserCircle },
@@ -114,6 +117,8 @@ export function ClientVaultLayout({
                 <span>{theme === "light" ? "Dark Mode" : "Light Mode"}</span>
               </button>
 
+
+
               {/* 1. Log Out */}
               <button 
                 onClick={onLogout}
@@ -131,6 +136,9 @@ export function ClientVaultLayout({
           <header className="h-16 flex items-center px-6 border-b border-border/50 sticky top-0 bg-background/80 backdrop-blur-sm z-10 md:hidden">
             <SidebarTrigger />
           </header>
+          <div className="absolute top-4 right-6 z-50">
+            <WhatsNewBulb isClientPortal={true} />
+          </div>
           <div className="flex-1 overflow-y-auto p-6 lg:p-10 max-w-6xl mx-auto w-full">
             {children}
           </div>

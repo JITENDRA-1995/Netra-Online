@@ -6028,6 +6028,7 @@ input[type="number"] {
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -7408,13 +7409,27 @@ input[type="number"] {
 .fullscreen-warning-content {
   max-width: 600px;
   width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
   padding: 3rem;
   text-align: center;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
   display: flex;
   flex-direction: column;
   align-items: center;
   box-sizing: border-box;
   animation: warning-content-intro 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.fullscreen-warning-content::-webkit-scrollbar {
+  display: none;
+}
+.expanded-warning-list {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.expanded-warning-list::-webkit-scrollbar {
+  display: none;
 }
 
 @keyframes warning-content-intro {

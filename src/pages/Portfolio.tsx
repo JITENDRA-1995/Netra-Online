@@ -380,6 +380,18 @@ function WorkScrollSection({
   selectedCategory: string;
   setSelectedCategory: (cat: string) => void;
 }) {
+  const [numCols, setNumCols] = useState(3);
+
+  useEffect(() => {
+    const updateCols = () => {
+      if (window.innerWidth < 640) setNumCols(1);
+      else if (window.innerWidth < 768) setNumCols(2);
+      else setNumCols(3);
+    };
+    updateCols();
+    window.addEventListener('resize', updateCols);
+    return () => window.removeEventListener('resize', updateCols);
+  }, []);
   if (!sections || sections.length === 0) {
     return (
       <div className="py-32 text-center text-white/30 font-mono text-xs uppercase tracking-widest bg-[#050508] border-y border-white/5">
@@ -410,6 +422,11 @@ function WorkScrollSection({
         }));
     }
   })();
+
+  const masonryColumns = Array.from({ length: numCols }, () => [] as any[]);
+  displayedPhotos.forEach((photo: any, idx: number) => {
+    masonryColumns[idx % numCols].push({ photo, originalIdx: idx });
+  });
 
   return (
     <div className="py-24 px-6 md:px-12 bg-[#050508]">
@@ -455,20 +472,22 @@ function WorkScrollSection({
 
       {/* Card Grid */}
       {displayedPhotos.length > 0 ? (
-        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 portfolio-card-grid">
-          {displayedPhotos.map((photo: any, idx: number) => {
-            const isVideo = photo.url ? (photo.url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || photo.url.includes("video") || photo.url.startsWith("data:video/")) : false;
-            return (
-              <div
-                key={idx}
-                onClick={() => onPhotoSelect(photo)}
-                className="group/card relative h-[300px] md:h-[380px] rounded-3xl overflow-hidden border border-white/5 bg-white/[0.01] cursor-pointer hover:border-white/15 hover:shadow-[0_15px_30px_rgba(0,0,0,0.4)] transition-all duration-500 hover:-translate-y-1"
-              >
-                <div className="absolute inset-0 z-0">
+        <div className="max-w-7xl mx-auto flex gap-8 portfolio-card-grid w-full items-start">
+          {masonryColumns.map((col: any[], colIdx: number) => (
+            <div key={colIdx} className="flex-1 flex flex-col gap-8 w-full">
+              {col.map(({ photo, originalIdx }: any) => {
+                const isVideo = photo.url ? (photo.url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || photo.url.includes("video") || photo.url.startsWith("data:video/")) : false;
+                return (
+                  <div
+                    key={originalIdx}
+                    onClick={() => onPhotoSelect(photo)}
+                    className="group/card relative rounded-3xl overflow-hidden border border-white/5 bg-white/[0.01] cursor-pointer hover:border-white/15 hover:shadow-[0_15px_30px_rgba(0,0,0,0.4)] transition-all duration-500 hover:-translate-y-1 block"
+                  >
+                <div className="w-full h-full transition-transform duration-700 group-hover/card:scale-105">
                   {isVideo ? (
                     <video
                       src={photo.url}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-105"
+                      className="w-full h-auto object-cover block"
                       muted
                       loop
                       autoPlay
@@ -476,6 +495,7 @@ function WorkScrollSection({
                       style={{
                         objectFit: photo.fit || 'cover',
                         objectPosition: `${(photo.positionX ?? 0) + 50}% ${(photo.positionY ?? 0) + 50}%`,
+                        transform: `scale(${photo.scale ?? 1})`,
                         filter: `brightness(${photo.brightness ?? 100}%) contrast(${photo.contrast ?? 100}%) saturate(${photo.saturation ?? 100}%) grayscale(${photo.grayscale ?? 0}%) hue-rotate(${photo.hueRotate ?? 0}deg)`
                       }}
                     />
@@ -483,10 +503,11 @@ function WorkScrollSection({
                     <img
                       src={photo.url}
                       alt={photo.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-105"
+                      className="w-full h-auto object-cover block"
                       style={{
                         objectFit: photo.fit || 'cover',
                         objectPosition: `${(photo.positionX ?? 0) + 50}% ${(photo.positionY ?? 0) + 50}%`,
+                        transform: `scale(${photo.scale ?? 1})`,
                         filter: `brightness(${photo.brightness ?? 100}%) contrast(${photo.contrast ?? 100}%) saturate(${photo.saturation ?? 100}%) grayscale(${photo.grayscale ?? 0}%) hue-rotate(${photo.hueRotate ?? 0}deg)`
                       }}
                     />
@@ -505,6 +526,8 @@ function WorkScrollSection({
               </div>
             );
           })}
+            </div>
+          ))}
         </div>
       ) : (
         <div className="max-w-7xl mx-auto h-[250px] border border-white/5 border-dashed rounded-3xl flex flex-col items-center justify-center text-white/20 text-xs font-mono uppercase tracking-widest">
@@ -1024,17 +1047,7 @@ export function Portfolio({
   }, [activeSections]);
 
   // Restore active slide on mount/refresh if deep linked
-  useEffect(() => {
-    const state = window.history.state;
-    if (state && state.page === 'vision' && state.photoUrl) {
-      const found = activeSections
-        .flatMap((s: any) => s.photos.map((p: any) => ({ ...p, section: s })))
-        .find((p: any) => p.url === state.photoUrl);
-      if (found && (!selectedPhoto || selectedPhoto.url !== found.url)) {
-        setSelectedPhoto(found);
-      }
-    }
-  }, [activeSections]);
+  // (Restoration logic removed to force fresh start on Vision page)
 
   const handlePhotoSelect = (photo: any) => {
     setSelectedPhoto(photo);

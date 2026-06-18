@@ -71,8 +71,8 @@ export function ClientProjects({ currentClient, onTabChange, setSelectedProjectI
                 </div>
                 <CardContent className="p-6 flex-1 flex flex-col">
                   <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-medium text-lg group-hover:text-primary transition-colors line-clamp-1" title={project.title}>
-                      {project.title}
+                    <h3 className="font-medium text-lg group-hover:text-primary transition-colors line-clamp-1" title={project.service || project.title}>
+                      {project.service || project.title}
                     </h3>
                   </div>
                   
