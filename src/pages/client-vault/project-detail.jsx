@@ -96,7 +96,7 @@ export function ClientProjectDetail({
               className="cursor-pointer"
               onClick={() => {
                 setSelectedProjectId(project.id);
-                onTabChange("ASSETS");
+                onTabChange("GLOBAL_ASSETS");
               }}
             >
               <FolderOpen className="h-4 w-4 mr-2" /> Assets

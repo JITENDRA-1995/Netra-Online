@@ -5,9 +5,9 @@ import {
   fetchClientProjectChats, 
   sendClientChatMessage, 
   subscribeToClientChats,
-  clearClientProjectChats,
-  fetchClientProjectMedia
+  clearClientProjectChats
 } from "../../supabase/database/clientVault";
+import { supabase } from "../../supabase/client";
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Textarea } from "../../components/ui/textarea";
@@ -120,13 +120,17 @@ export function ClientCollaboration({
         setIsChatsLoading(false);
       }
 
-      // Load Assets
+      // Load Assets (Unified Global Vault)
       try {
         setIsAssetsLoading(true);
-        const assetData = await fetchClientProjectMedia(selectedProject.id);
-        setAssets(assetData);
+        if (currentClient?.id) {
+          const { data, error } = await supabase.from('client_assets').select('*').eq('client_id', currentClient.id).order('created_at', { ascending: false });
+          if (!error && data) {
+            setAssets(data);
+          }
+        }
       } catch (err) {
-        console.error("Error loading assets:", err);
+        console.error("Error loading unified assets:", err);
       } finally {
         setIsAssetsLoading(false);
       }
@@ -445,7 +449,7 @@ export function ClientCollaboration({
         `}>
           <div className="flex items-center justify-between pb-2 border-b border-border/40">
             <h2 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase flex items-center gap-1.5">
-              <Paperclip className="h-4 w-4" /> Project Assets
+              <Paperclip className="h-4 w-4" /> Asset Vault
             </h2>
             {showMobileAssets && (
               <Button 
@@ -490,33 +494,31 @@ export function ClientCollaboration({
 }
 
 function CollaborationAssetCard({ asset }) {
-  const isImage = (asset.fileType || '').toLowerCase().startsWith('image/') || 
-                  (asset.name || '').match(/\.(jpg|jpeg|png|webp|gif)$/i);
+  const isImage = ((asset.file_type || '').toLowerCase().startsWith('image/') || 
+                  (asset.name || '').match(/\.(jpg|jpeg|png|webp|gif)$/i));
   
   const handleDownload = () => {
-    if (asset.downloadUrl) {
-      window.open(asset.downloadUrl, '_blank');
+    if (asset.file_url) {
+      window.open(asset.file_url, '_blank');
     }
   };
 
   return (
     <Card className="overflow-hidden border border-border/50 flex flex-col bg-background/55 hover:border-primary/20 transition-all">
       <div className="aspect-[4/3] relative bg-secondary/35 flex items-center justify-center p-2 overflow-hidden border-b border-border/30">
-        {asset.previewUrl ? (
+        {isImage ? (
           <img 
-            src={asset.previewUrl} 
+            src={asset.file_url} 
             alt={asset.name}
             className="w-full h-full object-cover rounded" 
           />
-        ) : isImage ? (
-          <FileImage className="h-10 w-10 text-muted-foreground/30" />
-        ) : (asset.fileType || '').includes('pdf') ? (
+        ) : (asset.file_type || '').includes('pdf') ? (
           <FileText className="h-10 w-10 text-muted-foreground/30" />
         ) : (
           <File className="h-10 w-10 text-muted-foreground/30" />
         )}
 
-        {!asset.canDownload && (
+        {!asset.is_locked ? null : (
           <div className="absolute inset-0 bg-background/85 backdrop-blur-[2px] flex flex-col items-center justify-center p-2 text-center">
             <Lock className="h-4 w-4 text-muted-foreground mb-1" />
             <span className="text-[10px] font-semibold text-foreground block">Locked Deliverable</span>
@@ -531,12 +533,12 @@ function CollaborationAssetCard({ asset }) {
             {asset.name}
           </h4>
           <span className="text-[9px] text-muted-foreground block uppercase font-medium">
-            {asset.fileType.split('/')[1] || asset.fileType}
+            {(asset.file_type || '').split('/')[1] || asset.file_type}
           </span>
         </div>
         
         <div>
-          {asset.canDownload ? (
+          {!asset.is_locked ? (
             <Button 
               variant="outline" 
               size="sm"

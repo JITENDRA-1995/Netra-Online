@@ -12,6 +12,18 @@ export function ClientAssetVault({ client, onClose }) {
 
   useEffect(() => {
     fetchAssets();
+
+    // Realtime subscription for syncing across portals
+    const subscription = supabase
+      .channel(`public:client_assets:${client.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'client_assets', filter: `client_id=eq.${client.id}` }, payload => {
+        fetchAssets();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, [client.id]);
 
   const fetchAssets = async () => {
@@ -40,12 +52,12 @@ export function ClientAssetVault({ client, onClose }) {
     let publicUrl = "";
 
     // Try Supabase upload
-    const { error: uploadError } = await supabase.storage.from('client-assets').upload(filePath, file);
+    const { error: uploadError } = await supabase.storage.from('studio-vault').upload(filePath, file);
     if (uploadError) {
       console.warn("Supabase storage upload failed, using mock local URL", uploadError);
       publicUrl = URL.createObjectURL(file); // Temporary mock
     } else {
-      const { data: publicUrlData } = supabase.storage.from('client-assets').getPublicUrl(filePath);
+      const { data: publicUrlData } = supabase.storage.from('studio-vault').getPublicUrl(filePath);
       publicUrl = publicUrlData.publicUrl;
     }
 
@@ -167,7 +179,7 @@ export function ClientAssetVault({ client, onClose }) {
                 <div key={asset.id} className="border border-white/10 rounded-xl overflow-hidden bg-black/40 group flex flex-col relative h-64">
                   {/* Preview Area */}
                   <div className="h-40 bg-black/50 border-b border-white/5 relative flex items-center justify-center overflow-hidden">
-                    {asset.file_type?.startsWith('image/') ? (
+                    {((asset.file_type || '').toLowerCase().startsWith('image/') || (asset.name || '').match(/\.(jpg|jpeg|png|webp|gif)$/i)) ? (
                       <>
                         <img src={asset.file_url} className={`w-full h-full object-cover transition-all ${asset.is_locked ? 'opacity-20 blur-[2px]' : ''}`} alt={asset.name} />
                         {asset.is_locked && (

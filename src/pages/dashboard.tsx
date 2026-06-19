@@ -97,6 +97,13 @@ interface DashboardProps {
   clients?: any[];
   invoices?: any[];
   cashbookEntries?: any[];
+  clientPortalNotifs?: any[];
+  flames?: any[];
+  sparks?: any[];
+  onMarkFlameAsRead?: (projectId: string | number) => void;
+  onSnoozeFlame?: (projectId: string | number, amount: number, unit: string) => void;
+  onRedirectToProject?: (project: any) => void;
+  onRedirectToClient?: (projectId: string | number | null, clientId?: string | number) => void;
   onOpenIgnitionModal?: () => void;
   onOpenCreateClient?: () => void;
   setActiveAdminModule?: (module: string) => void;
@@ -114,6 +121,13 @@ export default function Dashboard({
   clients = [],
   invoices = [],
   cashbookEntries = [],
+  clientPortalNotifs = [],
+  flames = [],
+  sparks = [],
+  onMarkFlameAsRead,
+  onSnoozeFlame,
+  onRedirectToProject,
+  onRedirectToClient,
   onOpenIgnitionModal,
   onOpenCreateClient,
   setActiveAdminModule,
@@ -138,23 +152,31 @@ export default function Dashboard({
   const handleQuickEntrySubmit = async () => {
     if (!qeAmount || !qeDesc) return;
     setQeSubmitting(true);
-    const entry = {
-      id: Date.now(),
-      date: qeDate || new Date().toISOString().split('T')[0],
-      desc: qeDesc,
-      amount: parseFloat(qeAmount),
-      type: quickEntryType,
-      mode: qeMode,
-      category: qeCategory || (quickEntryType === 'INCOME' ? 'General Income' : 'General Expense'),
-    };
-    if (onAddCashbookEntry) onAddCashbookEntry(entry);
-    setQeAmount(''); setQeDesc(''); setQeCategory(''); setQeMode('UPI');
-    setQeDate(new Date().toISOString().split('T')[0]);
+    try {
+      if (onAddCashbookEntry) {
+        await onAddCashbookEntry({
+          type: quickEntryType,
+          date: qeDate,
+          category: qeCategory,
+          amount: parseFloat(qeAmount),
+          mode: qeMode,
+          description: qeDesc
+        });
+      }
+      setQuickEntryType(null);
+      setQeAmount('');
+      setQeDesc('');
+      setQeCategory('');
+      setQeMode('UPI');
+      setQeDate(new Date().toISOString().split('T')[0]);
+    } catch (err) {
+      console.error(err);
+    }
     setQeSubmitting(false);
-    setQuickEntryType(null);
   };
   // Active Tab state
-  const [selectedTab, setSelectedTab] = useState<'revenue' | 'projects' | 'clients' | 'invoices'>('revenue');
+  const [selectedTab, setSelectedTab] = useState<'revenue' | 'projects' | 'clients' | 'invoices' | 'system_alerts'>('revenue');
+  const [systemAlertTab, setSystemAlertTab] = useState<'deadlines' | 'inquiries' | 'client'>('client');
 
   // 1. Calculate live statistics
   const activeProjects = projects.filter(p => p.status === 'Ongoing' || p.status === 'Active').length;
@@ -507,6 +529,17 @@ export default function Dashboard({
       trendLabel: undefined,
       overdue: overdueInvoicesCount,
       color: "#f59e0b",
+    },
+    {
+      tabKey: "system_alerts" as const,
+      label: "System Alerts",
+      value: flames.length + sparks.length + clientPortalNotifs.filter((n: any) => !n.is_read).length,
+      prefix: undefined,
+      icon: AlertTriangle,
+      trend: undefined,
+      trendLabel: undefined,
+      overdue: undefined,
+      color: "#ef4444",
     },
   ];
 
@@ -1076,6 +1109,145 @@ export default function Dashboard({
     );
   };
 
+  const renderSystemAlertsView = () => {
+    return (
+      <div className="rounded-2xl border bg-card/40 backdrop-blur-sm p-6" style={{ borderColor: '#ef444430' }}>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="font-bold text-foreground text-lg text-red-400 font-sans tracking-wide">System Alerts</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Critical notifications requiring your attention.</p>
+          </div>
+          <AlertTriangle className="w-5 h-5 text-red-500 animate-pulse" />
+        </div>
+
+        {/* Sub-tabs for System Alerts */}
+        <div className="flex items-center gap-2 mb-6 border-b border-border/50 pb-4">
+          <button
+            onClick={() => setSystemAlertTab('deadlines')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${systemAlertTab === 'deadlines' ? 'bg-[#ff5e00]/10 text-[#ff5e00] border border-[#ff5e00]/20' : 'bg-transparent text-muted-foreground hover:bg-white/5 border border-transparent'}`}
+          >
+            PENDING DEADLINES ({flames.length})
+          </button>
+          <button
+            onClick={() => setSystemAlertTab('inquiries')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${systemAlertTab === 'inquiries' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'bg-transparent text-muted-foreground hover:bg-white/5 border border-transparent'}`}
+          >
+            NEW INQUIRIES ({sparks.length})
+          </button>
+          <button
+            onClick={() => setSystemAlertTab('client')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${systemAlertTab === 'client' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-transparent text-muted-foreground hover:bg-white/5 border border-transparent'}`}
+          >
+            CLIENT PORTAL ({clientPortalNotifs.filter(n => !n.is_read).length})
+          </button>
+        </div>
+
+        {/* Content based on sub-tab */}
+        {systemAlertTab === 'deadlines' && (
+          <div className="space-y-4">
+            {flames.length > 0 ? flames.map((f: any) => (
+              <div key={f.id} className="p-4 rounded-xl border border-[#ff5e00]/20 bg-[#ff5e00]/5 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <div>
+                  <h4 className="font-bold text-sm text-[#ff5e00]">{f.service}</h4>
+                  <p className="text-xs text-muted-foreground">{f.name || f.clientName || 'Unknown Client'}</p>
+                  <p className="text-3xs text-muted-foreground mt-1">Due: {new Date(f.deadline).toLocaleDateString()}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 bg-black/40 border border-white/5 rounded-lg">
+                    <input 
+                      type="number" 
+                      min="1" 
+                      defaultValue="1" 
+                      id={`snooze-amt-${f.id}`} 
+                      className="w-10 bg-transparent border-none text-xs text-center text-white focus:outline-none py-1"
+                    />
+                    <select 
+                      id={`snooze-unit-${f.id}`} 
+                      className="bg-transparent border-none text-xs text-muted-foreground focus:outline-none cursor-pointer py-1 pr-1"
+                    >
+                      <option value="HOURS" className="bg-background">Hrs</option>
+                      <option value="MINS" className="bg-background">Mins</option>
+                    </select>
+                    <button 
+                      onClick={() => {
+                        const amt = (document.getElementById(`snooze-amt-${f.id}`) as HTMLInputElement)?.value;
+                        const unit = (document.getElementById(`snooze-unit-${f.id}`) as HTMLSelectElement)?.value;
+                        if (onSnoozeFlame) onSnoozeFlame(f.id, Number(amt), unit);
+                      }}
+                      className="px-2 py-1.5 border-l border-white/5 text-xs font-semibold hover:bg-white/10 text-muted-foreground hover:text-white transition-colors rounded-r-lg"
+                    >
+                      Snooze
+                    </button>
+                  </div>
+                  <button 
+                    onClick={() => onMarkFlameAsRead && onMarkFlameAsRead(f.id)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/5 hover:bg-white/10 text-muted-foreground transition-colors"
+                  >
+                    Mark Read
+                  </button>
+                  <button 
+                    onClick={() => onRedirectToProject && onRedirectToProject(f)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#ff5e00]/20 hover:bg-[#ff5e00]/30 text-[#ff5e00] transition-colors"
+                  >
+                    View Project
+                  </button>
+                </div>
+              </div>
+            )) : (
+              <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                <h4 className="text-sm font-black text-muted-foreground">No pending deadlines</h4>
+              </div>
+            )}
+          </div>
+        )}
+
+        {systemAlertTab === 'inquiries' && (
+          <div className="space-y-4">
+            {sparks.length > 0 ? sparks.map((s: any) => (
+              <div key={s.id} className="p-4 rounded-xl border border-cyan-500/20 bg-cyan-500/5 flex justify-between items-center">
+                <div>
+                  <h4 className="font-bold text-sm text-cyan-400">{s.name}</h4>
+                  <p className="text-xs text-muted-foreground">{s.email} | {s.phone}</p>
+                </div>
+                <span className="text-xs px-2 py-1 bg-cyan-500/10 rounded text-cyan-400 font-semibold">{s.status || 'New'}</span>
+              </div>
+            )) : (
+              <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                <h4 className="text-sm font-black text-muted-foreground">No new inquiries</h4>
+              </div>
+            )}
+          </div>
+        )}
+
+        {systemAlertTab === 'client' && (
+          <div className="space-y-4">
+            {clientPortalNotifs.length > 0 ? clientPortalNotifs.map((n: any) => (
+              <div key={n.id} className={`p-4 rounded-xl border ${n.is_read ? 'border-white/5 bg-white/5 opacity-60' : 'border-indigo-500/20 bg-indigo-500/5'}`}>
+                <div className="flex justify-between items-start mb-1">
+                  <h4 className="font-bold text-sm text-foreground">{n.title || n.type}</h4>
+                  <span className="text-3xs text-muted-foreground">{new Date(n.raw_date).toLocaleString()}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">{n.message}</p>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => onRedirectToClient && onRedirectToClient(n.project_id, n.client_id)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 transition-colors"
+                  >
+                    View Details
+                  </button>
+                </div>
+              </div>
+            )) : (
+              <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                <h4 className="text-sm font-black text-muted-foreground">No client alerts currently</h4>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <motion.div
       variants={containerVariants}
@@ -1103,7 +1275,7 @@ export default function Dashboard({
       </motion.div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
         {statCards.map((card, i) => {
           const isActive = selectedTab === card.tabKey;
           return (
@@ -1173,16 +1345,17 @@ export default function Dashboard({
       <AnimatePresence mode="wait">
         <motion.div
           key={selectedTab}
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -15 }}
-          transition={{ duration: 0.2 }}
+          initial="hidden"
+          animate="visible"
+          exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
+          variants={itemVariants}
           className="w-full"
         >
           {selectedTab === 'revenue' && renderRevenueView()}
           {selectedTab === 'projects' && renderProjectsView()}
           {selectedTab === 'clients' && renderClientsView()}
           {selectedTab === 'invoices' && renderInvoicesView()}
+          {selectedTab === 'system_alerts' && renderSystemAlertsView()}
         </motion.div>
       </AnimatePresence>
 

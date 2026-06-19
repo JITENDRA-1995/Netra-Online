@@ -48,7 +48,7 @@ import { supabase } from './supabase/client';
 import {
   getInquiries, createInquiry, updateInquiry, deleteInquiry,
   getClients, createClientProfile, verifyClientVaultKey, updateClientProfile,
-  getProjects, igniteProject, updateProjectState, toggleMilestone, addProjectActivityLog, sendChatMessage, subscribeToChats, uploadMediaVaultAsset,
+  getProjects, igniteProject, updateProjectState, toggleMilestone, addProjectActivityLog, sendChatMessage, subscribeToChats, uploadMediaVaultAsset, subscribeToAllChats, subscribeToAllMedia,
   getInvoices, saveInvoice, deleteInvoice, updateInvoice,
   getMicroJobs
 } from './supabase/database';
@@ -1298,9 +1298,83 @@ function App() {
   const [isWarningDismissed, setIsWarningDismissed] = useState(false);
   const [projectsSearchQuery, setProjectsSearchQuery] = useState("");
   const [inquiriesSearchQuery, setInquiriesSearchQuery] = useState("");
+  const [clientsSearchQuery, setClientsSearchQuery] = useState("");
   const [projectToDelete, setProjectToDelete] = useState(null);
   const [deleteStrategy, setDeleteStrategy] = useState('purge'); // 'purge' or 'keep'
   const [editingInvoiceData, setEditingInvoiceData] = useState(null);
+  const [readClientNotifs, setReadClientNotifs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('netra_read_client_notifs')) || [];
+    } catch {
+      return [];
+    }
+  });
+
+  const clientPortalNotifs = useMemo(() => {
+    const notifs = [];
+    ignitionQueue.forEach(proj => {
+      if (proj.collaborationStream && Array.isArray(proj.collaborationStream)) {
+        proj.collaborationStream.forEach(chat => {
+          if ((chat.sender || '').toLowerCase() !== 'admin') {
+            notifs.push({
+              id: `chat-${chat.id}`,
+              project_id: proj.id,
+              type: 'communication',
+              title: `New Message from ${chat.sender || 'Client'}`,
+              message: `Project: ${proj.service} - "${chat.text}"`,
+              created_at: chat.time,
+              is_read: readClientNotifs.includes(`chat-${chat.id}`),
+              raw_date: chat.raw_date || 0
+            });
+          }
+        });
+      }
+      if (proj.mediaVault && Array.isArray(proj.mediaVault)) {
+        proj.mediaVault.forEach(media => {
+          if ((media.uploaded_by || '').toLowerCase() !== 'admin') {
+            notifs.push({
+              id: `media-${media.id}`,
+              project_id: proj.id,
+              type: 'new_asset',
+              title: `New Asset Uploaded`,
+              message: `Project: ${proj.service} - File: ${media.name}`,
+              created_at: media.time,
+              is_read: readClientNotifs.includes(`media-${media.id}`),
+              raw_date: media.raw_date || 0
+            });
+          }
+        });
+      }
+    });
+
+    if (clients && Array.isArray(clients)) {
+      clients.forEach(client => {
+        if (client.pending_profile_update) {
+          notifs.push({
+            id: `profile-${client.id}`,
+            project_id: null,
+            client_id: client.id,
+            type: 'Profile Update',
+            title: `Profile Update Request`,
+            message: `Client ${client.name} requested a profile update.`,
+            created_at: new Date().toISOString(),
+            is_read: readClientNotifs.includes(`profile-${client.id}`),
+            raw_date: Date.now()
+          });
+        }
+      });
+    }
+
+    return notifs.sort((a, b) => b.raw_date - a.raw_date);
+  }, [ignitionQueue, clients, readClientNotifs]);
+
+  const markClientNotifAsRead = (id) => {
+    setReadClientNotifs(prev => {
+      const next = [...prev, id];
+      localStorage.setItem('netra_read_client_notifs', JSON.stringify(next));
+      return next;
+    });
+  };
 
   useEffect(() => {
     localStorage.setItem('netra_admin_active', isCommandCenterActive);
@@ -1728,7 +1802,8 @@ function App() {
     return q.status === "Read" || q.status === "Ignited" || q.status === "Replied" || q.status === "Resolved";
   });
 
-  const hasUrgentAlert = flames.length > 0 || sparks.length > 0;
+  const unreadClientNotifs = clientPortalNotifs.filter(n => !n.is_read);
+  const hasUrgentAlert = flames.length > 0 || sparks.length > 0 || unreadClientNotifs.length > 0;
 
   useEffect(() => {
     setUnreadSparksCount(sparks.length);
@@ -1917,6 +1992,17 @@ function App() {
   const [microJobs, setMicroJobs] = useState([]);
   const [redirectBackToMicroJob, setRedirectBackToMicroJob] = useState(false);
   const [expandedWarningTab, setExpandedWarningTab] = useState(null); // 'DEADLINES' | 'INQUIRIES' | null
+
+  const prevUnreadClientNotifsCountRef = useRef(0);
+  useEffect(() => {
+    if (unreadClientNotifs.length > prevUnreadClientNotifsCountRef.current) {
+      setIsWarningDismissed(false);
+      triggerBellPulse();
+      setExpandedWarningTab('CLIENT');
+    }
+    prevUnreadClientNotifsCountRef.current = unreadClientNotifs.length;
+  }, [unreadClientNotifs.length]);
+
   const [selectedBatchProjects, setSelectedBatchProjects] = useState([]);
   const [selectedVaultInvoices, setSelectedVaultInvoices] = useState([]);
   const [highlightedCashbookId, setHighlightedCashbookId] = useState(null);
@@ -3590,6 +3676,48 @@ function App() {
     };
   }, [selectedProjectTab]);
 
+  // Global Real-time Subscription for Client Portal Notifications
+  useEffect(() => {
+    const chatSub = subscribeToAllChats((newMsg) => {
+      setIgnitionQueue(prevQueue => prevQueue.map(proj => {
+        if (proj.id === newMsg.project_id) {
+          if (newMsg.eventType === 'DELETE') {
+            return {
+              ...proj,
+              collaborationStream: (proj.collaborationStream || []).filter(msg => msg.id !== newMsg.id)
+            };
+          }
+          const exists = (proj.collaborationStream || []).some(msg => msg.id === newMsg.id);
+          if (exists) return proj;
+          return {
+            ...proj,
+            collaborationStream: [...(proj.collaborationStream || []), newMsg]
+          };
+        }
+        return proj;
+      }));
+    });
+
+    const mediaSub = subscribeToAllMedia((newMedia) => {
+      setIgnitionQueue(prevQueue => prevQueue.map(proj => {
+        if (proj.id === newMedia.project_id) {
+          const exists = (proj.mediaVault || []).some(m => m.id === newMedia.id);
+          if (exists) return proj;
+          return {
+            ...proj,
+            mediaVault: [...(proj.mediaVault || []), newMedia]
+          };
+        }
+        return proj;
+      }));
+    });
+
+    return () => {
+      if (chatSub) chatSub.unsubscribe();
+      if (mediaSub) mediaSub.unsubscribe();
+    };
+  }, []);
+
   // Media Vault File Upload Handler
   const handleVaultFileUpload = async (e, projectId) => {
     const file = e.target.files[0];
@@ -4514,7 +4642,7 @@ function App() {
                   </a>
 
                   <div className="sidebar-version-tag">
-                    <p className="v-title">Netra OS v2.4</p>
+                    <p className="v-title">Netra OS v2.5.1</p>
                     <p className="v-status">Systems online.</p>
                   </div>
                 </div>
@@ -5528,6 +5656,31 @@ function App() {
                             clients={clients}
                             invoices={invoices}
                             cashbookEntries={cashbookEntries}
+                            clientPortalNotifs={clientPortalNotifs}
+                            flames={flames}
+                            sparks={sparks}
+                            onMarkFlameAsRead={markFlameAsRead}
+                            onSnoozeFlame={handleSnooze}
+                            onRedirectToProject={(project) => {
+                              const clientName = getProjectClientName(project);
+                              if (clientName) setProjectsSearchQuery(clientName);
+                              setSelectedProjectTab(project.id);
+                              setActiveAdminModule("PROJECTS");
+                            }}
+                            onRedirectToClient={(projectId, clientId) => {
+                              let targetClientName = null;
+                              if (clientId) {
+                                const client = clients.find(c => c.id === clientId);
+                                if (client) targetClientName = client.name;
+                              } else if (projectId) {
+                                const project = ignitionQueue.find(p => p.id === projectId);
+                                if (project && project.client) targetClientName = project.client.name;
+                              }
+                              if (targetClientName) {
+                                setClientsSearchQuery(targetClientName);
+                                setActiveAdminModule("CLIENTS");
+                              }
+                            }}
                             onOpenIgnitionModal={() => { setPrefillData(null); setIsIgnitionModalOpen(true); }}
                             onOpenCreateClient={() => { setSelectedClient(null); setClientModalPasscode(Math.random().toString(36).substring(2, 8).toUpperCase()); setIsClientModalOpen(true); }}
                             setActiveAdminModule={setActiveAdminModule}
@@ -5607,9 +5760,11 @@ function App() {
                           <Clients
                             clients={clients}
                             ignitionQueue={ignitionQueue}
+                            clientPortalNotifs={clientPortalNotifs}
                             onOpenCreateClient={() => { setSelectedClient(null); setClientModalPasscode(Math.random().toString(36).substring(2, 8).toUpperCase()); setIsClientModalOpen(true); }}
                             onOpenEditClient={(client) => { setSelectedClient(client); setClientModalPasscode(client.accessKey || client.access_key || ""); setIsClientModalOpen(true); }}
                             onDeleteClient={deleteClient}
+                            initialSearch={clientsSearchQuery}
                           />
                         )}
 
@@ -6177,11 +6332,12 @@ function App() {
                               <div className="warning-pulse-icon">⚠️</div>
                               <h2>CRITICAL UNRESOLVED SYSTEM ALERTS</h2>
                               <p className="warning-desc">
-                                Active project deadlines are overdue or new client inquiries (Sparks) are pending. 
+                                Active project deadlines are overdue, new client inquiries (Sparks) are pending, or client portal updates require attention. 
                                 Acknowledge or navigate to resolve them before interacting with sub-modules.
                               </p>
 
-                              <div className="warning-details-row">
+                              <div className="warning-content-wrapper">
+                                <div className="warning-details-row">
                                 <div 
                                   className={`warning-details-card cursor-pointer hover:bg-white/5 transition-colors ${expandedWarningTab === 'DEADLINES' ? 'border-[#ff5e00]/40 bg-[#ff5e00]/5' : ''}`}
                                   onClick={() => {
@@ -6217,11 +6373,21 @@ function App() {
                                   <h3>NEW INQUIRIES</h3>
                                   <span className="warning-count text-[#00E5FF]">{sparks.length}</span>
                                 </div>
+                                <div 
+                                  className={`warning-details-card cursor-pointer hover:bg-white/5 transition-colors ${expandedWarningTab === 'CLIENT' ? 'border-indigo-500/40 bg-indigo-500/5' : ''}`}
+                                  onClick={() => {
+                                    setExpandedWarningTab(expandedWarningTab === 'CLIENT' ? null : 'CLIENT');
+                                  }}
+                                >
+                                  <h3>CLIENT PORTAL</h3>
+                                  <span className="warning-count text-indigo-400">{unreadClientNotifs.length}</span>
+                                </div>
                               </div>
-
-                              {/* Expanded List Selection */}
-                              {expandedWarningTab === 'DEADLINES' && flames.length > 0 && (
-                                <div className="expanded-warning-list flex-shrink-0 border border-white/5 rounded-2xl p-4 bg-black/40 max-h-48 overflow-y-auto space-y-1.5 text-left w-full max-w-md my-4">
+                                
+                                <div className="expanded-warning-container w-full flex-1 flex flex-col justify-center min-w-0">
+                                  {/* Expanded List Selection */}
+                                  {expandedWarningTab === 'DEADLINES' && flames.length > 0 && (
+                                <div className="expanded-warning-list flex flex-col border border-white/5 rounded-2xl p-4 bg-black/40 h-full overflow-y-auto space-y-1.5 text-left w-full">
                                   <h4 className="text-3xs uppercase tracking-widest text-[#ff5e00] font-bold mb-2 border-b border-white/5 pb-1">Select Project to Redirect:</h4>
                                   {flames.map(f => (
                                     <div 
@@ -6258,7 +6424,7 @@ function App() {
                                 </div>
                               )}
                               {expandedWarningTab === 'INQUIRIES' && sparks.length > 0 && (
-                                <div className="expanded-warning-list flex-shrink-0 border border-white/5 rounded-2xl p-4 bg-black/40 max-h-48 overflow-y-auto space-y-1.5 text-left w-full max-w-md my-4">
+                                <div className="expanded-warning-list flex flex-col border border-white/5 rounded-2xl p-4 bg-black/40 h-full overflow-y-auto space-y-1.5 text-left w-full">
                                   <h4 className="text-3xs uppercase tracking-widest text-[#00E5FF] font-bold mb-2 border-b border-white/5 pb-1">Select Inquiry to Redirect:</h4>
                                   {sparks.map(s => (
                                     <div 
@@ -6279,6 +6445,47 @@ function App() {
                                   ))}
                                 </div>
                               )}
+                              {expandedWarningTab === 'CLIENT' && unreadClientNotifs.length > 0 && (
+                                <div className="expanded-warning-list flex flex-col border border-white/5 rounded-2xl p-4 bg-black/40 h-full overflow-y-auto space-y-1.5 text-left w-full">
+                                  <h4 className="text-3xs uppercase tracking-widest text-indigo-400 font-bold mb-2 border-b border-white/5 pb-1">Client Activity:</h4>
+                                  {unreadClientNotifs.map(n => (
+                                    <div 
+                                      key={n.id} 
+                                      className="p-2 hover:bg-white/5 rounded-xl cursor-pointer transition-colors text-xs flex justify-between items-center text-foreground"
+                                      onClick={() => {
+                                        markClientNotifAsRead(n.id);
+                                        let targetClientName = null;
+                                        if (n.type === 'Profile Update' || n.client_id) {
+                                          const client = clients.find(c => c.id === n.client_id);
+                                          if (client) targetClientName = client.name;
+                                        } else {
+                                          const project = ignitionQueue.find(p => p.id === n.project_id);
+                                          if (project && project.client) targetClientName = project.client.name;
+                                        }
+                                        
+                                        if (targetClientName) {
+                                          setClientsSearchQuery(targetClientName);
+                                          setActiveAdminModule("CLIENTS");
+                                          setIsAdminGridActive(true);
+                                          setIsWarningDismissed(true);
+                                          setExpandedWarningTab(null);
+                                          pushPageToHistory('admin', { activeAdminModule: 'CLIENTS', isAdminGridActive: true });
+                                        } else {
+                                          setIsWarningDismissed(true);
+                                          setExpandedWarningTab(null);
+                                        }
+                                      }}
+                                    >
+                                      <span className="font-semibold truncate pr-2">{n.message}</span>
+                                      <span className="text-3xs text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{n.type}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+
 
                               <div className="warning-actions">
                                 <button 
@@ -6757,6 +6964,7 @@ function App() {
                       onClick={() => setNotifTab('CLIENT')}
                     >
                       CLIENT PORTAL
+                      {unreadClientNotifs.length > 0 && <span className="tab-badge indigo">{unreadClientNotifs.length}</span>}
                     </button>
                   </div>
 
@@ -6897,10 +7105,61 @@ function App() {
                       </div>
                     ) : notifTab === 'CLIENT' ? (
                       <div className="notif-list">
-                        <div className="text-center text-muted-foreground/30 py-20 flex flex-col items-center gap-4">
-                          <span className="text-3xs uppercase tracking-widest text-indigo-400 font-bold">Awaiting Client Activity...</span>
-                          <span className="text-[10px] text-muted-foreground max-w-[200px] leading-relaxed">Profile updates, messages, and dropped assets will appear here when Supabase realtime syncing is deployed.</span>
-                        </div>
+                        {clientPortalNotifs.length > 0 ? (
+                          clientPortalNotifs.map(n => (
+                            <div 
+                              key={n.id} 
+                              className={`notif-card flex justify-between items-center ${n.is_read ? 'opacity-65' : ''}`}
+                              onClick={() => {
+                                markClientNotifAsRead(n.id);
+                                let targetClientName = null;
+                                if (n.type === 'Profile Update' || n.client_id) {
+                                  const client = clients.find(c => c.id === n.client_id);
+                                  if (client) targetClientName = client.name;
+                                } else {
+                                  const project = ignitionQueue.find(p => p.id === n.project_id);
+                                  if (project && project.client) targetClientName = project.client.name;
+                                }
+                                
+                                if (targetClientName) {
+                                  setClientsSearchQuery(targetClientName);
+                                  setActiveAdminModule("CLIENTS");
+                                  setIsAdminGridActive(true);
+                                  setIsNotificationOpen(false);
+                                  pushPageToHistory('admin', { activeAdminModule: 'CLIENTS', isAdminGridActive: true });
+                                } else {
+                                  setIsNotificationOpen(false);
+                                }
+                              }}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`notif-icon-box ${n.is_read ? 'grayscale' : 'indigo'}`}>✦</div>
+                                <div className="notif-info">
+                                  <p className="notif-msg">{n.message}</p>
+                                  <span className="notif-time">{n.type}</span>
+                                </div>
+                              </div>
+                              {!n.is_read && (
+                                <button
+                                  className="text-3xs uppercase tracking-wider text-indigo-400 hover:text-indigo-300 font-extrabold px-2.5 py-1 rounded bg-indigo-400/10 border border-indigo-400/20 cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    markClientNotifAsRead(n.id);
+                                  }}
+                                >
+                                  MARK READ
+                                </button>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center text-muted-foreground/30 py-20 flex flex-col items-center gap-4">
+                            <span className="empty-icon text-indigo-500/20">✦</span>
+                            <span className="text-xs uppercase tracking-widest text-balance leading-relaxed">
+                              No recent client activity.
+                            </span>
+                          </div>
+                        )}
                       </div>
                     ) : null}
                   </div>

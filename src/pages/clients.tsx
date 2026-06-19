@@ -28,6 +28,8 @@ interface ClientsProps {
   onOpenCreateClient: () => void;
   onOpenEditClient: (client: Client) => void;
   onDeleteClient: (id: number) => void;
+  initialSearch?: string;
+  clientPortalNotifs?: any[];
 }
 
 const INDUSTRY_COLORS = ["#00d4ff", "#8b5cf6", "#10b981", "#f59e0b", "#ec4899", "#3b82f6", "#f97316"];
@@ -46,9 +48,17 @@ export default function Clients({
   ignitionQueue = [],
   onOpenCreateClient,
   onOpenEditClient,
-  onDeleteClient
+  onDeleteClient,
+  initialSearch = "",
+  clientPortalNotifs = []
 }: ClientsProps) {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
+
+  useEffect(() => {
+    if (initialSearch) {
+      setSearch(initialSearch);
+    }
+  }, [initialSearch]);
 
   // States for Review Changes modal
   const [reviewClient, setReviewClient] = useState<Client | null>(null);
@@ -490,9 +500,12 @@ export default function Clients({
                           e.stopPropagation();
                           handleOpenBridge(client);
                         }}
-                        className="w-6 h-6 rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 transition-all"
+                        className="w-6 h-6 rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 transition-all relative"
                       >
                         <MessageSquare className="w-3 h-3" />
+                        {clientProjects.some(p => clientPortalNotifs.some(n => n.project_id === p.id && !n.is_read && n.type === 'Communication')) && (
+                          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-cyan-500 rounded-full shadow-[0_0_8px_rgba(6,182,212,0.8)] animate-pulse" />
+                        )}
                       </Button>
 
                       <Button
@@ -503,9 +516,12 @@ export default function Clients({
                           setVaultClient(client);
                           setIsVaultModalOpen(true);
                         }}
-                        className="w-6 h-6 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 transition-all"
+                        className="w-6 h-6 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 transition-all relative"
                       >
                         <FolderOpen className="w-3 h-3" />
+                        {clientProjects.some(p => clientPortalNotifs.some(n => n.project_id === p.id && !n.is_read && n.type === 'Asset Vault')) && (
+                          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-indigo-500 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.8)] animate-pulse" />
+                        )}
                       </Button>
 
                       <Button

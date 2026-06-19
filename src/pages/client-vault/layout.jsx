@@ -28,7 +28,7 @@ import { WhatsNewBulb } from "../../components/WhatsNewBulb";
 const navItems = [
   { title: "Dashboard", tab: "DASHBOARD", icon: LayoutDashboard },
   { title: "Projects", tab: "PROJECTS", icon: FolderKanban },
-  { title: "Global Vault", tab: "GLOBAL_ASSETS", icon: FolderOpen },
+  { title: "Asset Vault", tab: "GLOBAL_ASSETS", icon: FolderOpen },
   { title: "Communication", tab: "COMMUNICATION", icon: MessageSquare },
   { title: "Invoices", tab: "INVOICES", icon: Receipt },
   { title: "Profile", tab: "PROFILE", icon: UserCircle },
@@ -46,7 +46,7 @@ export function ClientVaultLayout({
 
   const isTabActive = (itemTab) => {
     if (itemTab === "PROJECTS") {
-      return ["PROJECTS", "PROJECT_DETAIL", "MESSAGES", "ASSETS"].includes(activeTab);
+      return ["PROJECTS", "PROJECT_DETAIL", "MESSAGES"].includes(activeTab);
     }
     if (itemTab === "INVOICES") {
       return ["INVOICES", "INVOICE_DETAIL"].includes(activeTab);

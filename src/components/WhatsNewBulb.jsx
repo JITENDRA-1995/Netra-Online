@@ -4,14 +4,14 @@ import { Lightbulb, X, CheckCircle2 } from 'lucide-react';
 
 export function WhatsNewBulb({ isClientPortal = false }) {
   const [showBulb, setShowBulb] = useState(() => {
-    return localStorage.getItem(`netra_whatsnew_v24_${isClientPortal ? 'client' : 'admin'}`) !== 'true';
+    return localStorage.getItem(`netra_whatsnew_v251_${isClientPortal ? 'client' : 'admin'}`) !== 'true';
   });
   const [isOpen, setIsOpen] = useState(false);
 
   if (!showBulb) return null;
 
   const handleGotIt = () => {
-    localStorage.setItem(`netra_whatsnew_v24_${isClientPortal ? 'client' : 'admin'}`, 'true');
+    localStorage.setItem(`netra_whatsnew_v251_${isClientPortal ? 'client' : 'admin'}`, 'true');
     setShowBulb(false);
     setIsOpen(false);
   };
@@ -21,7 +21,7 @@ export function WhatsNewBulb({ isClientPortal = false }) {
       <button 
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(true); }}
         className={`flex items-center justify-center gap-2 p-2 rounded-lg transition-colors border ${isClientPortal ? 'bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20' : 'bg-transparent border-transparent text-amber-400 hover:bg-white/5 mx-2'}`}
-        title="What's New in v2.4"
+        title="What's New in v2.5.1"
       >
         <Lightbulb className={`w-5 h-5 ${isClientPortal ? '' : 'animate-pulse'} ${isOpen ? 'fill-amber-400' : ''}`} />
         {isClientPortal && <span className="text-sm font-semibold tracking-wider pr-1">What's New</span>}
@@ -43,7 +43,7 @@ export function WhatsNewBulb({ isClientPortal = false }) {
                 </div>
                 <div>
                   <h3 className="text-xl font-black text-white tracking-widest uppercase">Idea Spark</h3>
-                  <p className="text-xs text-amber-400/80 uppercase tracking-widest mt-1">Netra OS v2.4 Update</p>
+                  <p className="text-xs text-amber-400/80 uppercase tracking-widest mt-1">Netra OS v2.5.1 Update</p>
                 </div>
                 <button onClick={() => setIsOpen(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-white p-2">
                   <X className="w-5 h-5" />
@@ -60,16 +60,16 @@ export function WhatsNewBulb({ isClientPortal = false }) {
                   <li className="flex gap-3 items-start">
                     <CheckCircle2 className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="text-sm font-bold text-white">Global Asset Vault</h4>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Securely share and comment on project-independent files with integrated locking and watermarking.</p>
+                      <h4 className="text-sm font-bold text-white">Refined System Alerts</h4>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">The system alert window now utilizes full-screen real estate with dynamic layout centering and extended viewing space.</p>
                     </div>
                   </li>
                   {!isClientPortal && (
                     <li className="flex gap-3 items-start">
                       <CheckCircle2 className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
                       <div>
-                        <h4 className="text-sm font-bold text-white">Smart Deadline Reminders</h4>
-                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Snooze critical system alerts dynamically by minutes or hours so they don't clutter your view.</p>
+                        <h4 className="text-sm font-bold text-white">Enhanced UI Consistency</h4>
+                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Layout upgrades ensure perfect column alignment and smooth responsive behavior across the admin modules.</p>
                       </div>
                     </li>
                   )}

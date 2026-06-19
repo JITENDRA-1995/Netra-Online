@@ -330,6 +330,22 @@ export const sendClientChatMessage = async (projectId, senderName, content) => {
       }
     ]);
 
+  // Insert system alert notification for the Admin
+  if ((senderName || '').toLowerCase() !== 'admin') {
+    // We need the client_id. The easiest way is to fetch it from the project, 
+    // or just pass it. Since we only have projectId here, let's fetch client_id.
+    const { data: proj } = await supabase.from('projects').select('client_id').eq('id', projectId).single();
+    if (proj && proj.client_id) {
+      await supabase.from('client_notifications').insert([{
+        client_id: proj.client_id,
+        type: 'communication',
+        title: 'New Client Message',
+        message: `${senderName || 'Client'} sent: "${content.substring(0, 50)}${content.length > 50 ? '...' : ''}"`,
+        is_read: false
+      }]);
+    }
+  }
+
   return data;
 };
 

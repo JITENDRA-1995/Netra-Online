@@ -104,13 +104,15 @@ export const getProjects = async () => {
         .map(l => ({ action: l.action, time: new Date(l.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) })),
       collaborationStream: (project.project_chats || [])
         .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-        .map(c => ({ id: c.id, sender: c.sender, text: c.message, time: new Date(c.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) })),
+        .map(c => ({ id: c.id, sender: c.sender, text: c.message, time: new Date(c.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }), raw_date: new Date(c.created_at).getTime() })),
       mediaVault: (project.project_media || []).map(m => ({
         id: m.id,
         name: m.file_name,
         url: m.file_url,
         type: m.file_type,
-        time: new Date(m.uploaded_at).toLocaleDateString()
+        time: new Date(m.uploaded_at).toLocaleDateString(),
+        raw_date: new Date(m.uploaded_at).getTime(),
+        uploaded_by: m.uploaded_by
       }))
     };
   });
@@ -396,6 +398,38 @@ export const subscribeToChats = (projectId, onMessageReceived) => {
 };
 
 /**
+ * Listen to all real-time chat messages globally
+ */
+export const subscribeToAllChats = (onMessageReceived) => {
+  return supabase
+    .channel('project-chats-global')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'project_chats' },
+      (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const msg = payload.new;
+          onMessageReceived({
+            id: msg.id,
+            project_id: msg.project_id,
+            sender: msg.sender,
+            text: msg.message,
+            time: new Date(msg.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+            raw_date: new Date(msg.created_at).getTime(),
+            eventType: 'INSERT'
+          });
+        } else if (payload.eventType === 'DELETE') {
+          onMessageReceived({
+            id: payload.old.id,
+            eventType: 'DELETE'
+          });
+        }
+      }
+    )
+    .subscribe();
+};
+
+/**
  * Clear all chat messages for a project
  */
 export const clearProjectChats = async (projectId) => {
@@ -462,6 +496,35 @@ export const uploadMediaVaultAsset = async (projectId, file, fileName) => {
     name: data.file_name,
     url: data.file_url,
     type: data.file_type,
-    time: new Date(data.uploaded_at).toLocaleDateString()
+    time: new Date(data.uploaded_at).toLocaleDateString(),
+    raw_date: new Date(data.uploaded_at).getTime(),
+    uploaded_by: data.uploaded_by
   };
+};
+
+/**
+ * Listen to all real-time media uploads globally
+ */
+export const subscribeToAllMedia = (onMediaReceived) => {
+  return supabase
+    .channel('project-media-global')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'project_media' },
+      (payload) => {
+        const m = payload.new;
+        onMediaReceived({
+          id: m.id,
+          project_id: m.project_id,
+          name: m.file_name,
+          url: m.file_url,
+          type: m.file_type,
+          time: new Date(m.uploaded_at).toLocaleDateString(),
+          raw_date: new Date(m.uploaded_at).getTime(),
+          uploaded_by: m.uploaded_by,
+          eventType: 'INSERT'
+        });
+      }
+    )
+    .subscribe();
 };
