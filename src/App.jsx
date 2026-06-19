@@ -3618,6 +3618,10 @@ function App() {
         mediaVault: [],
         collaborationStream: [
           { id: 1, sender: "SYSTEM", text: "Project Ignited", time: new Date().toLocaleTimeString() }
+        ],
+        activityLog: [
+          { action: "Project Ignited", time: new Date().toLocaleTimeString(), raw_date: new Date().getTime() },
+          { action: "Progress Updated to 20%", time: new Date().toLocaleTimeString(), raw_date: new Date().getTime() }
         ]
       };
 
@@ -4061,6 +4065,13 @@ function App() {
           }
         }
 
+        const activityLogsToPrepend = [...newMilestoneLogs];
+        if (updatedFields.progress !== undefined && updatedFields.progress !== p.progress) {
+          const progMsg = `Progress Updated to ${updatedFields.progress}%`;
+          addProjectActivityLog(projectId, progMsg).catch(console.warn);
+          activityLogsToPrepend.unshift({ action: progMsg, time: new Date().toLocaleTimeString(), raw_date: new Date().getTime() });
+        }
+
         const updatedMilestones = (p.milestones || []).map((m, idx) => ({
           ...m,
           completed: idx <= maxPos
@@ -4071,7 +4082,7 @@ function App() {
           ...updatedFields,
           milestones: updatedMilestones,
           activityLog: [
-            ...newMilestoneLogs,
+            ...activityLogsToPrepend,
             ...(p.activityLog || [])
           ]
         };
@@ -4139,17 +4150,35 @@ function App() {
 
     try {
       await updateProjectState(projectId, updatedFields);
+      
+      const actionMsg = `Progress Updated to ${newProgress}%`;
+      await addProjectActivityLog(projectId, actionMsg);
+
+      let maxPos = -1;
+      const nextStageCalc = updatedFields.stage !== undefined ? updatedFields.stage : project.stage;
+      const nextStatusCalc = nextStageCalc === 4 && newProgress === 100 ? "Completed" : project.status;
+      
+      if (nextStatusCalc === "Completed" || newProgress >= 100 || nextStageCalc >= 5) maxPos = 4;
+      else if (newProgress >= 80 || nextStageCalc >= 4) maxPos = 3;
+      else if (newProgress >= 60 || nextStageCalc >= 3) maxPos = 2;
+      else if (newProgress >= 40 || nextStageCalc >= 2) maxPos = 1;
+      else if (newProgress >= 20 || nextStageCalc >= 1) maxPos = 0;
+
+      const newMilestoneLogs = [];
+      if (project.milestones) {
+        for (let idx = 0; idx < project.milestones.length; idx++) {
+          if (!project.milestones[idx].completed && idx <= maxPos) {
+            const mMsg = `Milestone Achieved: ${project.milestones[idx].name}`;
+            await addProjectActivityLog(projectId, mMsg);
+            newMilestoneLogs.unshift({ action: mMsg, time: new Date().toLocaleTimeString(), raw_date: new Date().getTime() });
+          }
+        }
+      }
+
       setIgnitionQueue(prev => prev.map(p => {
         if (p.id === projectId) {
           const nextStage = updatedFields.stage !== undefined ? updatedFields.stage : p.stage;
           const nextStatus = nextStage === 4 && newProgress === 100 ? "Completed" : p.status;
-
-          let maxPos = -1;
-          if (nextStatus === "Completed" || newProgress >= 100 || nextStage >= 5) maxPos = 4;
-          else if (newProgress >= 80 || nextStage >= 4) maxPos = 3;
-          else if (newProgress >= 60 || nextStage >= 3) maxPos = 2;
-          else if (newProgress >= 40 || nextStage >= 2) maxPos = 1;
-          else if (newProgress >= 20 || nextStage >= 1) maxPos = 0;
 
           const updatedMilestones = (p.milestones || []).map((m, idx) => ({
             ...m,
@@ -4159,7 +4188,12 @@ function App() {
           return {
             ...p,
             ...updatedFields,
-            milestones: updatedMilestones
+            milestones: updatedMilestones,
+            activityLog: [
+              ...newMilestoneLogs,
+              { action: actionMsg, time: new Date().toLocaleTimeString(), raw_date: new Date().getTime() },
+              ...(p.activityLog || [])
+            ]
           };
         }
         return p;

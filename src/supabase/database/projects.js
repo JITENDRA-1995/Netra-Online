@@ -100,7 +100,7 @@ export const getProjects = async () => {
           }));
       })(),
       activityLog: (project.project_activity_logs || [])
-        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         .map(l => ({ action: l.action, time: new Date(l.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }), raw_date: new Date(l.created_at).getTime() })),
       collaborationStream: (project.project_chats || [])
         .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
@@ -178,7 +178,8 @@ export const igniteProject = async (projectData) => {
   const { error: lError } = await supabase
     .from('project_activity_logs')
     .insert([
-      { project_id: project.id, action: 'Project Ignited' }
+      { project_id: project.id, action: 'Project Ignited' },
+      { project_id: project.id, action: `Progress Updated to ${project.progress}%` }
     ]);
 
   if (lError) throw lError;

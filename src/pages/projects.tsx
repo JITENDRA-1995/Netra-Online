@@ -1547,31 +1547,41 @@ export default function Projects({
                       ) : (
                         <>
                           <div className="flex items-center gap-2.5 flex-wrap">
-                            <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5">
-                              <span>Visionary:</span>
-                              <strong className="text-black font-extrabold bg-white px-2 py-0.5 rounded-md border border-white/20 shadow-sm">{clientName}</strong>
+                            <h3 className="font-bold text-sm flex items-center gap-1.5">
+                              <span className="text-muted-foreground font-normal">Visionary:</span>
+                              <Badge
+                                className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5"
+                                style={{
+                                  background: `${categoryColor}15`,
+                                  color: categoryColor,
+                                }}
+                              >
+                                {clientName}
+                              </Badge>
                             </h3>
                             <Badge
-                              className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5"
+                              className="text-3xs uppercase tracking-wider font-black border px-2 py-0.5 shadow-sm"
                               style={{
-                                background: `${statusColor}15`,
+                                borderColor: `${statusColor}30`,
                                 color: statusColor,
+                                background: "transparent"
                               }}
                             >
                               {statusVal.replace("_", " ")}
                             </Badge>
                             <Badge
-                              className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5"
+                              className="text-3xs uppercase tracking-wider font-black border px-2 py-0.5 shadow-sm"
                               style={{
-                                background: `${categoryColor}15`,
+                                borderColor: `${categoryColor}30`,
                                 color: categoryColor,
+                                background: "transparent"
                               }}
                             >
                               {categoryVal.replace("_", " ")}
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 flex-wrap">
-                            <span>Service: <strong className="text-foreground">{serviceName}</strong></span>
+                            <span>Service: <strong className="font-bold text-black bg-white px-2 py-0.5 rounded-md border border-white/20 shadow-sm">{serviceName}</strong></span>
                             {project.deadline && (
                               <>
                                 <span>·</span>
