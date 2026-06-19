@@ -101,7 +101,7 @@ export const getProjects = async () => {
       })(),
       activityLog: (project.project_activity_logs || [])
         .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-        .map(l => ({ action: l.action, time: new Date(l.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) })),
+        .map(l => ({ action: l.action, time: new Date(l.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }), raw_date: new Date(l.created_at).getTime() })),
       collaborationStream: (project.project_chats || [])
         .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
         .map(c => ({ id: c.id, sender: c.sender, text: c.message, time: new Date(c.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }), raw_date: new Date(c.created_at).getTime() })),

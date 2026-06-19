@@ -1368,9 +1368,10 @@ function App() {
     return notifs.sort((a, b) => b.raw_date - a.raw_date);
   }, [ignitionQueue, clients, readClientNotifs]);
 
-  const markClientNotifAsRead = (id) => {
+  const markClientNotifAsRead = (ids) => {
+    const idArray = Array.isArray(ids) ? ids : [ids];
     setReadClientNotifs(prev => {
-      const next = [...prev, id];
+      const next = [...prev, ...idArray.filter(id => !prev.includes(id))];
       localStorage.setItem('netra_read_client_notifs', JSON.stringify(next));
       return next;
     });
@@ -1992,6 +1993,8 @@ function App() {
   const [microJobs, setMicroJobs] = useState([]);
   const [redirectBackToMicroJob, setRedirectBackToMicroJob] = useState(false);
   const [expandedWarningTab, setExpandedWarningTab] = useState(null); // 'DEADLINES' | 'INQUIRIES' | null
+  const [showClientNotifHistory, setShowClientNotifHistory] = useState(false);
+  const [expandedNotifGroup, setExpandedNotifGroup] = useState(null);
 
   const prevUnreadClientNotifsCountRef = useRef(0);
   useEffect(() => {
@@ -2591,10 +2594,12 @@ function App() {
                          isPromptOpenForProject ||
                          (trashItems || []).some(item => item.type === 'cashbook' && item.data && item.data.projectId === p.id && (item.data.isFinal || (item.data.desc && (item.data.desc.toLowerCase().startsWith('payment:') || item.data.desc.toLowerCase().startsWith('final payment:')))));
         if (!hasFinal && remainingDue > 0) {
+          const completionLog = (p.activityLog || []).find(l => l.action.toLowerCase().includes('completed') || l.action.toLowerCase().includes('final payment'));
+          const entryDate = completionLog?.raw_date ? new Date(completionLog.raw_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
           newEntries.push({
             id: Date.now() + Math.random(),
             projectId: p.id,
-            date: new Date().toISOString().split('T')[0],
+            date: entryDate,
             desc: `Payment: ${p.service} - ${p.name}`,
             amount: remainingDue,
             type: "INCOME",
@@ -3076,7 +3081,13 @@ function App() {
 
     window.addEventListener('popstate', handlePopState);
     if (!window.history.state) {
-      window.history.replaceState({ page: 'home' }, '');
+      if (localStorage.getItem('netra_admin_active') === 'true') {
+        window.history.replaceState({ page: 'admin', activeAdminModule: 'DASHBOARD', isAdminGridActive: false }, '');
+      } else if (localStorage.getItem('netra_client_active') === 'true') {
+        window.history.replaceState({ page: 'client-vault' }, '');
+      } else {
+        window.history.replaceState({ page: 'home' }, '');
+      }
     }
 
     return () => window.removeEventListener('popstate', handlePopState);
@@ -4610,6 +4621,7 @@ function App() {
                           if (link.id === "INQUIRIES") setShowInquiryBadge(false);
                           setProjectsSearchQuery("");
                           setInquiriesSearchQuery("");
+                          pushPageToHistory('admin', { activeAdminModule: link.id, isAdminGridActive: true });
                         }}
                         data-testid={`link-sidebar-${link.label.toLowerCase()}`}
                       >
@@ -5583,6 +5595,7 @@ function App() {
                                   setUnreadSparksCount(0);
                                   setShowInquiryBadge(false);
                                 }
+                                pushPageToHistory('admin', { activeAdminModule: card.id, isAdminGridActive: true });
                               }
                             }}
                           >
@@ -5666,6 +5679,7 @@ function App() {
                               if (clientName) setProjectsSearchQuery(clientName);
                               setSelectedProjectTab(project.id);
                               setActiveAdminModule("PROJECTS");
+                              pushPageToHistory('admin', { activeAdminModule: "PROJECTS", isAdminGridActive: true });
                             }}
                             onRedirectToClient={(projectId, clientId) => {
                               let targetClientName = null;
@@ -5679,6 +5693,7 @@ function App() {
                               if (targetClientName) {
                                 setClientsSearchQuery(targetClientName);
                                 setActiveAdminModule("CLIENTS");
+                                pushPageToHistory('admin', { activeAdminModule: "CLIENTS", isAdminGridActive: true });
                               }
                             }}
                             onOpenIgnitionModal={() => { setPrefillData(null); setIsIgnitionModalOpen(true); }}
@@ -5691,6 +5706,7 @@ function App() {
                             onFilterProjectsByClient={(clientName) => {
                               setProjectsSearchQuery(clientName);
                               setActiveAdminModule("PROJECTS");
+                              pushPageToHistory('admin', { activeAdminModule: "PROJECTS", isAdminGridActive: true });
                             }}
                             onRedirectToFinancialsProject={(p) => {
                               setLedgerSearch('');
@@ -5698,13 +5714,16 @@ function App() {
                               setRedirectFilterService(p.service || '');
                               setFinancialTab("PROJECTS");
                               setActiveAdminModule("FINANCIALS");
+                              pushPageToHistory('admin', { activeAdminModule: "FINANCIALS", isAdminGridActive: true });
                             }}
                             onOpenMicroJobModal={() => {
                               setRedirectBackToMicroJob(true);
                               setActiveAdminModule("PROJECTS");
+                              pushPageToHistory('admin', { activeAdminModule: "PROJECTS", isAdminGridActive: true });
                             }}
                             onOpenCreateInvoice={() => {
                               setActiveAdminModule("INVOICES");
+                              pushPageToHistory('admin', { activeAdminModule: "INVOICES", isAdminGridActive: true });
                             }}
                             onAddCashbookEntry={(entry) => {
                               setCashbookEntries(prev => [entry, ...prev]);
@@ -6341,16 +6360,7 @@ function App() {
                                 <div 
                                   className={`warning-details-card cursor-pointer hover:bg-white/5 transition-colors ${expandedWarningTab === 'DEADLINES' ? 'border-[#ff5e00]/40 bg-[#ff5e00]/5' : ''}`}
                                   onClick={() => {
-                                    if (flames.length === 1) {
-                                      setProjectsSearchQuery(getProjectClientName(flames[0]));
-                                      setSelectedProjectTab(flames[0].id);
-                                      setActiveAdminModule("PROJECTS");
-                                      setIsAdminGridActive(true);
-                                      setIsWarningDismissed(true);
-                                      pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: true });
-                                    } else if (flames.length > 1) {
-                                      setExpandedWarningTab(expandedWarningTab === 'DEADLINES' ? null : 'DEADLINES');
-                                    }
+                                    setExpandedWarningTab(expandedWarningTab === 'DEADLINES' ? null : 'DEADLINES');
                                   }}
                                 >
                                   <h3>PENDING DEADLINES</h3>
@@ -6359,15 +6369,7 @@ function App() {
                                 <div 
                                   className={`warning-details-card cursor-pointer hover:bg-white/5 transition-colors ${expandedWarningTab === 'INQUIRIES' ? 'border-cyan-500/40 bg-cyan-500/5' : ''}`}
                                   onClick={() => {
-                                    if (sparks.length === 1) {
-                                      setInquiriesSearchQuery(sparks[0].name || sparks[0].clientName);
-                                      setActiveAdminModule("INQUIRIES");
-                                      setIsAdminGridActive(true);
-                                      setIsWarningDismissed(true);
-                                      pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: true });
-                                    } else if (sparks.length > 1) {
-                                      setExpandedWarningTab(expandedWarningTab === 'INQUIRIES' ? null : 'INQUIRIES');
-                                    }
+                                    setExpandedWarningTab(expandedWarningTab === 'INQUIRIES' ? null : 'INQUIRIES');
                                   }}
                                 >
                                   <h3>NEW INQUIRIES</h3>
@@ -6445,15 +6447,25 @@ function App() {
                                   ))}
                                 </div>
                               )}
-                              {expandedWarningTab === 'CLIENT' && unreadClientNotifs.length > 0 && (
+                              {expandedWarningTab === 'CLIENT' && (
                                 <div className="expanded-warning-list flex flex-col border border-white/5 rounded-2xl p-4 bg-black/40 h-full overflow-y-auto space-y-1.5 text-left w-full">
-                                  <h4 className="text-3xs uppercase tracking-widest text-indigo-400 font-bold mb-2 border-b border-white/5 pb-1">Client Activity:</h4>
-                                  {unreadClientNotifs.map(n => (
-                                    <div 
-                                      key={n.id} 
-                                      className="p-2 hover:bg-white/5 rounded-xl cursor-pointer transition-colors text-xs flex justify-between items-center text-foreground"
-                                      onClick={() => {
-                                        markClientNotifAsRead(n.id);
+                                  <div className="flex justify-between items-center mb-2 border-b border-white/5 pb-1">
+                                    <h4 className="text-3xs uppercase tracking-widest text-indigo-400 font-bold m-0">Client Activity:</h4>
+                                    <button 
+                                      className="text-[10px] uppercase font-bold px-2 py-1 rounded bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition-colors"
+                                      onClick={() => setShowClientNotifHistory(!showClientNotifHistory)}
+                                    >
+                                      {showClientNotifHistory ? "Show Unread" : "History"}
+                                    </button>
+                                  </div>
+                                  {(() => {
+                                    const visibleNotifs = clientPortalNotifs.filter(n => showClientNotifHistory ? n.is_read : !n.is_read);
+                                    if (visibleNotifs.length === 0) {
+                                      return <p className="text-xs text-muted-foreground text-center py-4">No {showClientNotifHistory ? 'read' : 'unread'} notifications.</p>;
+                                    }
+                                    const groupedNotifs = visibleNotifs.reduce((acc, n) => {
+                                      const key = n.client_id ? `client-${n.client_id}` : `project-${n.project_id}`;
+                                      if (!acc[key]) {
                                         let targetClientName = null;
                                         if (n.type === 'Profile Update' || n.client_id) {
                                           const client = clients.find(c => c.id === n.client_id);
@@ -6462,24 +6474,67 @@ function App() {
                                           const project = ignitionQueue.find(p => p.id === n.project_id);
                                           if (project && project.client) targetClientName = project.client.name;
                                         }
-                                        
-                                        if (targetClientName) {
-                                          setClientsSearchQuery(targetClientName);
-                                          setActiveAdminModule("CLIENTS");
-                                          setIsAdminGridActive(true);
-                                          setIsWarningDismissed(true);
-                                          setExpandedWarningTab(null);
-                                          pushPageToHistory('admin', { activeAdminModule: 'CLIENTS', isAdminGridActive: true });
-                                        } else {
-                                          setIsWarningDismissed(true);
-                                          setExpandedWarningTab(null);
-                                        }
-                                      }}
-                                    >
-                                      <span className="font-semibold truncate pr-2">{n.message}</span>
-                                      <span className="text-3xs text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{n.type}</span>
-                                    </div>
-                                  ))}
+                                        acc[key] = {
+                                          id: key,
+                                          targetClientName: targetClientName || 'Unknown',
+                                          project_id: n.project_id,
+                                          client_id: n.client_id,
+                                          messages: []
+                                        };
+                                      }
+                                      acc[key].messages.push(n);
+                                      return acc;
+                                    }, {});
+
+                                    return Object.values(groupedNotifs).map(group => (
+                                      <div key={group.id} className="flex flex-col border border-white/5 rounded-xl bg-black/20 overflow-hidden">
+                                        <div 
+                                          className="p-2 cursor-pointer hover:bg-white/5 transition-colors flex justify-between items-center"
+                                          onClick={() => setExpandedNotifGroup(expandedNotifGroup === group.id ? null : group.id)}
+                                        >
+                                          <span className="font-bold text-xs text-indigo-300 truncate">{group.targetClientName}</span>
+                                          <span className="text-3xs text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{group.messages.length}</span>
+                                        </div>
+                                        <AnimatePresence>
+                                          {expandedNotifGroup === group.id && (
+                                            <motion.div
+                                              initial={{ height: 0, opacity: 0 }}
+                                              animate={{ height: 'auto', opacity: 1 }}
+                                              exit={{ height: 0, opacity: 0 }}
+                                              className="border-t border-white/5 bg-black/40 flex flex-col"
+                                            >
+                                              {group.messages.map(n => (
+                                                <div 
+                                                  key={n.id} 
+                                                  className="p-2 hover:bg-white/5 cursor-pointer transition-colors text-xs flex justify-between items-center text-foreground border-b border-white/5 last:border-0"
+                                                  onClick={() => {
+                                                    const allIdsInGroup = group.messages.map(m => m.id);
+                                                    markClientNotifAsRead(allIdsInGroup);
+                                                    
+                                                    let targetClientName = group.targetClientName;
+                                                    if (targetClientName && targetClientName !== 'Unknown') {
+                                                      setClientsSearchQuery(targetClientName);
+                                                      setActiveAdminModule("CLIENTS");
+                                                      setIsAdminGridActive(true);
+                                                      setIsWarningDismissed(true);
+                                                      setExpandedWarningTab(null);
+                                                      pushPageToHistory('admin', { activeAdminModule: 'CLIENTS', isAdminGridActive: true });
+                                                    } else {
+                                                      setIsWarningDismissed(true);
+                                                      setExpandedWarningTab(null);
+                                                    }
+                                                  }}
+                                                >
+                                                  <span className="font-semibold truncate pr-2 opacity-80">{n.message}</span>
+                                                  <span className="text-3xs text-indigo-400/60 uppercase tracking-wider">{n.type}</span>
+                                                </div>
+                                              ))}
+                                            </motion.div>
+                                          )}
+                                        </AnimatePresence>
+                                      </div>
+                                    ));
+                                  })()}
                                 </div>
                               )}
                             </div>
@@ -7104,62 +7159,115 @@ function App() {
                         )}
                       </div>
                     ) : notifTab === 'CLIENT' ? (
-                      <div className="notif-list">
-                        {clientPortalNotifs.length > 0 ? (
-                          clientPortalNotifs.map(n => (
-                            <div 
-                              key={n.id} 
-                              className={`notif-card flex justify-between items-center ${n.is_read ? 'opacity-65' : ''}`}
-                              onClick={() => {
-                                markClientNotifAsRead(n.id);
-                                let targetClientName = null;
-                                if (n.type === 'Profile Update' || n.client_id) {
-                                  const client = clients.find(c => c.id === n.client_id);
-                                  if (client) targetClientName = client.name;
-                                } else {
-                                  const project = ignitionQueue.find(p => p.id === n.project_id);
-                                  if (project && project.client) targetClientName = project.client.name;
-                                }
-                                
-                                if (targetClientName) {
-                                  setClientsSearchQuery(targetClientName);
-                                  setActiveAdminModule("CLIENTS");
-                                  setIsAdminGridActive(true);
-                                  setIsNotificationOpen(false);
-                                  pushPageToHistory('admin', { activeAdminModule: 'CLIENTS', isAdminGridActive: true });
-                                } else {
-                                  setIsNotificationOpen(false);
-                                }
-                              }}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className={`notif-icon-box ${n.is_read ? 'grayscale' : 'indigo'}`}>✦</div>
-                                <div className="notif-info">
-                                  <p className="notif-msg">{n.message}</p>
-                                  <span className="notif-time">{n.type}</span>
-                                </div>
+                      <div className="notif-list relative">
+                        <div className="flex justify-between items-center mb-4 px-2">
+                          <span className="text-xs uppercase tracking-widest text-muted-foreground font-bold">Communications</span>
+                          <button 
+                            className="text-[10px] uppercase font-bold px-2 py-1 rounded bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition-colors"
+                            onClick={() => setShowClientNotifHistory(!showClientNotifHistory)}
+                          >
+                            {showClientNotifHistory ? "Show Unread" : "History"}
+                          </button>
+                        </div>
+                        {(() => {
+                          const visibleNotifs = clientPortalNotifs.filter(n => showClientNotifHistory ? n.is_read : !n.is_read);
+                          if (visibleNotifs.length === 0) {
+                            return (
+                              <div className="text-center text-muted-foreground/30 py-20 flex flex-col items-center gap-4">
+                                <span className="empty-icon text-indigo-500/20">✦</span>
+                                <span className="text-xs uppercase tracking-widest text-balance leading-relaxed">
+                                  No {showClientNotifHistory ? 'read' : 'unread'} client activity.
+                                </span>
                               </div>
-                              {!n.is_read && (
-                                <button
-                                  className="text-3xs uppercase tracking-wider text-indigo-400 hover:text-indigo-300 font-extrabold px-2.5 py-1 rounded bg-indigo-400/10 border border-indigo-400/20 cursor-pointer"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    markClientNotifAsRead(n.id);
-                                  }}
-                                >
-                                  MARK READ
-                                </button>
-                              )}
+                            );
+                          }
+                          const groupedNotifs = visibleNotifs.reduce((acc, n) => {
+                            const key = n.client_id ? `client-${n.client_id}` : `project-${n.project_id}`;
+                            if (!acc[key]) {
+                              let targetClientName = null;
+                              if (n.type === 'Profile Update' || n.client_id) {
+                                const client = clients.find(c => c.id === n.client_id);
+                                if (client) targetClientName = client.name;
+                              } else {
+                                const project = ignitionQueue.find(p => p.id === n.project_id);
+                                if (project && project.client) targetClientName = project.client.name;
+                              }
+                              acc[key] = {
+                                id: key,
+                                targetClientName: targetClientName || 'Unknown',
+                                messages: []
+                              };
+                            }
+                            acc[key].messages.push(n);
+                            return acc;
+                          }, {});
+
+                          return Object.values(groupedNotifs).map(group => (
+                            <div key={group.id} className="flex flex-col mb-3 border border-white/5 rounded-xl bg-black/20 overflow-hidden">
+                              <div 
+                                className="p-3 cursor-pointer hover:bg-white/5 transition-colors flex justify-between items-center"
+                                onClick={() => setExpandedNotifGroup(expandedNotifGroup === group.id ? null : group.id)}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className={`notif-icon-box ${showClientNotifHistory ? 'grayscale' : 'indigo'}`}>✦</div>
+                                  <span className="font-bold text-sm text-indigo-300">{group.targetClientName}</span>
+                                </div>
+                                <span className="text-xs text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{group.messages.length}</span>
+                              </div>
+                              <AnimatePresence>
+                                {expandedNotifGroup === group.id && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="border-t border-white/5 bg-black/40 flex flex-col"
+                                  >
+                                    {group.messages.map(n => (
+                                      <div 
+                                        key={n.id} 
+                                        className={`notif-card flex justify-between items-center border-b border-white/5 last:border-0 rounded-none m-0 bg-transparent hover:bg-white/5 transition-colors ${n.is_read ? 'opacity-65' : ''}`}
+                                        onClick={() => {
+                                          const allIdsInGroup = group.messages.map(m => m.id);
+                                          markClientNotifAsRead(allIdsInGroup);
+                                          
+                                          let targetClientName = group.targetClientName;
+                                          if (targetClientName && targetClientName !== 'Unknown') {
+                                            setClientsSearchQuery(targetClientName);
+                                            setActiveAdminModule("CLIENTS");
+                                            setIsAdminGridActive(true);
+                                            setIsNotificationOpen(false);
+                                            pushPageToHistory('admin', { activeAdminModule: 'CLIENTS', isAdminGridActive: true });
+                                          } else {
+                                            setIsNotificationOpen(false);
+                                          }
+                                        }}
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <div className="notif-info">
+                                            <p className="notif-msg">{n.message}</p>
+                                            <span className="notif-time">{n.type}</span>
+                                          </div>
+                                        </div>
+                                        {!n.is_read && (
+                                          <button
+                                            className="text-3xs uppercase tracking-wider text-indigo-400 hover:text-indigo-300 font-extrabold px-2.5 py-1 rounded bg-indigo-400/10 border border-indigo-400/20 cursor-pointer"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              const allIdsInGroup = group.messages.map(m => m.id);
+                                              markClientNotifAsRead(allIdsInGroup);
+                                            }}
+                                          >
+                                            MARK READ
+                                          </button>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
                             </div>
-                          ))
-                        ) : (
-                          <div className="text-center text-muted-foreground/30 py-20 flex flex-col items-center gap-4">
-                            <span className="empty-icon text-indigo-500/20">✦</span>
-                            <span className="text-xs uppercase tracking-widest text-balance leading-relaxed">
-                              No recent client activity.
-                            </span>
-                          </div>
-                        )}
+                          ));
+                        })()}
                       </div>
                     ) : null}
                   </div>
@@ -7515,7 +7623,7 @@ function App() {
                             <div style={{ textAlign: 'right' }}>
                               <label style={{ fontSize: '0.65rem', color: '#888', letterSpacing: '1px', display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>INVOICE DETAILS</label>
                               <p style={{ margin: 0, fontSize: '0.9rem' }}><strong>Invoice #:</strong> {stableInvoiceNo}</p>
-                              <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem' }}><strong>Issue Date:</strong> {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                              <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem' }}><strong>Issue Date:</strong> {new Date(invoiceProject.issueDate || invoiceProject.createdAt || Date.now()).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                             </div>
                           </div>
 
