@@ -2129,9 +2129,16 @@ function App() {
 
     const newInvoice = {
       invoiceNo: invNo,
+      issueDate: (() => {
+                                  const isCompleted = (invoiceProject.status || '').toLowerCase() === 'completed';
+                                  if (isCompleted) {
+                                    const completionLog = (invoiceProject.activityLog || invoiceProject.rawProject?.activityLog || []).find(l => l.action.toLowerCase().includes('completed') || l.action.toLowerCase().includes('final payment'));
+                                    if (completionLog?.raw_date) return new Date(completionLog.raw_date).toISOString();
+                                  }
+                                  return invoiceProject.issueDate || (invoiceProject.createdAt ? new Date(invoiceProject.createdAt).toISOString() : new Date().toISOString());
+                                })(),
       clientName: clientNamePayload,
       projectService: p.service,
-      issueDate: new Date().toISOString().split('T')[0],
       grandTotal: grandTotal,
       projectId: isBatch ? null : p.id
     };
@@ -2555,13 +2562,15 @@ function App() {
 
       // A. Advance payment verification
       if (advance > 0 && !isCancelled) {
-        const hasAdvance = newEntries.some(entry => entry.projectId === p.id && (entry.isAdvance || entry.desc.toLowerCase().startsWith('advance:') || entry.desc.toLowerCase().startsWith('advance payment:'))) ||
-                           (trashItems || []).some(item => item.type === 'cashbook' && item.data && item.data.projectId === p.id && (item.data.isAdvance || (item.data.desc && (item.data.desc.toLowerCase().startsWith('advance:') || item.data.desc.toLowerCase().startsWith('advance payment:')))));
-        if (!hasAdvance) {
+        const advanceEntryIndex = newEntries.findIndex(entry => entry.projectId === p.id && (entry.isAdvance || entry.desc.toLowerCase().startsWith('advance:') || entry.desc.toLowerCase().startsWith('advance payment:')));
+        const isAdvanceInTrash = (trashItems || []).some(item => item.type === 'cashbook' && item.data && item.data.projectId === p.id && (item.data.isAdvance || (item.data.desc && (item.data.desc.toLowerCase().startsWith('advance:') || item.data.desc.toLowerCase().startsWith('advance payment:')))));
+        const trueAdvanceDate = p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+
+        if (advanceEntryIndex === -1 && !isAdvanceInTrash) {
           newEntries.push({
             id: Date.now() + Math.random(),
             projectId: p.id,
-            date: p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            date: trueAdvanceDate,
             desc: `Advance: ${p.service} - ${p.name}`,
             amount: advance,
             type: "INCOME",
@@ -2569,6 +2578,9 @@ function App() {
             category: "Project",
             isAdvance: true
           });
+          updated = true;
+        } else if (advanceEntryIndex !== -1 && newEntries[advanceEntryIndex].date !== trueAdvanceDate) {
+          newEntries[advanceEntryIndex] = { ...newEntries[advanceEntryIndex], date: trueAdvanceDate };
           updated = true;
         }
       }
@@ -2590,16 +2602,17 @@ function App() {
       // B. Final payment verification
       if (isCompleted) {
         const isPromptOpenForProject = customPaymentPrompt && customPaymentPrompt.p.id === p.id;
-        const hasFinal = newEntries.some(entry => entry.projectId === p.id && (entry.isFinal || entry.desc.toLowerCase().startsWith('payment:') || entry.desc.toLowerCase().startsWith('final payment:'))) ||
-                         isPromptOpenForProject ||
-                         (trashItems || []).some(item => item.type === 'cashbook' && item.data && item.data.projectId === p.id && (item.data.isFinal || (item.data.desc && (item.data.desc.toLowerCase().startsWith('payment:') || item.data.desc.toLowerCase().startsWith('final payment:')))));
-        if (!hasFinal && remainingDue > 0) {
-          const completionLog = (p.activityLog || []).find(l => l.action.toLowerCase().includes('completed') || l.action.toLowerCase().includes('final payment'));
-          const entryDate = completionLog?.raw_date ? new Date(completionLog.raw_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+        const finalEntriesIndex = newEntries.findIndex(entry => entry.projectId === p.id && (entry.isFinal || entry.desc.toLowerCase().startsWith('payment:') || entry.desc.toLowerCase().startsWith('final payment:')));
+        const isFinalInTrash = (trashItems || []).some(item => item.type === 'cashbook' && item.data && item.data.projectId === p.id && (item.data.isFinal || (item.data.desc && (item.data.desc.toLowerCase().startsWith('payment:') || item.data.desc.toLowerCase().startsWith('final payment:')))));
+        
+        const completionLog = (p.activityLog || []).find(l => l.action.toLowerCase().includes('completed') || l.action.toLowerCase().includes('final payment'));
+        const trueEntryDate = completionLog?.raw_date ? new Date(completionLog.raw_date).toISOString().split('T')[0] : p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+
+        if (finalEntriesIndex === -1 && remainingDue > 0 && !isPromptOpenForProject && !isFinalInTrash) {
           newEntries.push({
             id: Date.now() + Math.random(),
             projectId: p.id,
-            date: entryDate,
+            date: trueEntryDate,
             desc: `Payment: ${p.service} - ${p.name}`,
             amount: remainingDue,
             type: "INCOME",
@@ -2607,6 +2620,9 @@ function App() {
             category: "Project",
             isFinal: true
           });
+          updated = true;
+        } else if (finalEntriesIndex !== -1 && newEntries[finalEntriesIndex].date !== trueEntryDate) {
+          newEntries[finalEntriesIndex] = { ...newEntries[finalEntriesIndex], date: trueEntryDate };
           updated = true;
         }
       }
@@ -7623,7 +7639,15 @@ function App() {
                             <div style={{ textAlign: 'right' }}>
                               <label style={{ fontSize: '0.65rem', color: '#888', letterSpacing: '1px', display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>INVOICE DETAILS</label>
                               <p style={{ margin: 0, fontSize: '0.9rem' }}><strong>Invoice #:</strong> {stableInvoiceNo}</p>
-                              <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem' }}><strong>Issue Date:</strong> {new Date(invoiceProject.issueDate || invoiceProject.createdAt || Date.now()).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                              <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem' }}><strong>Issue Date:</strong> {(() => {
+                                const isCompleted = (invoiceProject.status || '').toLowerCase() === 'completed';
+                                let finalDate = invoiceProject.issueDate || invoiceProject.createdAt || Date.now();
+                                if (isCompleted) {
+                                  const completionLog = (invoiceProject.activityLog || invoiceProject.rawProject?.activityLog || []).find(l => l.action.toLowerCase().includes('completed') || l.action.toLowerCase().includes('final payment'));
+                                  if (completionLog?.raw_date) finalDate = completionLog.raw_date;
+                                }
+                                return new Date(finalDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                              })()}</p>
                             </div>
                           </div>
 
