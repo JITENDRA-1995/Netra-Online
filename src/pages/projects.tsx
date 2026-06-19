@@ -1472,60 +1472,139 @@ export default function Projects({
                       {categoryVal.slice(0, 2)}
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2.5 flex-wrap">
-                        <h3 className="font-bold text-foreground text-sm">{serviceName}</h3>
-                        <Badge
-                          className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5"
-                          style={{
-                            background: `${statusColor}15`,
-                            color: statusColor,
-                          }}
-                        >
-                          {statusVal.replace("_", " ")}
-                        </Badge>
-                        <Badge
-                          className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5"
-                          style={{
-                            background: `${categoryColor}15`,
-                            color: categoryColor,
-                          }}
-                        >
-                          {categoryVal.replace("_", " ")}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 flex-wrap">
-                        <span>Visionary: <strong className="text-black font-extrabold bg-white px-2 py-0.5 rounded-md border border-white/20 shadow-sm">{clientName}</strong></span>
-                        {project.deadline && (
-                          <>
-                            <span>·</span>
-                            {isProjectActive ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.2)] animate-pulse-glow">
-                                <span className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
-                                DUE {new Date(project.deadline).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {layoutMode === "grid" ? (
+                        <div className="flex flex-col gap-2">
+                          {/* Row 1: Visionary Name (styled like service tag) */}
+                          <div className="flex items-center">
+                            <span className="text-xs text-muted-foreground mr-1.5">Visionary:</span>
+                            <Badge
+                              className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5"
+                              style={{
+                                background: `${categoryColor}15`,
+                                color: categoryColor,
+                              }}
+                            >
+                              {clientName}
+                            </Badge>
+                          </div>
+                          {/* Row 2: Service Details (Project Name / Category, styled like visionary name) */}
+                          <div className="flex items-center">
+                            <h3 className="font-bold text-sm text-black bg-white px-2 py-0.5 rounded-md border border-white/20 shadow-sm">{serviceName}</h3>
+                          </div>
+                          {/* Row 3: Status and Service Tag (styled with a thin border and colored text) */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge
+                              className="text-3xs uppercase tracking-wider font-black border px-2 py-0.5 shadow-sm"
+                              style={{
+                                borderColor: `${statusColor}30`,
+                                color: statusColor,
+                                background: "transparent"
+                              }}
+                            >
+                              {statusVal.replace("_", " ")}
+                            </Badge>
+                            <Badge
+                              className="text-3xs uppercase tracking-wider font-black border px-2 py-0.5 shadow-sm"
+                              style={{
+                                borderColor: `${categoryColor}30`,
+                                color: categoryColor,
+                                background: "transparent"
+                              }}
+                            >
+                              {categoryVal.replace("_", " ")}
+                            </Badge>
+                          </div>
+                          {/* Row 4: Due Date and Priority */}
+                          <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                            {project.deadline && (
+                              isProjectActive ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.2)] animate-pulse-glow">
+                                  <span className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
+                                  DUE {new Date(project.deadline).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Due {new Date(project.deadline).toLocaleDateString("en-IN")}</span>
+                              )
+                            )}
+                            {project.priority === "High" ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_12px_rgba(239,68,68,0.2)] animate-pulse-glow">
+                                <span className="w-1 h-1 rounded-full bg-red-400 animate-ping" />
+                                HIGH PRIORITY
+                              </span>
+                            ) : project.priority === "Low" ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-500/10 text-slate-400 border border-slate-500/20">
+                                <span className="w-1 h-1 rounded-full bg-slate-400" />
+                                LOW PRIORITY
                               </span>
                             ) : (
-                              <span>Due {new Date(project.deadline).toLocaleDateString()}</span>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_12px_rgba(6,182,212,0.2)]">
+                                <span className="w-1 h-1 rounded-full bg-cyan-400" />
+                                NORMAL PRIORITY
+                              </span>
                             )}
-                          </>
-                        )}
-                        <span>·</span>
-                        {project.priority === "High" ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_12px_rgba(239,68,68,0.2)] animate-pulse-glow">
-                            <span className="w-1 h-1 rounded-full bg-red-400 animate-ping" />
-                            HIGH PRIORITY
-                          </span>
-                        ) : project.priority === "Low" ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-500/10 text-slate-400 border border-slate-500/20">
-                            <span className="w-1 h-1 rounded-full bg-slate-400" />
-                            LOW PRIORITY
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_12px_rgba(6,182,212,0.2)]">
-                            <span className="w-1 h-1 rounded-full bg-cyan-400" />
-                            NORMAL PRIORITY
-                          </span>
-                        )}
-                      </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5">
+                              <span>Visionary:</span>
+                              <strong className="text-black font-extrabold bg-white px-2 py-0.5 rounded-md border border-white/20 shadow-sm">{clientName}</strong>
+                            </h3>
+                            <Badge
+                              className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5"
+                              style={{
+                                background: `${statusColor}15`,
+                                color: statusColor,
+                              }}
+                            >
+                              {statusVal.replace("_", " ")}
+                            </Badge>
+                            <Badge
+                              className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5"
+                              style={{
+                                background: `${categoryColor}15`,
+                                color: categoryColor,
+                              }}
+                            >
+                              {categoryVal.replace("_", " ")}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 flex-wrap">
+                            <span>Service: <strong className="text-foreground">{serviceName}</strong></span>
+                            {project.deadline && (
+                              <>
+                                <span>·</span>
+                                {isProjectActive ? (
+                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.2)] animate-pulse-glow">
+                                    <span className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
+                                    DUE {new Date(project.deadline).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}
+                                  </span>
+                                ) : (
+                                  <span>Due {new Date(project.deadline).toLocaleDateString()}</span>
+                                )}
+                              </>
+                            )}
+                            <span>·</span>
+                            {project.priority === "High" ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_12px_rgba(239,68,68,0.2)] animate-pulse-glow">
+                                <span className="w-1 h-1 rounded-full bg-red-400 animate-ping" />
+                                HIGH PRIORITY
+                              </span>
+                            ) : project.priority === "Low" ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-500/10 text-slate-400 border border-slate-500/20">
+                                <span className="w-1 h-1 rounded-full bg-slate-400" />
+                                LOW PRIORITY
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_12px_rgba(6,182,212,0.2)]">
+                                <span className="w-1 h-1 rounded-full bg-cyan-400" />
+                                NORMAL PRIORITY
+                              </span>
+                            )}
+                          </p>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -2873,12 +2952,23 @@ export default function Projects({
                   <span className="text-3xs uppercase tracking-widest text-muted-foreground block mb-1">Advance Amount</span>
                   <span className="text-sm font-bold text-emerald-400">₹{(parseFloat(viewingProject.advanceAmount) || 0).toLocaleString()}</span>
                 </div>
-                <div className="bg-white/5 border border-white/5 rounded-xl p-3">
-                  <span className="text-3xs uppercase tracking-widest text-muted-foreground block mb-1">Remaining Balance</span>
-                  <span className="text-sm font-bold text-cyan-400">
-                    ₹{Math.max(0, ((viewingProject.budget !== undefined ? viewingProject.budget : (parseFloat(viewingProject.quote) || 0)) - (parseFloat(viewingProject.discount) || 0) - (parseFloat(viewingProject.advanceAmount) || 0))).toLocaleString()}
-                  </span>
-                </div>
+                {(() => {
+                  const targetVal = viewingProject.budget !== undefined ? viewingProject.budget : (parseFloat(viewingProject.quote) || 0);
+                  const discount = parseFloat(viewingProject.discount) || 0;
+                  const advance = parseFloat(viewingProject.advanceAmount) || 0;
+                  const balance = Math.max(0, targetVal - discount - advance);
+                  const isCompletedAndPaid = (viewingProject.status || "").toLowerCase() === "completed" && balance === 0;
+                  return (
+                    <div className="bg-white/5 border border-white/5 rounded-xl p-3">
+                      <span className="text-3xs uppercase tracking-widest text-muted-foreground block mb-1">
+                        {isCompletedAndPaid ? "Received Amount" : "Remaining Balance"}
+                      </span>
+                      <span className="text-sm font-bold text-cyan-400">
+                        ₹{(isCompletedAndPaid ? (targetVal - discount) : balance).toLocaleString()}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Progress Stepper & Milestones */}
@@ -2938,7 +3028,9 @@ export default function Projects({
                     {viewingProject.activityLog.map((log: any, idx: number) => (
                       <div key={idx} className="flex items-start justify-between gap-4 text-3xs font-mono border-b border-white/5 pb-2 last:border-b-0 last:pb-0">
                         <span className="text-white/80 font-semibold">{log.action}</span>
-                        <span className="text-muted-foreground text-right shrink-0">{log.time}</span>
+                        <span className="text-muted-foreground text-right shrink-0">
+                          {log.raw_date ? new Date(log.raw_date).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : log.time}
+                        </span>
                       </div>
                     ))}
                   </div>

@@ -3294,15 +3294,26 @@ function App() {
       const actionMsg = `Transitioned to ${kanbanColumns[nextStage - 1].title}`;
       await addProjectActivityLog(projectId, actionMsg);
 
+      let maxPos = -1;
+      if (newStatus === "Completed" || nextStage >= 5) maxPos = 4;
+      else if (nextStage === 4) maxPos = 3;
+      else if (nextStage === 3) maxPos = 2;
+      else if (nextStage === 2) maxPos = 1;
+      else if (nextStage === 1) maxPos = 0;
+
+      const newMilestoneLogs = [];
+      if (project && project.milestones) {
+        for (let idx = 0; idx < project.milestones.length; idx++) {
+          if (!project.milestones[idx].completed && idx <= maxPos) {
+            const mMsg = `Milestone Achieved: ${project.milestones[idx].name}`;
+            await addProjectActivityLog(projectId, mMsg);
+            newMilestoneLogs.unshift({ action: mMsg, time: new Date().toLocaleTimeString(), raw_date: new Date().getTime() });
+          }
+        }
+      }
+
       setIgnitionQueue(prev => prev.map(p => {
         if (p.id === projectId) {
-          let maxPos = -1;
-          if (newStatus === "Completed" || nextStage >= 5) maxPos = 4;
-          else if (nextStage === 4) maxPos = 3;
-          else if (nextStage === 3) maxPos = 2;
-          else if (nextStage === 2) maxPos = 1;
-          else if (nextStage === 1) maxPos = 0;
-
           const updatedMilestones = (p.milestones || []).map((m, idx) => ({
             ...m,
             completed: idx <= maxPos
@@ -3314,7 +3325,8 @@ function App() {
             status: newStatus,
             milestones: updatedMilestones,
             activityLog: [
-              { action: actionMsg, time: new Date().toLocaleTimeString() },
+              ...newMilestoneLogs,
+              { action: actionMsg, time: new Date().toLocaleTimeString(), raw_date: new Date().getTime() },
               ...(p.activityLog || [])
             ]
           };
@@ -3379,15 +3391,26 @@ function App() {
       const actionMsg = `Status Updated to ${newStatus.toUpperCase()}`;
       await addProjectActivityLog(projectId, actionMsg);
 
+      let maxPos = -1;
+      if (newStatus === "Completed" || project.progress >= 100 || project.stage >= 5) maxPos = 4;
+      else if (project.progress >= 80 || project.stage >= 4) maxPos = 3;
+      else if (project.progress >= 60 || project.stage >= 3) maxPos = 2;
+      else if (project.progress >= 40 || project.stage >= 2) maxPos = 1;
+      else if (project.progress >= 20 || project.stage >= 1) maxPos = 0;
+
+      const newMilestoneLogs = [];
+      if (project && project.milestones) {
+        for (let idx = 0; idx < project.milestones.length; idx++) {
+          if (!project.milestones[idx].completed && idx <= maxPos) {
+            const mMsg = `Milestone Achieved: ${project.milestones[idx].name}`;
+            await addProjectActivityLog(projectId, mMsg);
+            newMilestoneLogs.unshift({ action: mMsg, time: new Date().toLocaleTimeString(), raw_date: new Date().getTime() });
+          }
+        }
+      }
+
       setIgnitionQueue(prev => prev.map(p => {
         if (p.id === projectId) {
-          let maxPos = -1;
-          if (newStatus === "Completed" || p.progress >= 100 || p.stage >= 5) maxPos = 4;
-          else if (p.progress >= 80 || p.stage >= 4) maxPos = 3;
-          else if (p.progress >= 60 || p.stage >= 3) maxPos = 2;
-          else if (p.progress >= 40 || p.stage >= 2) maxPos = 1;
-          else if (p.progress >= 20 || p.stage >= 1) maxPos = 0;
-
           const updatedMilestones = (p.milestones || []).map((m, idx) => ({
             ...m,
             completed: idx <= maxPos
@@ -3398,7 +3421,8 @@ function App() {
             status: newStatus,
             milestones: updatedMilestones,
             activityLog: [
-              { action: actionMsg, time: new Date().toLocaleTimeString() },
+              ...newMilestoneLogs,
+              { action: actionMsg, time: new Date().toLocaleTimeString(), raw_date: new Date().getTime() },
               ...(p.activityLog || [])
             ]
           };
@@ -3577,7 +3601,7 @@ function App() {
         status: "Active",
         priority: "Normal",
         alertMeDays: alertMeDays,
-        description: prefillData?.description || '',
+        description: formData.get('description') || prefillData?.description || '',
         deadline: formData.get('deadline'),
         isManual: true,
         client: { ...clientInfo, id: clientDbId },
@@ -4026,6 +4050,17 @@ function App() {
         else if (nextProgress >= 40 || nextStage >= 2) maxPos = 1;
         else if (nextProgress >= 20 || nextStage >= 1) maxPos = 0;
 
+        const newMilestoneLogs = [];
+        if (p.milestones) {
+          for (let idx = 0; idx < p.milestones.length; idx++) {
+            if (!p.milestones[idx].completed && idx <= maxPos) {
+              const mMsg = `Milestone Achieved: ${p.milestones[idx].name}`;
+              addProjectActivityLog(projectId, mMsg).catch(console.warn);
+              newMilestoneLogs.unshift({ action: mMsg, time: new Date().toLocaleTimeString(), raw_date: new Date().getTime() });
+            }
+          }
+        }
+
         const updatedMilestones = (p.milestones || []).map((m, idx) => ({
           ...m,
           completed: idx <= maxPos
@@ -4034,7 +4069,11 @@ function App() {
         return {
           ...p,
           ...updatedFields,
-          milestones: updatedMilestones
+          milestones: updatedMilestones,
+          activityLog: [
+            ...newMilestoneLogs,
+            ...(p.activityLog || [])
+          ]
         };
       }
       return p;
@@ -6027,6 +6066,17 @@ function App() {
                                   </div>
                                 </div>
 
+                                <div className="form-row">
+                                  <div className="input-group">
+                                    <label>Mission Brief / Notes</label>
+                                    <textarea
+                                      name="description"
+                                      defaultValue={prefillData?.description || ''}
+                                      placeholder="Provide context, design goals, or notes for this project..."
+                                      style={{ width: '100%', padding: '0.8rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '4px', outline: 'none', minHeight: '80px', resize: 'vertical' }}
+                                    />
+                                  </div>
+                                </div>
                                 <div className="form-row">
                                   <div className="input-group">
                                     <label>Quantity</label>
