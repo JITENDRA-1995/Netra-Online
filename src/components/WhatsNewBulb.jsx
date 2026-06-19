@@ -56,6 +56,7 @@ export function WhatsNewBulb({ isClientPortal = false }) {
                   We've introduced new capabilities to streamline your workflow and improve collaboration. Here's what's new:
                 </p>
                 
+                <ul className="space-y-3">
                   <li className="flex gap-3 items-start">
                     <CheckCircle2 className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
                     <div>
