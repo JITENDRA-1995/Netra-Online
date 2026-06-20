@@ -2122,8 +2122,12 @@ export default function Projects({
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Mission Brief / Notes</label>
-                  <Input value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
-                    className="bg-white/5 border-white/10 rounded-xl focus:border-cyan-400" placeholder="Project objectives and notes" />
+                  <textarea
+                    value={formDescription}
+                    onChange={(e) => setFormDescription(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl focus:border-cyan-400 p-3 text-xs text-white placeholder:text-white/20 min-h-[80px] resize-y outline-none"
+                    placeholder="Project objectives and notes"
+                  />
                 </div>
               </div>
 
