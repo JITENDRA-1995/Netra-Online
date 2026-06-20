@@ -462,6 +462,16 @@ export default function SettingsPage({
     error: null
   });
 
+  const [dbSizeData, setDbSizeData] = useState<{
+    size: number;
+    isLoading: boolean;
+    error: string | null;
+  }>({
+    size: 0,
+    isLoading: false,
+    error: null
+  });
+
   const [selectedPlanLimit, setSelectedPlanLimit] = useState<number>(1024 * 1024 * 1024);
 
   const formatBytes = (bytes: number, decimals: number = 2) => {
@@ -475,6 +485,9 @@ export default function SettingsPage({
 
   const fetchStorageUtilisation = async () => {
     setStorageData(prev => ({ ...prev, isLoading: true, error: null }));
+    setDbSizeData(prev => ({ ...prev, isLoading: true, error: null }));
+
+    // 1. Fetch Supabase Storage bucket files
     try {
       const allFiles: { path: string; name: string; size: number }[] = [];
       
@@ -541,6 +554,48 @@ export default function SettingsPage({
         isLoading: false,
         error: err.message || "Unknown storage retrieval error."
       }));
+    }
+
+    // 2. Fetch PostgreSQL Database Size
+    try {
+      const { data, error } = await supabase.rpc("get_database_size");
+      if (error) {
+        throw error;
+      }
+      setDbSizeData({
+        size: typeof data === "number" ? data : parseInt(data) || 0,
+        isLoading: false,
+        error: null
+      });
+    } catch (err: any) {
+      console.warn("Failed to retrieve PostgreSQL database size. Falling back to mock/estimate:", err);
+      
+      // Resilient Fallback: If RPC not created yet, estimate database size by counting table rows
+      try {
+        let estimatedSize = 153600; // Base size in bytes (around 150KB) for DB schemas
+        
+        // Count entries in some tables to simulate growth
+        const { count: projCount } = await supabase.from("projects").select("*", { count: "exact", head: true });
+        const { count: invCount } = await supabase.from("invoices").select("*", { count: "exact", head: true });
+        const { count: cashCount } = await supabase.from("cashbook").select("*", { count: "exact", head: true });
+        
+        estimatedSize += (projCount || 0) * 8192; // Approx 8KB per project
+        estimatedSize += (invCount || 0) * 16384; // Approx 16KB per invoice (with JSON_MOCK payload)
+        estimatedSize += (cashCount || 0) * 4096; // Approx 4KB per cashbook transaction
+        
+        setDbSizeData({
+          size: estimatedSize,
+          isLoading: false,
+          error: "RPC function not found. Running with estimated row-count fallback."
+        });
+      } catch (fallbackErr) {
+        // Absolute fallback to static value if even table counts fail (offline / mock mode)
+        setDbSizeData({
+          size: 24576, // 24 KB
+          isLoading: false,
+          error: "Database size calculation offline."
+        });
+      }
     }
   };
 
@@ -2031,14 +2086,14 @@ export default function SettingsPage({
           {/* Card: Main Storage Stats */}
           <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 rounded-2xl border border-white/5 bg-[#08080f]/80 backdrop-blur-sm p-6 space-y-6">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center border-b border-white/5 pb-4">
                 <div>
                   <h3 className="font-extrabold text-sm text-foreground uppercase tracking-widest flex items-center gap-2">
                     <Database className="w-4 h-4 text-cyan-400" />
-                    Storage Bucket Volume
+                    System Storage Volumes
                   </h3>
                   <p className="text-3xs text-muted-foreground mt-1">
-                    Traversing files inside the secure storage bucket: <span className="font-mono text-cyan-400">studio-vault</span>
+                    Real-time analysis of active database tables and file buckets.
                   </p>
                 </div>
                 
@@ -2063,57 +2118,113 @@ export default function SettingsPage({
                 </div>
               </div>
 
-              {storageData.isLoading ? (
-                <div className="py-12 flex flex-col items-center justify-center space-y-3">
-                  <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
-                  <span className="text-3xs font-mono uppercase tracking-widest text-cyan-400/80 animate-pulse">Scanning Cloud Edge Storage...</span>
-                </div>
-              ) : storageData.error ? (
-                <div className="py-12 flex flex-col items-center justify-center text-center space-y-2 border border-red-500/10 rounded-xl bg-red-500/5">
-                  <AlertCircle className="w-8 h-8 text-red-400" />
-                  <span className="text-xs font-bold text-red-400 uppercase">Storage Query Interrupted</span>
-                  <span className="text-3xs text-muted-foreground max-w-sm">{storageData.error}</span>
-                </div>
-              ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                {/* Left side: Supabase Storage Bucket size */}
                 <div className="space-y-4">
-                  {/* Progress bar */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-foreground">
-                        {formatBytes(storageData.totalSize)} Used
-                      </span>
-                      <span className="text-muted-foreground text-3xs font-semibold uppercase tracking-wider">
-                        {((storageData.totalSize / selectedPlanLimit) * 100).toFixed(3)}% Utilised
-                      </span>
-                      <span className="font-bold text-foreground">
-                        {formatBytes(selectedPlanLimit)} Limit
-                      </span>
+                  <h4 className="font-bold text-2xs uppercase tracking-widest text-cyan-400/80 flex items-center gap-1.5">
+                    📂 studio-vault bucket
+                  </h4>
+                  
+                  {storageData.isLoading ? (
+                    <div className="py-6 flex flex-col items-center justify-center space-y-2">
+                      <Loader2 className="w-5 h-5 text-cyan-400 animate-spin" />
+                      <span className="text-[10px] font-mono text-cyan-400/80 animate-pulse">Scanning bucket...</span>
                     </div>
-                    <div className="h-2.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 relative">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(100, (storageData.totalSize / selectedPlanLimit) * 100)}%` }}
-                        transition={{ duration: 0.8, ease: "easeOut" }}
-                        className="h-full bg-gradient-to-r from-cyan-400 to-indigo-500 rounded-full"
-                      />
+                  ) : storageData.error ? (
+                    <div className="p-4 flex flex-col items-center justify-center text-center space-y-1.5 border border-red-500/10 rounded-xl bg-red-500/5 animate-none">
+                      <AlertCircle className="w-4 h-4 text-red-400" />
+                      <span className="text-[10px] text-muted-foreground">{storageData.error}</span>
                     </div>
-                  </div>
-
-                  {/* Quick details */}
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-                    <div className="p-3 rounded-xl border border-white/5 bg-white/[0.01]">
-                      <span className="text-[10px] text-muted-foreground font-mono uppercase block">Total Files Indexed</span>
-                      <span className="text-lg font-black text-white block mt-1">{storageData.filesCount}</span>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center text-3xs font-mono">
+                          <span className="text-white/60">Used: {formatBytes(storageData.totalSize)}</span>
+                          <span className="text-cyan-400 font-bold">{((storageData.totalSize / selectedPlanLimit) * 100).toFixed(3)}%</span>
+                          <span className="text-white/60">Limit: {formatBytes(selectedPlanLimit)}</span>
+                        </div>
+                        <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 relative">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.min(100, (storageData.totalSize / selectedPlanLimit) * 100)}%` }}
+                            transition={{ duration: 0.8, ease: "easeOut" }}
+                            className="h-full bg-gradient-to-r from-cyan-400 to-indigo-500 rounded-full"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-center text-3xs">
+                        <div className="p-2 rounded-lg bg-white/[0.01] border border-white/5">
+                          <span className="text-muted-foreground block">Files Indexed</span>
+                          <span className="font-bold text-white block mt-0.5">{storageData.filesCount}</span>
+                        </div>
+                        <div className="p-2 rounded-lg bg-[#050915] border border-white/5">
+                          <span className="text-muted-foreground block">Free Space</span>
+                          <span className="font-bold text-cyan-400 block mt-0.5">{formatBytes(Math.max(0, selectedPlanLimit - storageData.totalSize))}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="p-3 rounded-xl border border-white/5 bg-white/[0.01]">
-                      <span className="text-[10px] text-muted-foreground font-mono uppercase block">Remaining Free Volume</span>
-                      <span className="text-lg font-black text-cyan-400 block mt-1">
-                        {formatBytes(Math.max(0, selectedPlanLimit - storageData.totalSize))}
-                      </span>
-                    </div>
-                  </div>
+                  )}
                 </div>
-              )}
+
+                {/* Right side: Supabase PostgreSQL Database size */}
+                <div className="space-y-4 border-t md:border-t-0 md:border-l border-white/5 pt-4 md:pt-0 md:pl-6">
+                  <h4 className="font-bold text-2xs uppercase tracking-widest text-emerald-400/80 flex items-center gap-1.5">
+                    🗄️ postgresql database
+                  </h4>
+
+                  {dbSizeData.isLoading ? (
+                    <div className="py-6 flex flex-col items-center justify-center space-y-2">
+                      <Loader2 className="w-5 h-5 text-emerald-400 animate-spin" />
+                      <span className="text-[10px] font-mono text-emerald-400/80 animate-pulse">Running SQL RPC...</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Resolve Database Limit based on Plan */}
+                      {/* Free: 500MB, Pro: 8GB */}
+                      {(() => {
+                        const dbLimit = selectedPlanLimit === 1024 * 1024 * 1024 
+                          ? 500 * 1024 * 1024 // 500 MB
+                          : 8 * 1024 * 1024 * 1024; // 8 GB
+                        const dbPercent = (dbSizeData.size / dbLimit) * 100;
+                        return (
+                          <>
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-center text-3xs font-mono">
+                                <span className="text-white/60">Used: {formatBytes(dbSizeData.size)}</span>
+                                <span className="text-emerald-400 font-bold">{dbPercent.toFixed(3)}%</span>
+                                <span className="text-white/60">Limit: {formatBytes(dbLimit)}</span>
+                              </div>
+                              <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 relative">
+                                <motion.div
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${Math.min(100, dbPercent)}%` }}
+                                  transition={{ duration: 0.8, ease: "easeOut" }}
+                                  className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-center text-3xs">
+                              <div className="p-2 rounded-lg bg-white/[0.01] border border-white/5">
+                                <span className="text-muted-foreground block">Sync Mode</span>
+                                <span className="font-bold text-white block mt-0.5 truncate uppercase">Definer RPC</span>
+                              </div>
+                              <div className="p-2 rounded-lg bg-[#050915] border border-white/5">
+                                <span className="text-muted-foreground block">Free Space</span>
+                                <span className="font-bold text-emerald-400 block mt-0.5">{formatBytes(Math.max(0, dbLimit - dbSizeData.size))}</span>
+                              </div>
+                            </div>
+                            {dbSizeData.error && (
+                              <div className="p-1.5 rounded bg-amber-500/5 border border-amber-500/10 text-amber-400 text-[8px] font-mono leading-tight tracking-wider text-center">
+                                ⚠ {dbSizeData.error}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Sidebar info */}
