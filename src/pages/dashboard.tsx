@@ -33,6 +33,7 @@ import {
   Receipt,
   X,
 } from "lucide-react";
+import { getISTDateString } from "../lib/utils";
 
 const CATEGORY_COLORS: Record<string, string> = {
   branding: "#00d4ff",
@@ -146,8 +147,56 @@ export default function Dashboard({
   const [qeDesc, setQeDesc] = useState('');
   const [qeCategory, setQeCategory] = useState('');
   const [qeMode, setQeMode] = useState('UPI');
-  const [qeDate, setQeDate] = useState(new Date().toISOString().split('T')[0]);
+  const [qeDate, setQeDate] = useState(getISTDateString());
   const [qeSubmitting, setQeSubmitting] = useState(false);
+
+  const resolvedInvoiceNumbers = useMemo(() => {
+    const mapping: Record<string, string> = {};
+    
+    // First, map explicitly saved invoices
+    invoices.forEach(inv => {
+      if (inv.rawProject && inv.rawProject.id) {
+        mapping[String(inv.rawProject.id)] = inv.invoiceNo;
+      } else if (inv.projectId) {
+        mapping[String(inv.projectId)] = inv.invoiceNo;
+      }
+    });
+
+    // Then, compute virtual invoice numbers for pending projects, exactly like invoices.tsx
+    if (projects && projects.length > 0) {
+      let nextSerial = invoices.length + 1;
+      const getLocalInvoiceNumber = (date: any, serial: number) => {
+        const d = new Date(date || Date.now());
+        const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '');
+        return `NG/${dateStr}/${serial.toString().padStart(4, '0')}`;
+      };
+
+      // Sort projects ascending by creation time to ensure stable virtual invoice numbers
+      const pendingProjects = [...projects].sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+      
+      const existingNos = new Set(invoices.map(i => i.invoiceNo));
+
+      pendingProjects.forEach(p => {
+        if (p.status !== 'Completed' && !p.isStandalone) {
+          const projIdStr = String(p.id);
+          // If it doesn't have an explicitly saved invoice
+          if (!mapping[projIdStr]) {
+            const issueDate = p.createdAt || new Date().toISOString();
+            let invNo = getLocalInvoiceNumber(issueDate, nextSerial);
+            while (existingNos.has(invNo)) {
+              nextSerial++;
+              invNo = getLocalInvoiceNumber(issueDate, nextSerial);
+            }
+            mapping[projIdStr] = invNo;
+            existingNos.add(invNo);
+            nextSerial++;
+          }
+        }
+      });
+    }
+
+    return mapping;
+  }, [invoices, projects]);
 
   const handleQuickEntrySubmit = async () => {
     if (!qeAmount || !qeDesc) return;
@@ -168,7 +217,7 @@ export default function Dashboard({
       setQeDesc('');
       setQeCategory('');
       setQeMode('UPI');
-      setQeDate(new Date().toISOString().split('T')[0]);
+      setQeDate(getISTDateString());
     } catch (err) {
       console.error(err);
     }
@@ -177,6 +226,107 @@ export default function Dashboard({
   // Active Tab state
   const [selectedTab, setSelectedTab] = useState<'revenue' | 'projects' | 'clients' | 'invoices' | 'system_alerts'>('revenue');
   const [systemAlertTab, setSystemAlertTab] = useState<'deadlines' | 'inquiries' | 'client'>('client');
+
+  const [activePopupData, setActivePopupData] = useState<any>(null);
+
+  const handleBarClick = (dataPoint: any, chartType: 'INCOME' | 'EXPENSE', granularity: 'day' | 'month' | 'year') => {
+    const itemData = dataPoint && (dataPoint.payload || dataPoint);
+    if (!itemData || !itemData.dateKey) return;
+
+    const dateKey = itemData.dateKey;
+    let popupItems: any[] = [];
+    let total = 0;
+
+    const relevantEntries = (cashbookEntries || []).filter(e => e && e.type === chartType);
+
+    if (granularity === 'day') {
+      const dayEntries = relevantEntries.filter(e => {
+        if (!e.date) return false;
+        const entryDateStr = e.date.split('T')[0];
+        return entryDateStr === dateKey;
+      });
+
+      popupItems = dayEntries.map(e => ({
+        label: e.desc || e.description || "Payment Entry",
+        value: parseFloat(e.amount) || 0,
+        description: e.category
+      }));
+      total = popupItems.reduce((sum, item) => sum + item.value, 0);
+
+    } else if (granularity === 'month') {
+      const monthEntries = relevantEntries.filter(e => {
+        if (!e.date) return false;
+        const entryDateStr = e.date.split('T')[0];
+        return entryDateStr.startsWith(dateKey);
+      });
+
+      const dayGroup: Record<number, number> = {};
+      monthEntries.forEach(e => {
+        const d = new Date(e.date);
+        const dayNum = d.getDate();
+        dayGroup[dayNum] = (dayGroup[dayNum] || 0) + (parseFloat(e.amount) || 0);
+      });
+
+      const parts = dateKey.split('-');
+      const yearNum = parseInt(parts[0]);
+      const monthNum = parseInt(parts[1]) - 1;
+      const tempDate = new Date(yearNum, monthNum, 1);
+      const monthShort = tempDate.toLocaleDateString('en-US', { month: 'short' });
+
+      const daysWithData = Object.keys(dayGroup).map(Number).sort((a, b) => a - b);
+      popupItems = daysWithData.map(day => {
+        const dayStr = String(day).padStart(2, '0');
+        return {
+          label: `${dayStr} ${monthShort}`,
+          value: dayGroup[day]
+        };
+      });
+      total = popupItems.reduce((sum, item) => sum + item.value, 0);
+
+    } else { // year
+      const yearEntries = relevantEntries.filter(e => {
+        if (!e.date) return false;
+        const entryDateStr = e.date.split('T')[0];
+        return entryDateStr.startsWith(dateKey);
+      });
+
+      const monthGroup: Record<number, number> = {};
+      yearEntries.forEach(e => {
+        const d = new Date(e.date);
+        const mNum = d.getMonth();
+        monthGroup[mNum] = (monthGroup[mNum] || 0) + (parseFloat(e.amount) || 0);
+      });
+
+      const monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const activeMonths = Object.keys(monthGroup).map(Number).sort((a, b) => a - b);
+      popupItems = activeMonths.map(m => ({
+        label: monthsShort[m],
+        value: monthGroup[m]
+      }));
+      total = popupItems.reduce((sum, item) => sum + item.value, 0);
+    }
+
+    let formattedTitle = '';
+    if (granularity === 'day') {
+      const d = new Date(dateKey);
+      formattedTitle = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+    } else if (granularity === 'month') {
+      const parts = dateKey.split('-');
+      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+      formattedTitle = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    } else {
+      formattedTitle = `Year ${dateKey}`;
+    }
+
+    setActivePopupData({
+      title: formattedTitle,
+      type: chartType,
+      granularity,
+      dateKey,
+      items: popupItems,
+      total
+    });
+  };
 
   // 1. Calculate live statistics
   const activeProjects = projects.filter(p => p.status === 'Ongoing' || p.status === 'Active').length;
@@ -586,7 +736,10 @@ export default function Dashboard({
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={210}>
-                <BarChart data={revenueChartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                <BarChart
+                  data={revenueChartData}
+                  margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                >
                   <defs>
                     <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#00d4ff" stopOpacity={0.4} />
@@ -605,7 +758,15 @@ export default function Dashboard({
                     }}
                     formatter={(value: number) => [`₹${value.toLocaleString()}`, ""]}
                   />
-                  <Bar dataKey="value" name="Revenue" fill="url(#revenueGrad)" radius={[6, 6, 0, 0]} />
+                  <Bar 
+                    dataKey="value" 
+                    name="Revenue" 
+                    fill="url(#revenueGrad)" 
+                    radius={[6, 6, 0, 0]} 
+                    background={{ fill: 'transparent', cursor: 'pointer' }}
+                    onClick={(data) => handleBarClick(data, 'INCOME', revenueGranularity)} 
+                    style={{ cursor: 'pointer' }}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -646,7 +807,10 @@ export default function Dashboard({
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={210}>
-                <BarChart data={expenseChartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                <BarChart
+                  data={expenseChartData}
+                  margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                >
                   <defs>
                     <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#ef4444" stopOpacity={0.4} />
@@ -665,7 +829,15 @@ export default function Dashboard({
                     }}
                     formatter={(value: number) => [`₹${value.toLocaleString()}`, ""]}
                   />
-                  <Bar dataKey="value" name="Expenses" fill="url(#expenseGrad)" radius={[6, 6, 0, 0]} />
+                  <Bar 
+                    dataKey="value" 
+                    name="Expense" 
+                    fill="url(#expenseGrad)" 
+                    radius={[6, 6, 0, 0]} 
+                    background={{ fill: 'transparent', cursor: 'pointer' }}
+                    onClick={(data) => handleBarClick(data, 'EXPENSE', expenseGranularity)} 
+                    style={{ cursor: 'pointer' }}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -945,7 +1117,7 @@ export default function Dashboard({
             <tbody className="divide-y divide-white/5 text-xs text-foreground">
               {activeClients.length > 0 ? (
                 activeClients.map((client) => {
-                  const clientProjectsCount = projects.filter(p => (p.client?.id === client.id) || (p.name === client.name)).length;
+                  const clientProjectsCount = (projects || []).filter(p => (p.client?.id === client.id) || (p.name === client.name)).length;
                   return (
                     <tr key={client.id || client.email} className="hover:bg-emerald-500/5 transition-colors">
                       <td className="py-3 px-4 font-bold">{client.name}</td>
@@ -994,7 +1166,7 @@ export default function Dashboard({
   };
 
   const renderInvoicesView = () => {
-    const pendingInvoicesList = projects.filter(p => {
+    const pendingInvoicesList = (projects || []).filter(p => {
       if ((p.status || "").toLowerCase() === "cancelled") return false;
       const baseQuote = parseFloat(p.quote) || 0;
       const discountVal = parseFloat(p.discount) || 0;
@@ -1029,8 +1201,9 @@ export default function Dashboard({
               </thead>
               <tbody className="divide-y divide-white/5 text-xs text-foreground">
                 {pendingInvoicesList.map((p) => {
-                  const existingInv = invoices.find(inv => inv.rawProject?.id === p.id);
-                  const invoiceNo = existingInv ? existingInv.invoiceNo : `DRAFT-${p.id.slice(0, 5).toUpperCase()}`;
+                  const existingInv = (invoices || []).find(inv => String(inv.rawProject?.id) === String(p.id));
+                  const safeId = p.id ? String(p.id) : Math.random().toString(36).substring(7);
+                  const invoiceNo = resolvedInvoiceNumbers[String(p.id)] || `UNINVOICED`;
                   
                   const baseQuote = parseFloat(p.quote) || 0;
                   const discountVal = parseFloat(p.discount) || 0;
@@ -1422,6 +1595,161 @@ export default function Dashboard({
                   {qeSubmitting ? 'SAVING...' : `SAVE ${quickEntryType}`}
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Chart Bar Details Popup Modal */}
+      <AnimatePresence>
+        {activePopupData && (
+          <div 
+            className="fixed inset-0 z-[10050] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
+            onClick={() => setActivePopupData(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 15 }}
+              transition={{ type: "spring", damping: 25, stiffness: 350 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-md rounded-2xl border p-6 shadow-2xl overflow-hidden bg-[#0a0f1e]/95 backdrop-blur-md"
+              style={{ 
+                borderColor: activePopupData.type === 'INCOME' ? 'rgba(0, 212, 255, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+                boxShadow: activePopupData.type === 'INCOME' 
+                  ? '0 10px 40px -10px rgba(0, 212, 255, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.1)' 
+                  : '0 10px 40px -10px rgba(239, 68, 68, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.1)'
+              }}
+            >
+              {/* Top highlight bar */}
+              <div 
+                className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r"
+                style={{ 
+                  backgroundImage: activePopupData.type === 'INCOME' 
+                    ? 'linear-gradient(90deg, transparent, #00d4ff, transparent)' 
+                    : 'linear-gradient(90deg, transparent, #ef4444, transparent)'
+                }}
+              />
+
+              {/* Header */}
+              <div className="flex items-start justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{ 
+                      background: activePopupData.type === 'INCOME' ? 'rgba(0, 212, 255, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                      border: `1px solid ${activePopupData.type === 'INCOME' ? 'rgba(0, 212, 255, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
+                    }}
+                  >
+                    {activePopupData.type === 'INCOME' ? (
+                      <TrendingUp className="w-5 h-5 text-cyan-400" />
+                    ) : (
+                      <TrendingDown className="w-5 h-5 text-red-400" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-foreground text-base tracking-wide flex items-center gap-2">
+                      {activePopupData.type === 'INCOME' ? 'Income Overview' : 'Expense Overview'}
+                    </h3>
+                    <p className="text-3xs text-muted-foreground uppercase tracking-widest mt-0.5 font-semibold">
+                      {activePopupData.title}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActivePopupData(null)}
+                  className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-colors cursor-pointer bg-transparent border-none outline-none"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Content List */}
+              <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
+                {activePopupData.items && activePopupData.items.length > 0 ? (
+                  activePopupData.items.map((item: any, idx: number) => {
+                    if (activePopupData.granularity === 'day') {
+                      return (
+                        <div 
+                          key={idx}
+                          className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] transition-colors"
+                        >
+                          <div className="flex flex-col min-w-0 pr-2">
+                            <span className="text-xs font-bold text-foreground truncate">
+                              {item.label}
+                            </span>
+                            {item.description && (
+                              <span className="text-3xs text-muted-foreground truncate mt-0.5">
+                                {item.description}
+                              </span>
+                            )}
+                          </div>
+                          <span 
+                            className="text-xs font-mono font-extrabold flex-shrink-0"
+                            style={{ color: activePopupData.type === 'INCOME' ? '#00d4ff' : '#ef4444' }}
+                          >
+                            ₹{item.value.toLocaleString()}
+                          </span>
+                        </div>
+                      );
+                    } else if (activePopupData.granularity === 'month') {
+                      // "show day - 1 to last day of month entry like "01 jun - 200 rs""
+                      return (
+                        <div 
+                          key={idx}
+                          className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] transition-colors"
+                        >
+                          <span className="text-xs font-bold text-foreground">
+                            {item.label.toLowerCase()}
+                          </span>
+                          <span 
+                            className="text-xs font-mono font-extrabold"
+                            style={{ color: activePopupData.type === 'INCOME' ? '#00d4ff' : '#ef4444' }}
+                          >
+                            {item.value.toLocaleString()} rs
+                          </span>
+                        </div>
+                      );
+                    } else {
+                      // Yearly view: "show month wise entry details"
+                      return (
+                        <div 
+                          key={idx}
+                          className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] transition-colors"
+                        >
+                          <span className="text-xs font-bold text-foreground">
+                            {item.label}
+                          </span>
+                          <span 
+                            className="text-xs font-mono font-extrabold"
+                            style={{ color: activePopupData.type === 'INCOME' ? '#00d4ff' : '#ef4444' }}
+                          >
+                            ₹{item.value.toLocaleString()}
+                          </span>
+                        </div>
+                      );
+                    }
+                  })
+                ) : (
+                  <div className="py-8 text-center text-xs text-muted-foreground">
+                    No records found for this period.
+                  </div>
+                )}
+              </div>
+
+              {/* Footer Total */}
+              {activePopupData.items && activePopupData.items.length > 0 && (
+                <div className="mt-5 pt-4 border-t border-white/5 flex justify-between items-center">
+                  <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Period Total</span>
+                  <span 
+                    className="text-base font-mono font-black"
+                    style={{ color: activePopupData.type === 'INCOME' ? '#00d4ff' : '#ef4444' }}
+                  >
+                    ₹{activePopupData.total.toLocaleString()}
+                  </span>
+                </div>
+              )}
             </motion.div>
           </div>
         )}

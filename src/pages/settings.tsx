@@ -448,6 +448,108 @@ export default function SettingsPage({
     fileName: ""
   });
 
+  const [storageData, setStorageData] = useState<{
+    totalSize: number;
+    filesCount: number;
+    categories: { name: string; size: number; count: number }[];
+    isLoading: boolean;
+    error: string | null;
+  }>({
+    totalSize: 0,
+    filesCount: 0,
+    categories: [],
+    isLoading: false,
+    error: null
+  });
+
+  const [selectedPlanLimit, setSelectedPlanLimit] = useState<number>(1024 * 1024 * 1024);
+
+  const formatBytes = (bytes: number, decimals: number = 2) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
+  };
+
+  const fetchStorageUtilisation = async () => {
+    setStorageData(prev => ({ ...prev, isLoading: true, error: null }));
+    try {
+      const allFiles: { path: string; name: string; size: number }[] = [];
+      
+      const listFolder = async (path: string = "") => {
+        const { data, error } = await supabase.storage.from("studio-vault").list(path, { limit: 100 });
+        if (error) {
+          throw error;
+        }
+        if (!data) return;
+
+        for (const item of data) {
+          if (!item.id || item.metadata === null) {
+            const subPath = path ? `${path}/${item.name}` : item.name;
+            await listFolder(subPath);
+          } else {
+            allFiles.push({
+              path: path ? `${path}/${item.name}` : item.name,
+              name: item.name,
+              size: item.metadata?.size || 0
+            });
+          }
+        }
+      };
+
+      await listFolder("");
+
+      const catMap: Record<string, { size: number; count: number }> = {
+        projects: { size: 0, count: 0 },
+        vision: { size: 0, count: 0 },
+        services: { size: 0, count: 0 },
+        others: { size: 0, count: 0 }
+      };
+
+      let totalSize = 0;
+      allFiles.forEach(file => {
+        totalSize += file.size;
+        const segment = file.path.split("/")[0].toLowerCase();
+        if (segment in catMap) {
+          catMap[segment].size += file.size;
+          catMap[segment].count += 1;
+        } else {
+          catMap.others.size += file.size;
+          catMap.others.count += 1;
+        }
+      });
+
+      const categories = Object.entries(catMap).map(([name, stat]) => ({
+        name: name.toUpperCase(),
+        size: stat.size,
+        count: stat.count
+      })).filter(c => c.count > 0);
+
+      setStorageData({
+        totalSize,
+        filesCount: allFiles.length,
+        categories,
+        isLoading: false,
+        error: null
+      });
+    } catch (err: any) {
+      console.error("Failed to load storage utilisation:", err);
+      setStorageData(prev => ({
+        ...prev,
+        isLoading: false,
+        error: err.message || "Unknown storage retrieval error."
+      }));
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "STORAGE") {
+      fetchStorageUtilisation();
+    }
+  }, [activeTab]);
+
   const handleSaveSettings = async () => {
     setIsSaving(true);
     // Instantly show the calibration success dialog box for maximum responsiveness
@@ -1004,6 +1106,17 @@ export default function SettingsPage({
         >
           <ShieldCheck className="w-3.5 h-3.5" />
           Security Settings
+        </button>
+        <button
+          onClick={() => setActiveTab("STORAGE")}
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wider uppercase transition-all duration-300 outline-none select-none cursor-pointer flex items-center gap-2 shrink-0 ${
+            activeTab === "STORAGE" 
+              ? "bg-indigo-500 text-white font-black shadow-[0_0_15px_rgba(99,102,241,0.35)] border border-indigo-400/20 scale-[0.98]" 
+              : "border border-transparent text-muted-foreground hover:text-foreground hover:bg-white/[0.03] hover:scale-[1.02]"
+          }`}
+        >
+          <Database className="w-3.5 h-3.5" />
+          Storage & Systems
         </button>
       </motion.div>
 
@@ -1906,6 +2019,186 @@ export default function SettingsPage({
           trashItems={trashItems}
           onRestoreItem={onRestoreItem}
         />
+      )}
+
+      {activeTab === "STORAGE" && (
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="space-y-6 text-left"
+        >
+          {/* Card: Main Storage Stats */}
+          <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 rounded-2xl border border-white/5 bg-[#08080f]/80 backdrop-blur-sm p-6 space-y-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="font-extrabold text-sm text-foreground uppercase tracking-widest flex items-center gap-2">
+                    <Database className="w-4 h-4 text-cyan-400" />
+                    Storage Bucket Volume
+                  </h3>
+                  <p className="text-3xs text-muted-foreground mt-1">
+                    Traversing files inside the secure storage bucket: <span className="font-mono text-cyan-400">studio-vault</span>
+                  </p>
+                </div>
+                
+                {/* Plan Toggle */}
+                <div className="flex p-0.5 rounded-lg bg-white/5 border border-white/10 shrink-0">
+                  <Button
+                    size="sm"
+                    variant={selectedPlanLimit === 1024 * 1024 * 1024 ? "secondary" : "ghost"}
+                    className={`text-3xs font-bold tracking-wider px-3 h-7 rounded-md ${selectedPlanLimit === 1024 * 1024 * 1024 ? "bg-white/10 text-cyan-400" : "text-muted-foreground hover:text-foreground"}`}
+                    onClick={() => setSelectedPlanLimit(1024 * 1024 * 1024)}
+                  >
+                    FREE PLAN (1GB)
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={selectedPlanLimit === 100 * 1024 * 1024 * 1024 ? "secondary" : "ghost"}
+                    className={`text-3xs font-bold tracking-wider px-3 h-7 rounded-md ${selectedPlanLimit === 100 * 1024 * 1024 * 1024 ? "bg-white/10 text-indigo-400" : "text-muted-foreground hover:text-foreground"}`}
+                    onClick={() => setSelectedPlanLimit(100 * 1024 * 1024 * 1024)}
+                  >
+                    PRO PLAN (100GB)
+                  </Button>
+                </div>
+              </div>
+
+              {storageData.isLoading ? (
+                <div className="py-12 flex flex-col items-center justify-center space-y-3">
+                  <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+                  <span className="text-3xs font-mono uppercase tracking-widest text-cyan-400/80 animate-pulse">Scanning Cloud Edge Storage...</span>
+                </div>
+              ) : storageData.error ? (
+                <div className="py-12 flex flex-col items-center justify-center text-center space-y-2 border border-red-500/10 rounded-xl bg-red-500/5">
+                  <AlertCircle className="w-8 h-8 text-red-400" />
+                  <span className="text-xs font-bold text-red-400 uppercase">Storage Query Interrupted</span>
+                  <span className="text-3xs text-muted-foreground max-w-sm">{storageData.error}</span>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Progress bar */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-bold text-foreground">
+                        {formatBytes(storageData.totalSize)} Used
+                      </span>
+                      <span className="text-muted-foreground text-3xs font-semibold uppercase tracking-wider">
+                        {((storageData.totalSize / selectedPlanLimit) * 100).toFixed(3)}% Utilised
+                      </span>
+                      <span className="font-bold text-foreground">
+                        {formatBytes(selectedPlanLimit)} Limit
+                      </span>
+                    </div>
+                    <div className="h-2.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 relative">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(100, (storageData.totalSize / selectedPlanLimit) * 100)}%` }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
+                        className="h-full bg-gradient-to-r from-cyan-400 to-indigo-500 rounded-full"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Quick details */}
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                    <div className="p-3 rounded-xl border border-white/5 bg-white/[0.01]">
+                      <span className="text-[10px] text-muted-foreground font-mono uppercase block">Total Files Indexed</span>
+                      <span className="text-lg font-black text-white block mt-1">{storageData.filesCount}</span>
+                    </div>
+                    <div className="p-3 rounded-xl border border-white/5 bg-white/[0.01]">
+                      <span className="text-[10px] text-muted-foreground font-mono uppercase block">Remaining Free Volume</span>
+                      <span className="text-lg font-black text-cyan-400 block mt-1">
+                        {formatBytes(Math.max(0, selectedPlanLimit - storageData.totalSize))}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sidebar info */}
+            <div className="rounded-2xl border border-white/5 bg-[#08080f]/80 backdrop-blur-sm p-6 flex flex-col justify-between space-y-4">
+              <div className="space-y-3">
+                <h4 className="font-bold text-xs uppercase tracking-widest text-[#00E5FF] flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 text-[#00E5FF]" />
+                  Storage Synchronisation
+                </h4>
+                <p className="text-3xs text-muted-foreground leading-relaxed">
+                  The dashboard queries the cloud edge storage directly. Run manual synchronization to scan any newly uploaded assets, projects, or vision slides.
+                </p>
+              </div>
+
+              <Button
+                onClick={fetchStorageUtilisation}
+                disabled={storageData.isLoading}
+                className="w-full bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-black font-extrabold text-xs rounded-xl py-5 shadow-lg shadow-indigo-500/10 cursor-pointer animate-none"
+              >
+                {storageData.isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                {storageData.isLoading ? "RE-INDEXING..." : "REFRESH STORAGE METRICS"}
+              </Button>
+            </div>
+          </motion.div>
+
+          {/* Directory breakdown */}
+          {!storageData.isLoading && !storageData.error && (
+            <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 bg-card/25 backdrop-blur-sm p-6 space-y-4">
+              <div>
+                <h3 className="font-extrabold text-sm text-foreground uppercase tracking-widest flex items-center gap-2">
+                  <LayoutGrid className="w-4 h-4 text-indigo-400" />
+                  Category Directory Analysis
+                </h3>
+                <p className="text-3xs text-muted-foreground mt-1">
+                  Directory breakdown of byte weight and file count inside the active workspace buckets.
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-white/5 text-muted-foreground uppercase text-3xs font-mono tracking-widest h-10">
+                      <th className="pb-2">Directory / Category</th>
+                      <th className="pb-2">File Count</th>
+                      <th className="pb-2">Total Volume</th>
+                      <th className="pb-2 text-right">Percentage Share</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {storageData.categories.length > 0 ? (
+                      storageData.categories.map((cat, idx) => (
+                        <tr key={idx} className="h-12 hover:bg-white/[0.01] transition-colors">
+                          <td className="align-middle">
+                            <Badge className="text-[9px] tracking-wider border font-bold capitalize px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border-indigo-500/20">
+                              {cat.name}
+                            </Badge>
+                          </td>
+                          <td className="align-middle font-mono text-[10px] text-white/90">
+                            {cat.count} files
+                          </td>
+                          <td className="align-middle font-mono text-[10px] text-white/90">
+                            {formatBytes(cat.size)}
+                          </td>
+                          <td className="align-middle text-right font-mono text-[10px] text-cyan-400 font-bold">
+                            {storageData.totalSize > 0 ? ((cat.size / storageData.totalSize) * 100).toFixed(1) : 0}%
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="text-center py-8 text-muted-foreground font-mono text-[10px] uppercase tracking-widest">
+                          No files detected in the storage bucket.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+          )}
+        </motion.div>
       )}
 
       {/* Cyber Upload Progress Dialogue */}

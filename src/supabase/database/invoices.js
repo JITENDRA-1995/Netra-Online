@@ -1,5 +1,16 @@
 import { supabase } from '../client';
 
+const getISTDateString = (d) => {
+  const dateObj = d ? new Date(d) : new Date();
+  if (isNaN(dateObj.getTime())) {
+    const fallback = new Date();
+    const offset = fallback.getTimezoneOffset() * 60000;
+    return new Date(fallback.getTime() - offset).toISOString().split('T')[0];
+  }
+  const offset = dateObj.getTimezoneOffset() * 60000;
+  return new Date(dateObj.getTime() - offset).toISOString().split('T')[0];
+};
+
 const getLocalInvoiceMetadata = () => {
   try {
     const data = localStorage.getItem('mock_invoice_extra_metadata');
@@ -94,8 +105,8 @@ export const saveInvoice = async (invoiceData) => {
     client_name: invoiceData.clientName || invoiceData.client_name,
     project_service: invoiceData.projectService || invoiceData.project_service,
     issue_date: (invoiceData.issueDate && !isNaN(new Date(invoiceData.issueDate).getTime()))
-      ? new Date(invoiceData.issueDate).toISOString().split('T')[0]
-      : new Date().toISOString().split('T')[0],
+      ? getISTDateString(invoiceData.issueDate)
+      : getISTDateString(),
     grand_total: invoiceData.grandTotal || invoiceData.grand_total,
     client_link: invoiceData.clientLink || invoiceData.client_link || null,
     invoice_total: invoiceData.invoiceTotal || invoiceData.invoice_total || invoiceData.grandTotal || invoiceData.grand_total,
@@ -181,7 +192,7 @@ export const updateInvoice = async (invoiceId, invoiceData) => {
     client_name: invoiceData.clientName || invoiceData.client_name,
     project_service: invoiceData.projectService || invoiceData.project_service,
     issue_date: (invoiceData.issueDate && !isNaN(new Date(invoiceData.issueDate).getTime())) 
-      ? new Date(invoiceData.issueDate).toISOString().split('T')[0] 
+      ? getISTDateString(invoiceData.issueDate) 
       : undefined,
     grand_total: invoiceData.grandTotal || invoiceData.grand_total,
     client_link: invoiceData.clientLink || invoiceData.client_link,

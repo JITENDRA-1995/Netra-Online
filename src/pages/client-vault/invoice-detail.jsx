@@ -6,6 +6,7 @@ import { Button } from "../../components/ui/button";
 import { Skeleton } from "../../components/ui/skeleton";
 import { ArrowLeft, Printer, Download, CheckCircle2, AlertCircle, Clock, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { extractDateFromInvoiceNo } from "../../lib/utils";
 
 export function ClientInvoiceDetail({ invoiceId, onTabChange }) {
   const [invoice, setInvoice] = useState(null);
@@ -280,7 +281,7 @@ export function ClientInvoiceDetail({ invoiceId, onTabChange }) {
             <label style={{ fontSize: '0.65rem', color: '#888', letterSpacing: '1px', display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>INVOICE DETAILS</label>
             <p style={{ margin: 0, fontSize: '0.9rem' }}><strong>Invoice #:</strong> {invoice.invoiceNumber}</p>
             <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem' }}>
-              <strong>Issue Date:</strong> {invoice.createdAt ? format(new Date(invoice.createdAt), 'dd-MM-yyyy') : 'N/A'}
+              <strong>Issue Date:</strong> {format(new Date(extractDateFromInvoiceNo(invoice.invoiceNumber, invoice.createdAt || invoice.issueDate)), 'dd-MM-yyyy')}
             </p>
           </div>
         </div>

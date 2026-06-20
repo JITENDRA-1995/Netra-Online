@@ -13,7 +13,9 @@ import {
   TrendingUp,
   MapPin,
   Calendar,
-  MessageSquare
+  MessageSquare,
+  MessageCircle,
+  Mail
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -332,7 +334,13 @@ export default function Inquiries({
                 <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
                   <span className="text-2xs text-muted-foreground font-mono">{inq.phone}</span>
                   <div className="flex items-center gap-1">
-                    {!(inq.status.toLowerCase().includes("ignit") || inq.status.toLowerCase() === "accepted") && (
+                    {!(
+                      inq.status.toLowerCase().includes("ignit") ||
+                      inq.status.toLowerCase() === "accepted" ||
+                      inq.status.toLowerCase().includes("extinguish") ||
+                      inq.status.toLowerCase() === "rejected" ||
+                      inq.status.toLowerCase() === "canceled"
+                    ) && (
                       <>
                         <Button
                           size="icon"
@@ -394,6 +402,44 @@ export default function Inquiries({
                           }}
                         >
                           <X className="w-3.5 h-3.5" />
+                        </Button>
+                      </>
+                    )}
+                    {!(
+                      inq.status.toLowerCase().includes("ignit") ||
+                      inq.status.toLowerCase() === "accepted" ||
+                      inq.status.toLowerCase().includes("extinguish") ||
+                      inq.status.toLowerCase() === "rejected" ||
+                      inq.status.toLowerCase() === "canceled"
+                    ) && (
+                      <>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="w-7 h-7 hover:bg-emerald-500/10 hover:text-emerald-400 rounded-lg border border-white/5"
+                          title="Direct WhatsApp Chat"
+                          onClick={() => {
+                            let cleanedPhone = inq.phone.replace(/\D/g, "");
+                            while (cleanedPhone.startsWith("0")) {
+                              cleanedPhone = cleanedPhone.substring(1);
+                            }
+                            const cleanPhone = cleanedPhone.length === 10 ? "91" + cleanedPhone : cleanedPhone;
+                            const whatsappMsg = `Hello ${inq.name}, we received your inquiry regarding "${inq.service}" on Netra Graphics.`;
+                            window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(whatsappMsg)}`, '_blank');
+                          }}
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="w-7 h-7 hover:bg-cyan-500/10 hover:text-cyan-400 rounded-lg border border-white/5"
+                          title="Direct Email"
+                          onClick={() => {
+                            window.open(`mailto:${inq.email}?subject=Regarding your Netra Graphics inquiry for ${encodeURIComponent(inq.service)}`, '_blank');
+                          }}
+                        >
+                          <Mail className="w-3.5 h-3.5" />
                         </Button>
                       </>
                     )}

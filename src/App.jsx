@@ -1992,6 +1992,7 @@ function App() {
   const [invoices, setInvoices] = useState([]);
   const [microJobs, setMicroJobs] = useState([]);
   const [redirectBackToMicroJob, setRedirectBackToMicroJob] = useState(false);
+  const [redirectBackToProjectEdit, setRedirectBackToProjectEdit] = useState(null);
   const [expandedWarningTab, setExpandedWarningTab] = useState(null); // 'DEADLINES' | 'INQUIRIES' | null
   const [showClientNotifHistory, setShowClientNotifHistory] = useState(false);
   const [expandedNotifGroup, setExpandedNotifGroup] = useState(null);
@@ -3636,7 +3637,10 @@ function App() {
         createdAt: savedProjCore.created_at ? new Date(savedProjCore.created_at).getTime() : Date.now()
       };
 
-      setIgnitionQueue(prev => [...prev, newProject]);
+      setIgnitionQueue(prev => {
+        if (prev.some(p => p.id === newProject.id)) return prev;
+        return [...prev, newProject];
+      });
       triggerBellPulse();
 
       // Auto-generate and save draft invoice in vault
@@ -3648,7 +3652,7 @@ function App() {
         const advanceEntry = {
           id: Date.now(),
           projectId: savedProjCore.id,
-          date: new Date().toISOString().split('T')[0],
+          date: getISTDateString(),
           desc: `Advance: ${serviceName} - ${clientInfo.name}`,
           amount: advanceVal,
           type: "INCOME",
@@ -3913,7 +3917,7 @@ function App() {
       const newEntry = {
         id: Date.now(),
         projectId: project.id,
-        date: new Date().toISOString().split('T')[0],
+        date: getISTDateString(),
         desc: desc,
         amount: milestoneAmt,
         type: "INCOME",
@@ -4505,8 +4509,8 @@ function App() {
                 client_name: inv.clientName || inv.client_name,
                 project_service: inv.projectService || inv.project_service,
                 issue_date: (inv.issueDate && !isNaN(new Date(inv.issueDate).getTime()))
-                  ? new Date(inv.issueDate).toISOString().split('T')[0]
-                  : new Date().toISOString().split('T')[0],
+                  ? getISTDateString(inv.issueDate)
+                  : getISTDateString(),
                 grand_total: inv.grandTotal || inv.grand_total,
                 created_at: inv.createdAt ? new Date(inv.createdAt).toISOString() : undefined
               });
@@ -4519,7 +4523,10 @@ function App() {
           }
         }
 
-        setIgnitionQueue(prev => [p, ...prev]);
+        setIgnitionQueue(prev => {
+          if (prev.some(x => x.id === p.id)) return prev;
+          return [p, ...prev];
+        });
         toast({ title: "Project Restored", description: `${p.name} workspace fully restored.` });
 
       } else if (item.type === 'invoice') {
@@ -4531,8 +4538,8 @@ function App() {
           client_name: inv.clientName || inv.client_name,
           project_service: inv.projectService || inv.project_service,
           issue_date: (inv.issueDate && !isNaN(new Date(inv.issueDate).getTime()))
-            ? new Date(inv.issueDate).toISOString().split('T')[0]
-            : new Date().toISOString().split('T')[0],
+            ? getISTDateString(inv.issueDate)
+            : getISTDateString(),
           grand_total: inv.grandTotal || inv.grand_total,
           created_at: inv.createdAt ? new Date(inv.createdAt).toISOString() : undefined
         });
@@ -4556,8 +4563,8 @@ function App() {
             client_name: inv.clientName || inv.client_name,
             project_service: inv.projectService || inv.project_service,
             issue_date: (inv.issueDate && !isNaN(new Date(inv.issueDate).getTime()))
-              ? new Date(inv.issueDate).toISOString().split('T')[0]
-              : new Date().toISOString().split('T')[0],
+              ? getISTDateString(inv.issueDate)
+              : getISTDateString(),
             grand_total: inv.grandTotal || inv.grand_total,
             created_at: inv.createdAt ? new Date(inv.createdAt).toISOString() : undefined
           });
@@ -5851,6 +5858,8 @@ function App() {
                             setActiveAdminModule={setActiveAdminModule}
                             redirectBackToMicroJob={redirectBackToMicroJob}
                             setRedirectBackToMicroJob={setRedirectBackToMicroJob}
+                            redirectBackToProjectEdit={redirectBackToProjectEdit}
+                            setRedirectBackToProjectEdit={setRedirectBackToProjectEdit}
                           />
                         )}
 
@@ -5919,6 +5928,10 @@ function App() {
                              setDefaultTab={setInvoiceDefaultTab}
                              microJobs={microJobs}
                              setMicroJobs={setMicroJobs}
+                             onRedirectToProjectEdit={(projectId) => {
+                               setActiveAdminModule("PROJECTS");
+                               setRedirectBackToProjectEdit(projectId);
+                             }}
                            />
                         )}
 
@@ -5958,6 +5971,10 @@ function App() {
                             handleUpdateProjectStatusHandy={handleUpdateProjectStatusHandy}
                             trashItems={trashItems}
                             setTrashItems={setTrashItems}
+                            onRedirectToProjectEdit={(projectId) => {
+                              setActiveAdminModule("PROJECTS");
+                              setRedirectBackToProjectEdit(projectId);
+                            }}
                           />
                         )}
 
@@ -7495,7 +7512,7 @@ function App() {
                           setCashbookEntries(prev => [...prev, {
                             id: entryId,
                             projectId: customPaymentPrompt.p.id,
-                            date: new Date().toISOString().split('T')[0],
+                            date: getISTDateString(),
                             desc: `Payment: ${customPaymentPrompt.p.service} - ${customPaymentPrompt.p.name}`,
                             amount: amt,
                             type: "INCOME",
@@ -7622,6 +7639,10 @@ function App() {
                        invoiceProject.paymentStatus?.toLowerCase() === 'unpaid' ||
                        (existingInvoice && (existingInvoice.paymentStatus?.toLowerCase() === 'pending' || existingInvoice.paymentStatus?.toLowerCase() === 'unpaid')));
 
+                    const isStandalone = (invoiceProject.projectId === null) || invoiceProject.isStandalone || stableInvoiceNo?.includes('/C') || (invoiceProject.id && typeof invoiceProject.id === 'string' && (invoiceProject.id.startsWith('custom-') || invoiceProject.id.startsWith('local-')));
+                    const isCompletedProject = (invoiceProject.status || '').toLowerCase() === 'completed';
+                    const showDraftInvoiceHeader = isMicroJobInvoice ? isPendingMicroJob : (!isStandalone && !isCompletedProject);
+
                     // If it's a batch project, use its internal items, otherwise use single project as one item
                     const allItems = (invoiceProject.items && invoiceProject.items.length > 0)
                       ? invoiceProject.items.map(item => ({
@@ -7695,7 +7716,7 @@ function App() {
                             </div>
                             <div style={{ textAlign: 'right', zIndex: 2 }}>
                               <h2 style={{ margin: 0, fontSize: '2.0rem', letterSpacing: '3px', fontWeight: '900', fontFamily: 'Urbanist, sans-serif' }}>
-                                {isPendingMicroJob ? "DRAFT INVOICE" : "TAX INVOICE"}
+                                {showDraftInvoiceHeader ? "DRAFT INVOICE" : "TAX INVOICE"}
                               </h2>
                               <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.9, maxWidth: '300px', marginLeft: 'auto' }}>{adminProfile.address}</p>
                             </div>
@@ -8011,36 +8032,53 @@ function App() {
                           >
                             Send via WhatsApp
                           </button>
-                           <button
-                             className="action-btn btn-edit"
-                             onClick={() => {
-                               const isStandalone = (invoiceProject.projectId === null) || invoiceProject.isStandalone || stableInvoiceNo?.includes('/C') || (invoiceProject.id && typeof invoiceProject.id === 'string' && (invoiceProject.id.startsWith('custom-') || invoiceProject.id.startsWith('local-')));
-                               setEditingInvoiceData({
-                                 id: existingInvoice?.id || invoiceProject.id,
-                                 invoiceNo: stableInvoiceNo,
-                                 name: invoiceProject.name,
-                                 address: getClientAddress(invoiceProject.name),
-                                 phone: invoiceProject.phone || ((invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink) ? clients.find(c => c.id === (invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink)) : clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase()))?.phone || "",
-                                 email: invoiceProject.email || ((invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink) ? clients.find(c => c.id === (invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink)) : clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase()))?.email || "",
-                                 gst: invoiceProject.gst || ((invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink) ? clients.find(c => c.id === (invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink)) : clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase()))?.gst || "",
-                                 service: invoiceProject.service,
-                                 quote: invoiceProject.quote,
-                                 discount: invoiceProject.discount || 0,
-                                 advanceAmount: invoiceProject.advanceAmount || 0,
-                                 qty: invoiceProject.qty || 1,
-                                 rate: invoiceProject.rate || (invoiceProject.quote / (invoiceProject.qty || 1)),
-                                 items: invoiceProject.items || [],
-                                 isStandalone: isStandalone,
-                                 projectId: isStandalone ? null : (invoiceProject.projectId || invoiceProject.id)
-                               });
-                               if (isStandalone) {
-                                 setActiveAdminModule("INVOICES");
-                                 setIsInvoicePreviewOpen(false);
-                               }
-                             }}
-                           >
-                             Edit Details
-                           </button>
+                            {(() => {
+                              const isStandalone = (invoiceProject.projectId === null) || invoiceProject.isStandalone || stableInvoiceNo?.includes('/C') || (invoiceProject.id && typeof invoiceProject.id === 'string' && (invoiceProject.id.startsWith('custom-') || invoiceProject.id.startsWith('local-')));
+                              const targetProjId = isStandalone ? null : (invoiceProject.projectId || invoiceProject.id);
+                              const linkedProj = targetProjId ? ignitionQueue.find(p => p.id === targetProjId) : null;
+                              const isCompletedProj = linkedProj && (linkedProj.status || '').toLowerCase() === 'completed';
+
+                              return (
+                                <button
+                                  className={`action-btn btn-edit ${isCompletedProj ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}
+                                  disabled={isCompletedProj}
+                                  title={isCompletedProj ? "Completed project invoices cannot be edited" : "Edit Details"}
+                                  onClick={() => {
+                                    if (isCompletedProj) return;
+                                    if (!isStandalone) {
+                                      setActiveAdminModule("PROJECTS");
+                                      setRedirectBackToProjectEdit(targetProjId);
+                                      setIsInvoicePreviewOpen(false);
+                                      setInvoiceProject(null);
+                                      setSelectedBatchProjects([]);
+                                    } else {
+                                      setEditingInvoiceData({
+                                        id: existingInvoice?.id || invoiceProject.id,
+                                        invoiceNo: stableInvoiceNo,
+                                        name: invoiceProject.name,
+                                        address: getClientAddress(invoiceProject.name),
+                                        phone: invoiceProject.phone || ((invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink) ? clients.find(c => c.id === (invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink)) : clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase()))?.phone || "",
+                                        email: invoiceProject.email || ((invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink) ? clients.find(c => c.id === (invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink)) : clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase()))?.email || "",
+                                        gst: invoiceProject.gst || ((invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink) ? clients.find(c => c.id === (invoiceProject.client?.id || invoiceProject.rawProject?.client?.id || invoiceProject.clientLink)) : clients.find(c => c.name.toLowerCase() === invoiceProject.name.toLowerCase()))?.gst || "",
+                                        service: invoiceProject.service,
+                                        quote: invoiceProject.quote,
+                                        discount: invoiceProject.discount || 0,
+                                        advanceAmount: invoiceProject.advanceAmount || 0,
+                                        qty: invoiceProject.qty || 1,
+                                        rate: invoiceProject.rate || (invoiceProject.quote / (invoiceProject.qty || 1)),
+                                        items: invoiceProject.items || [],
+                                        isStandalone: isStandalone,
+                                        projectId: null
+                                      });
+                                      setActiveAdminModule("INVOICES");
+                                      setIsInvoicePreviewOpen(false);
+                                    }
+                                  }}
+                                >
+                                  Edit Details
+                                </button>
+                              );
+                            })()}
                           <button
                             className="action-btn btn-close"
                             onClick={() => {

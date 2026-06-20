@@ -12,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "../supabase/client";
 import { getMicroJobs, createMicroJob, linkJobsToInvoice, saveInvoice, updateMicroJob, deleteMicroJob, clearAllMicroJobs } from "../supabase/database";
+import { getISTDateString, getISTDateTimeString } from "../lib/utils";
 
 
 const STATUS_COLORS: Record<string, string> = {
@@ -124,6 +125,8 @@ interface ProjectsProps {
   setMicroJobs?: React.Dispatch<React.SetStateAction<any[]>>;
   setInvoiceDefaultTab?: (tab: "SAVED" | "DRAFT" | "CUSTOM" | "MICRO_JOB" | null) => void;
   setActiveAdminModule?: (module: string) => void;
+  redirectBackToProjectEdit?: number | null;
+  setRedirectBackToProjectEdit?: (id: number | null) => void;
 }
 
 const containerVariants = {
@@ -155,7 +158,9 @@ export default function Projects({
   microJobs = [],
   setMicroJobs = () => {},
   setInvoiceDefaultTab,
-  setActiveAdminModule
+  setActiveAdminModule,
+  redirectBackToProjectEdit = null,
+  setRedirectBackToProjectEdit
 }: ProjectsProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -220,7 +225,7 @@ export default function Projects({
     setEditJobClientLink(job.clientLink || job.client_link || "");
     setEditJobTaskName(job.taskName || job.task_name || "");
     setEditJobAmount(job.amount || "");
-    setEditJobDate(job.dateLogged ? job.dateLogged.split('T')[0] : new Date().toISOString().split('T')[0]);
+    setEditJobDate(job.dateLogged ? job.dateLogged.split('T')[0] : getISTDateString());
     setEditJobClientSearchQuery("");
     setIsEditJobClientDropdownOpen(false);
     setEditJobQty(job.qty && job.qty !== 1 ? job.qty : "");
@@ -250,7 +255,7 @@ export default function Projects({
         rate: Number(editJobRate) || 0,
         discount: Number(editJobDiscount) || 0,
         amount: Number(editJobAmount),
-        dateLogged: editJobDate ? new Date(editJobDate).toISOString() : undefined,
+        dateLogged: editJobDate ? getISTDateTimeString(editJobDate) : undefined,
         billingStatus: editingJob.billingStatus,
         invoiceLink: editingJob.invoiceLink
       });
@@ -308,7 +313,7 @@ export default function Projects({
   const [newJobClientLink, setNewJobClientLink] = useState<number | "">("");
   const [newJobTaskName, setNewJobTaskName] = useState("");
   const [newJobAmount, setNewJobAmount] = useState<number | "">("");
-  const [newJobDate, setNewJobDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [newJobDate, setNewJobDate] = useState(() => getISTDateString());
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [newJobQty, setNewJobQty] = useState<number | "">("");
@@ -362,6 +367,18 @@ export default function Projects({
       }
     }
   }, [redirectBackToMicroJob, setRedirectBackToMicroJob]);
+
+  useEffect(() => {
+    if (redirectBackToProjectEdit && projects && projects.length > 0) {
+      const proj = projects.find(p => p.id === redirectBackToProjectEdit);
+      if (proj) {
+        openEdit(proj);
+      }
+      if (setRedirectBackToProjectEdit) {
+        setRedirectBackToProjectEdit(null);
+      }
+    }
+  }, [redirectBackToProjectEdit, projects, setRedirectBackToProjectEdit]);
 
 
   const getUniqueInvoiceNumber = () => {
@@ -510,7 +527,7 @@ export default function Projects({
         rate: Number(newJobRate) || 0,
         discount: Number(newJobDiscount) || 0,
         amount: Number(newJobAmount),
-        dateLogged: newJobDate ? new Date(newJobDate).toISOString() : undefined
+        dateLogged: newJobDate ? getISTDateTimeString(newJobDate) : undefined
       });
       
       toast({
@@ -526,7 +543,7 @@ export default function Projects({
       setNewJobRate("");
       setNewJobDiscount(0);
       setNewJobLastCalculatedBy("rate");
-      setNewJobDate(new Date().toISOString().split('T')[0]);
+      setNewJobDate(getISTDateString());
       setIsQuickJobModalOpen(false);
       
       // Refresh list
@@ -2224,7 +2241,7 @@ export default function Projects({
           setNewJobRate("");
           setNewJobDiscount(0);
           setNewJobLastCalculatedBy("rate");
-          setNewJobDate(new Date().toISOString().split('T')[0]);
+          setNewJobDate(getISTDateString());
           setClientSearchQuery("");
           setIsClientDropdownOpen(false);
         }
@@ -2484,7 +2501,7 @@ export default function Projects({
                   setNewJobRate("");
                   setNewJobDiscount(0);
                   setNewJobLastCalculatedBy("rate");
-                  setNewJobDate(new Date().toISOString().split('T')[0]);
+                  setNewJobDate(getISTDateString());
                   setClientSearchQuery("");
                   setIsQuickJobModalOpen(false);
                 }}
@@ -2967,14 +2984,14 @@ export default function Projects({
                   const discount = parseFloat(viewingProject.discount) || 0;
                   const advance = parseFloat(viewingProject.advanceAmount) || 0;
                   const balance = Math.max(0, targetVal - discount - advance);
-                  const isCompletedAndPaid = (viewingProject.status || "").toLowerCase() === "completed" && balance === 0;
+                  const isCompleted = (viewingProject.status || "").toLowerCase() === "completed";
                   return (
                     <div className="bg-white/5 border border-white/5 rounded-xl p-3">
                       <span className="text-3xs uppercase tracking-widest text-muted-foreground block mb-1">
-                        {isCompletedAndPaid ? "Received Amount" : "Remaining Balance"}
+                        {isCompleted ? "Received Amount" : "Remaining Balance"}
                       </span>
                       <span className="text-sm font-bold text-cyan-400">
-                        ₹{(isCompletedAndPaid ? (targetVal - discount) : balance).toLocaleString()}
+                        ₹{(isCompleted ? (targetVal - discount) : balance).toLocaleString()}
                       </span>
                     </div>
                   );

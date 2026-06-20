@@ -25,6 +25,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { getISTDateString } from "@/lib/utils";
+import { deleteInvoice } from "@/supabase/database";
 import {
   AreaChart,
   Area,
@@ -81,6 +83,7 @@ interface FinancialsProps {
   setRedirectFilterService?: (s: string) => void;
   trashItems?: any[];
   setTrashItems?: React.Dispatch<React.SetStateAction<any[]>>;
+  onRedirectToProjectEdit?: (projectId: number) => void;
 }
 
 const containerVariants = {
@@ -127,7 +130,8 @@ export default function Financials({
   redirectFilterService,
   setRedirectFilterService,
   trashItems = [],
-  setTrashItems
+  setTrashItems,
+  onRedirectToProjectEdit
 }: FinancialsProps) {
   const { toast } = useToast();
   const [localSearch, setLocalSearch] = useState("");
@@ -147,8 +151,8 @@ export default function Financials({
   };
 
   // Cashbook sorting state
-  const [cashbookSortField, setCashbookSortField] = useState<"date" | "desc" | "mode" | "amount" | null>(null);
-  const [cashbookSortDirection, setCashbookSortDirection] = useState<"asc" | "desc">("asc");
+  const [cashbookSortField, setCashbookSortField] = useState<"date" | "desc" | "mode" | "amount" | null>("date");
+  const [cashbookSortDirection, setCashbookSortDirection] = useState<"asc" | "desc">("desc");
 
   const handleToggleCashbookSort = (field: "date" | "desc" | "mode" | "amount") => {
     if (cashbookSortField === field) {
@@ -390,6 +394,10 @@ export default function Financials({
           case "date":
             valA = a.date ? new Date(a.date).getTime() : 0;
             valB = b.date ? new Date(b.date).getTime() : 0;
+            if (valA === valB) {
+              valA = Number(a.id) || 0;
+              valB = Number(b.id) || 0;
+            }
             break;
           case "desc":
             valA = (a.desc || "").toLowerCase();
@@ -451,6 +459,10 @@ export default function Financials({
           case "date":
             valA = a.date ? new Date(a.date).getTime() : 0;
             valB = b.date ? new Date(b.date).getTime() : 0;
+            if (valA === valB) {
+              valA = Number(a.id) || 0;
+              valB = Number(b.id) || 0;
+            }
             break;
           case "desc":
             valA = (a.desc || "").toLowerCase();
@@ -1118,17 +1130,13 @@ export default function Financials({
                                       onClick={() => {
                                         const retProject = {
                                           ...p,
-                                          invoiceType: 'retainer',
-                                          quote: balanceAmt,
-                                          discount: 0,
-                                          advanceAmount: 0,
-                                          service: `Final Payment - ${p.service}`
+                                          invoiceType: 'retainer'
                                         };
                                         setInvoiceProject(retProject);
                                         setIsInvoicePreviewOpen(true);
                                       }}
                                     >
-                                      📄 INVOICE FINAL
+                                      📄 DRAFT INVOICE
                                     </Button>
                                   ) : (
                                     <Button
@@ -1402,24 +1410,70 @@ export default function Financials({
                             </td>
                             <td className="p-3">
                               <div className="flex items-center justify-end gap-1">
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="w-7 h-7 hover:bg-cyan-500/10 hover:text-cyan-400"
-                                  onClick={() => {
-                                    setSelectedCashbookEntry(entry);
-                                    setIsCashbookEditModalOpen(true);
-                                  }}
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </Button>
+                                {(() => {
+                                  const linkedProj = entry.projectId ? ignitionQueue.find(p => p.id === entry.projectId) : null;
+                                  const isCompleted = linkedProj && (linkedProj.status || '').toLowerCase() === 'completed';
+                                  const isCustomInvoiceEntry = !!entry.invoiceId;
+                                  const isEditDisabled = isCompleted || isCustomInvoiceEntry;
+                                  
+                                  return (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className={`w-7 h-7 ${isEditDisabled ? 'opacity-30 cursor-not-allowed text-muted-foreground' : 'hover:bg-cyan-500/10 hover:text-cyan-400'}`}
+                                      disabled={isEditDisabled}
+                                      title={
+                                        isCompleted 
+                                          ? "Completed project entries cannot be edited" 
+                                          : isCustomInvoiceEntry 
+                                            ? "Custom invoice entries cannot be edited" 
+                                            : "Edit Entry"
+                                      }
+                                      onClick={() => {
+                                        if (isEditDisabled) return;
+                                        if (entry.projectId && onRedirectToProjectEdit) {
+                                          onRedirectToProjectEdit(entry.projectId);
+                                        } else {
+                                          setSelectedCashbookEntry(entry);
+                                          setIsCashbookEditModalOpen(true);
+                                        }
+                                      }}
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </Button>
+                                  );
+                                })()}
                                 <Button
                                   size="icon"
                                   variant="ghost"
                                   className="w-7 h-7 hover:bg-red-500/10 hover:text-red-400"
-                                  onClick={() => {
+                                  onClick={async () => {
                                     console.log("Delete clicked (income) for ID:", entry.id);
                                     if (window.confirm(`Delete this entry: ${entry.desc}?`)) {
+                                      let deleteLinkedInvoice = false;
+                                      if (entry.invoiceId) {
+                                        deleteLinkedInvoice = window.confirm(
+                                          "This entry is linked to a Custom Invoice. Do you want to delete the Custom Invoice from the system as well?"
+                                        );
+                                      }
+
+                                      if (deleteLinkedInvoice && entry.invoiceId) {
+                                        try {
+                                          await deleteInvoice(entry.invoiceId);
+                                          if (setInvoices) {
+                                            setInvoices(prev => prev.filter(inv => inv.id !== entry.invoiceId));
+                                          }
+                                          toast({ title: "Custom Invoice deleted from system" });
+                                        } catch (err: any) {
+                                          console.error("Failed to delete linked invoice:", err);
+                                          toast({
+                                            title: "Invoice Deletion Failed",
+                                            description: err.message || "Could not delete the custom invoice.",
+                                            variant: "destructive"
+                                          });
+                                        }
+                                      }
+
                                       if (setTrashItems) {
                                         setTrashItems(prev => [
                                           ...prev,
@@ -1485,17 +1539,30 @@ export default function Financials({
                             </td>
                             <td className="p-3">
                               <div className="flex items-center justify-end gap-1">
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="w-7 h-7 hover:bg-cyan-500/10 hover:text-cyan-400"
-                                  onClick={() => {
-                                    setSelectedCashbookEntry(entry);
-                                    setIsCashbookEditModalOpen(true);
-                                  }}
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </Button>
+                                {(() => {
+                                  const linkedProj = entry.projectId ? ignitionQueue.find(p => p.id === entry.projectId) : null;
+                                  const isCompleted = linkedProj && (linkedProj.status || '').toLowerCase() === 'completed';
+                                  
+                                  return (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className={`w-7 h-7 ${isCompleted ? 'opacity-30 cursor-not-allowed text-muted-foreground' : 'hover:bg-cyan-500/10 hover:text-cyan-400'}`}
+                                      disabled={isCompleted}
+                                      onClick={() => {
+                                        if (isCompleted) return;
+                                        if (entry.projectId && onRedirectToProjectEdit) {
+                                          onRedirectToProjectEdit(entry.projectId);
+                                        } else {
+                                          setSelectedCashbookEntry(entry);
+                                          setIsCashbookEditModalOpen(true);
+                                        }
+                                      }}
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </Button>
+                                  );
+                                })()}
                                 <Button
                                   size="icon"
                                   variant="ghost"
@@ -1581,7 +1648,7 @@ export default function Financials({
                 
                 <div className="space-y-1.5">
                   <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Date</label>
-                  <Input type="date" name="date" defaultValue={new Date().toISOString().split('T')[0]} required className="bg-white/5 border-white/10 text-xs rounded-xl" />
+                  <Input type="date" name="date" defaultValue={getISTDateString()} required className="bg-white/5 border-white/10 text-xs rounded-xl" />
                 </div>
                 
                 <div className="space-y-1.5">

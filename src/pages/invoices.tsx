@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { saveInvoice, deleteInvoice, updateInvoice, revertJobsToLedger } from "@/supabase/database";
+import { getISTDateString, getISTDateTimeString, extractDateFromInvoiceNo } from "@/lib/utils";
 
 interface InvoicesPageProps {
   invoices: any[];
@@ -51,6 +52,7 @@ interface InvoicesPageProps {
   setMicroJobs?: React.Dispatch<React.SetStateAction<any[]>>;
   defaultTab?: "SAVED" | "DRAFT" | "CUSTOM" | "MICRO_JOB" | null;
   setDefaultTab?: (tab: "SAVED" | "DRAFT" | "CUSTOM" | "MICRO_JOB" | null) => void;
+  onRedirectToProjectEdit?: (projectId: number) => void;
 }
 
 const containerVariants = {
@@ -84,7 +86,8 @@ export default function InvoicesPage({
   microJobs = [],
   setMicroJobs = () => {},
   defaultTab,
-  setDefaultTab
+  setDefaultTab,
+  onRedirectToProjectEdit
 }: InvoicesPageProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -92,8 +95,8 @@ export default function InvoicesPage({
   const [invoiceTab, setInvoiceTab] = useState<"SAVED" | "DRAFT" | "CUSTOM" | "MICRO_JOB">(defaultTab || "SAVED");
 
   // Sorting state
-  const [sortField, setSortField] = useState<"invoiceNo" | "clientName" | "issueDate" | "paymentStatus" | "grandTotal" | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [sortField, setSortField] = useState<"invoiceNo" | "clientName" | "issueDate" | "paymentStatus" | "grandTotal" | null>("issueDate");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   const handleToggleSort = (field: "invoiceNo" | "clientName" | "issueDate" | "paymentStatus" | "grandTotal") => {
     if (sortField === field) {
@@ -117,11 +120,31 @@ export default function InvoicesPage({
     if (!selectedSettleInvoice) return;
     const inv = selectedSettleInvoice;
     try {
+      const isCustom = !inv.projectId || inv.rawProject?.isStandalone;
+      let clientNamePayload = inv.clientName;
+      if (isCustom && inv.rawProject) {
+        const mockClientPayload = {
+          name: inv.clientName,
+          address: inv.rawProject.address || "",
+          email: inv.rawProject.email || "",
+          phone: inv.rawProject.phone || "",
+          gst: inv.rawProject.gst || "",
+          service: inv.projectService || inv.rawProject.service,
+          quote: inv.rawProject.quote,
+          discount: inv.rawProject.discount || 0,
+          advanceAmount: inv.rawProject.advanceAmount || 0,
+          status: inv.rawProject.status || 'Completed',
+          isStandalone: true,
+          items: inv.rawProject.items || []
+        };
+        clientNamePayload = `JSON_MOCK:${JSON.stringify(mockClientPayload)}`;
+      }
+
       await updateInvoice(inv.id, {
         paymentStatus: "Paid",
         invoiceNo: inv.invoiceNo,
         projectId: inv.projectId,
-        clientName: inv.clientName,
+        clientName: clientNamePayload,
         projectService: inv.projectService,
         grandTotal: inv.grandTotal,
         clientLink: inv.clientLink,
@@ -143,7 +166,7 @@ export default function InvoicesPage({
 
       const cashbookEntry = {
         id: Date.now(),
-        date: new Date().toISOString().split("T")[0],
+        date: inv.issueDate ? getISTDateString(inv.issueDate) : getISTDateString(),
         desc: isMicroJobInvoice
           ? `Cumulative Jobs Settlement - ${inv.clientName} (Inv #${inv.invoiceNo})`
           : `Custom Invoice Paid: ${inv.projectService} - ${inv.clientName} [${inv.invoiceNo}]`,
@@ -185,8 +208,29 @@ export default function InvoicesPage({
       if (!confirmPending) return;
 
       try {
+        const isCustom = !inv.projectId || inv.rawProject?.isStandalone;
+        let clientNamePayload = inv.clientName;
+        if (isCustom && inv.rawProject) {
+          const mockClientPayload = {
+            name: inv.clientName,
+            address: inv.rawProject.address || "",
+            email: inv.rawProject.email || "",
+            phone: inv.rawProject.phone || "",
+            gst: inv.rawProject.gst || "",
+            service: inv.projectService || inv.rawProject.service,
+            quote: inv.rawProject.quote,
+            discount: inv.rawProject.discount || 0,
+            advanceAmount: inv.rawProject.advanceAmount || 0,
+            status: inv.rawProject.status || 'Completed',
+            isStandalone: true,
+            items: inv.rawProject.items || []
+          };
+          clientNamePayload = `JSON_MOCK:${JSON.stringify(mockClientPayload)}`;
+        }
+
         await updateInvoice(inv.id, {
           ...inv,
+          clientName: clientNamePayload,
           paymentStatus: "Pending"
         });
 
@@ -402,7 +446,53 @@ export default function InvoicesPage({
     };
   };
 
-  const upToDateInvoices = invoices.map(getUpToDateInvoice);
+  const upToDateInvoices = useMemo(() => {
+    const updated = invoices.map(getUpToDateInvoice);
+    
+    // Auto-inject draft invoices for active projects that don't have an explicitly saved invoice yet
+    if (projects && projects.length > 0) {
+      let nextSerial = invoices.length + 1;
+      const getLocalInvoiceNumber = (date, serial) => {
+        const d = new Date(date || Date.now());
+        const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '');
+        return `NG/${dateStr}/${serial.toString().padStart(4, '0')}`;
+      };
+
+      // Sort projects ascending by creation time to ensure stable virtual invoice numbers
+      const pendingProjects = [...projects].sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+      
+      pendingProjects.forEach(p => {
+        // Only include non-completed, non-standalone projects
+        if (p.status !== 'Completed' && !p.isStandalone) {
+          const hasInvoice = updated.some(inv => inv.rawProject && String(inv.rawProject.id) === String(p.id));
+          if (!hasInvoice) {
+            const clientName = p.client?.name || p.name || 'Unknown Client';
+            const issueDate = p.createdAt || new Date().toISOString();
+            
+            let invNo = getLocalInvoiceNumber(issueDate, nextSerial);
+            while (updated.some(i => i.invoiceNo === invNo)) {
+              nextSerial++;
+              invNo = getLocalInvoiceNumber(issueDate, nextSerial);
+            }
+
+            updated.push({
+              id: `draft-virtual-${p.id}`,
+              invoiceNo: invNo,
+              clientName: clientName,
+              projectService: p.service,
+              issueDate: issueDate,
+              paymentStatus: p.paymentStatus === 'paid' ? 'Paid' : 'Unpaid',
+              grandTotal: p.quote,
+              rawProject: p,
+              isVirtualDraft: true
+            });
+            nextSerial++;
+          }
+        }
+      });
+    }
+    return updated;
+  }, [invoices, projects, clients]);
 
   // Extract unique clients from current ledger list
   const uniqueClients = Array.from(
@@ -508,8 +598,8 @@ export default function InvoicesPage({
             valB = (b.clientName || "").toLowerCase();
             break;
           case "issueDate":
-            valA = a.issueDate ? new Date(a.issueDate).getTime() : 0;
-            valB = b.issueDate ? new Date(b.issueDate).getTime() : 0;
+            valA = new Date(extractDateFromInvoiceNo(a.invoiceNo, a.issueDate || a.createdAt)).getTime();
+            valB = new Date(extractDateFromInvoiceNo(b.invoiceNo, b.issueDate || b.createdAt)).getTime();
             break;
           case "paymentStatus":
             valA = (a.paymentStatus || "").toLowerCase();
@@ -570,7 +660,7 @@ export default function InvoicesPage({
           {
             id: `trash-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             type: "invoice",
-            deletedAt: new Date().toISOString(),
+            deletedAt: getISTDateTimeString(),
             data: {
               invoice: inv,
               strategy: deleteStrategy,
@@ -747,7 +837,7 @@ export default function InvoicesPage({
       invoiceNo: stableInvoiceNo,
       clientName: `JSON_MOCK:${JSON.stringify(mockClientPayload)}`,
       projectService: service,
-      issueDate: new Date().toISOString().split('T')[0],
+      issueDate: editingInvoiceId && prefilledEditData ? (prefilledEditData.issueDate || getISTDateString()) : getISTDateString(),
       grandTotal: totalVal,
       projectId: null,
       paymentStatus: logToCashbook ? "Paid" : "Pending"
@@ -823,6 +913,7 @@ export default function InvoicesPage({
               if (entry.invoiceId === (savedInvoice.id || editingInvoiceId) || (entry.invoiceNo && entry.invoiceNo === stableInvoiceNo)) {
                 return {
                   ...entry,
+                  date: editingInvoiceId && prefilledEditData ? (prefilledEditData.issueDate || entry.date) : getISTDateString(),
                   invoiceNo: stableInvoiceNo,
                   desc: `Custom Invoice: ${service} - ${billingName} [${stableInvoiceNo}]`,
                   amount: totalVal,
@@ -837,7 +928,7 @@ export default function InvoicesPage({
                 id: Date.now(),
                 invoiceId: savedInvoice.id || editingInvoiceId || `local-${Date.now()}`,
                 invoiceNo: stableInvoiceNo,
-                date: new Date().toISOString().split('T')[0],
+                date: editingInvoiceId && prefilledEditData ? (prefilledEditData.issueDate || getISTDateString()) : getISTDateString(),
                 desc: `Custom Invoice: ${service} - ${billingName} [${stableInvoiceNo}]`,
                 amount: totalVal,
                 type: "INCOME" as const,
@@ -1952,7 +2043,7 @@ export default function InvoicesPage({
                 </th>
                 <th className="p-4 text-right cursor-pointer select-none hover:bg-white/[0.02] transition-colors" onClick={() => handleToggleSort("grandTotal")}>
                   <div className="flex items-center justify-end gap-1.5">
-                    <span>Grand Total</span>
+                    <span>{invoiceTab === 'DRAFT' ? 'Remaining Due' : 'Grand Total'}</span>
                     {sortField === "grandTotal" ? (
                       sortDirection === "asc" ? <ChevronUp className="w-3.5 h-3.5 text-cyan-400" /> : <ChevronDown className="w-3.5 h-3.5 text-cyan-400" />
                     ) : (
@@ -1996,7 +2087,7 @@ export default function InvoicesPage({
                           <span className="text-3xs text-muted-foreground mt-0.5">{inv.projectService}</span>
                         </div>
                       </td>
-                      <td className="p-4 text-center text-muted-foreground">{inv.issueDate}</td>
+                      <td className="p-4 text-center text-muted-foreground">{new Date(extractDateFromInvoiceNo(inv.invoiceNo, inv.issueDate || inv.createdAt)).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                       <td className="p-4 text-center">
                         {invoiceTab === 'CUSTOM' ? (
                           <select
@@ -2023,7 +2114,11 @@ export default function InvoicesPage({
                           </Badge>
                         )}
                       </td>
-                      <td className="p-4 text-right font-bold text-foreground">₹{inv.grandTotal.toLocaleString()}</td>
+                      <td className="p-4 text-right font-bold text-foreground">
+                        ₹{invoiceTab === 'DRAFT' && inv.rawProject 
+                          ? ((parseFloat(inv.rawProject.quote) || 0) - (parseFloat(inv.rawProject.discount) || 0) - (parseFloat(inv.rawProject.advanceAmount) || 0)).toLocaleString() 
+                          : inv.grandTotal.toLocaleString()}
+                      </td>
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {(inv.paymentStatus?.toLowerCase() === 'pending' || inv.paymentStatus?.toLowerCase() === 'unpaid') && ((inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && inv.invoiceNo.startsWith('CMS'))) && (
@@ -2124,7 +2219,10 @@ export default function InvoicesPage({
                             }
                             disabled={isEditDisabled}
                             onClick={() => {
-                              if (!isEditDisabled && onEditInvoice) {
+                              if (isEditDisabled) return;
+                              if (invoiceTab === 'DRAFT' && (inv.projectId || inv.rawProject?.id) && onRedirectToProjectEdit) {
+                                onRedirectToProjectEdit(inv.projectId || inv.rawProject.id);
+                              } else if (onEditInvoice) {
                                 onEditInvoice(inv);
                               }
                             }}
