@@ -195,6 +195,10 @@ export default function Financials({
   const [expClient, setExpClient] = useState("all");
   const [expCategory, setExpCategory] = useState("all");
 
+  // Date range filters for cashbook entries
+  const [cashbookStartDate, setCashbookStartDate] = useState("");
+  const [cashbookEndDate, setCashbookEndDate] = useState("");
+
 
   const upToDateQueue = useMemo(() => {
     return (ignitionQueue || []).map((p: any) => {
@@ -382,6 +386,10 @@ export default function Financials({
         if (entry.category.toLowerCase() !== incCategory.toLowerCase()) return false;
       }
 
+      // 4. Date range filter
+      if (cashbookStartDate && entry.date < cashbookStartDate) return false;
+      if (cashbookEndDate && entry.date > cashbookEndDate) return false;
+
       return true;
     });
 
@@ -420,7 +428,7 @@ export default function Financials({
     }
 
     return filtered;
-  }, [upToDateCashbookEntries, incSearch, incClient, incCategory, cashbookSortField, cashbookSortDirection]);
+  }, [upToDateCashbookEntries, incSearch, incClient, incCategory, cashbookSortField, cashbookSortDirection, cashbookStartDate, cashbookEndDate]);
 
   const filteredExpenseEntries = useMemo(() => {
     const filtered = upToDateCashbookEntries.filter(entry => {
@@ -447,6 +455,10 @@ export default function Financials({
         if (entry.category.toLowerCase() !== expCategory.toLowerCase()) return false;
       }
 
+      // 4. Date range filter
+      if (cashbookStartDate && entry.date < cashbookStartDate) return false;
+      if (cashbookEndDate && entry.date > cashbookEndDate) return false;
+
       return true;
     });
 
@@ -485,7 +497,15 @@ export default function Financials({
     }
 
     return filtered;
-  }, [upToDateCashbookEntries, expSearch, expClient, expCategory, cashbookSortField, cashbookSortDirection]);
+  }, [upToDateCashbookEntries, expSearch, expClient, expCategory, cashbookSortField, cashbookSortDirection, cashbookStartDate, cashbookEndDate]);
+
+  const filteredIncomeTotal = useMemo(() => {
+    return filteredIncomeEntries.reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0);
+  }, [filteredIncomeEntries]);
+
+  const filteredExpenseTotal = useMemo(() => {
+    return filteredExpenseEntries.reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0);
+  }, [filteredExpenseEntries]);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [modalEntryType, setModalEntryType] = useState<"INCOME" | "EXPENSE">("INCOME");
@@ -1258,10 +1278,12 @@ export default function Financials({
             </div>
 
             {/* Separate Filters */}
-            <div className="flex items-center gap-2 pt-2">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
+            <div className="flex flex-col md:flex-row md:items-center gap-2 pt-2">
+              <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1 ${
+                cashbookMode === "INCOME" ? "lg:grid-cols-5" : "lg:grid-cols-3"
+              }`}>
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
                   <Input
                     className={`pl-8 h-9 bg-white/5 border-white/10 text-xs rounded-xl text-foreground placeholder:text-muted-foreground focus:ring-0 ${
                       cashbookMode === "INCOME" ? "focus:border-emerald-500/50" : "focus:border-rose-500/50"
@@ -1297,10 +1319,34 @@ export default function Financials({
                     </select>
                   </>
                 )}
+
+                {/* Date range filters */}
+                <div className={`flex items-center gap-2 bg-white/5 border border-white/10 h-9 px-3 rounded-xl ${
+                  cashbookMode === "INCOME" ? "focus-within:border-emerald-500/50" : "focus-within:border-rose-500/50"
+                }`}>
+                  <span className="text-3xs uppercase tracking-widest text-muted-foreground font-bold pointer-events-none whitespace-nowrap select-none">From:</span>
+                  <Input
+                    type="date"
+                    value={cashbookStartDate}
+                    onChange={(e) => setCashbookStartDate(e.target.value)}
+                    className="h-full bg-transparent border-none text-xs text-foreground focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none w-full p-0 min-w-0"
+                  />
+                </div>
+                <div className={`flex items-center gap-2 bg-white/5 border border-white/10 h-9 px-3 rounded-xl ${
+                  cashbookMode === "INCOME" ? "focus-within:border-emerald-500/50" : "focus-within:border-rose-500/50"
+                }`}>
+                  <span className="text-3xs uppercase tracking-widest text-muted-foreground font-bold pointer-events-none whitespace-nowrap select-none">To:</span>
+                  <Input
+                    type="date"
+                    value={cashbookEndDate}
+                    onChange={(e) => setCashbookEndDate(e.target.value)}
+                    className="h-full bg-transparent border-none text-xs text-foreground focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none w-full p-0 min-w-0"
+                  />
+                </div>
               </div>
               
               {cashbookMode === "INCOME" ? (
-                (incSearch !== "" || incClient !== "all" || incCategory !== "all") && (
+                (incSearch !== "" || incClient !== "all" || incCategory !== "all" || cashbookStartDate !== "" || cashbookEndDate !== "") && (
                   <Button
                     size="sm"
                     variant="ghost"
@@ -1308,6 +1354,8 @@ export default function Financials({
                       setIncSearch("");
                       setIncClient("all");
                       setIncCategory("all");
+                      setCashbookStartDate("");
+                      setCashbookEndDate("");
                     }}
                     className="h-9 px-3 text-2xs font-extrabold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 border border-rose-500/20 rounded-xl shrink-0"
                   >
@@ -1315,12 +1363,14 @@ export default function Financials({
                   </Button>
                 )
               ) : (
-                expSearch !== "" && (
+                (expSearch !== "" || cashbookStartDate !== "" || cashbookEndDate !== "") && (
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => {
                       setExpSearch("");
+                      setCashbookStartDate("");
+                      setCashbookEndDate("");
                     }}
                     className="h-9 px-3 text-2xs font-extrabold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 border border-rose-500/20 rounded-xl shrink-0"
                   >
@@ -1606,6 +1656,18 @@ export default function Financials({
                     )
                   )}
                 </tbody>
+                <tfoot>
+                  <tr className="sticky bottom-0 bg-[#0a0f1e] border-t border-white/10 font-bold text-xs">
+                    <td className="p-3 text-muted-foreground uppercase font-black tracking-wider" colSpan={3}>
+                      Grand Total
+                    </td>
+                    <td className={`p-3 text-right font-extrabold ${cashbookMode === "INCOME" ? "text-emerald-400" : "text-rose-400"}`}>
+                      {cashbookMode === "INCOME" ? "+₹" : "-₹"}
+                      {(cashbookMode === "INCOME" ? filteredIncomeTotal : filteredExpenseTotal).toLocaleString()}
+                    </td>
+                    <td className="p-3"></td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </motion.div>
