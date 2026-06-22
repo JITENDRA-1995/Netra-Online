@@ -40,7 +40,8 @@ export const getMicroJobs = async () => {
           *,
           clients (*)
         `)
-        .order('date_logged', { ascending: false });
+        .order('date_logged', { ascending: false })
+        .order('job_id', { ascending: false });
 
       if (error) {
         console.log("getMicroJobs supabase error:", error);

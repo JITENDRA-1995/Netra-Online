@@ -629,6 +629,12 @@ export default function InvoicesPage({
 
         if (valA < valB) return sortDirection === "asc" ? -1 : 1;
         if (valA > valB) return sortDirection === "asc" ? 1 : -1;
+        
+        // Fallback sorting: if values are equal, sort by serial number / invoiceNo descending (latest first)
+        const invNoA = a.invoiceNo || "";
+        const invNoB = b.invoiceNo || "";
+        if (invNoA < invNoB) return 1;
+        if (invNoA > invNoB) return -1;
         return 0;
       });
     }

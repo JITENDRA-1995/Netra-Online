@@ -722,7 +722,11 @@ export default function Projects({
 
         if (valA < valB) return jobSortDirection === "asc" ? -1 : 1;
         if (valA > valB) return jobSortDirection === "asc" ? 1 : -1;
-        return 0;
+        
+        // Fallback: sort by jobId descending (latest first)
+        const idA = a.jobId || a.id || 0;
+        const idB = b.jobId || b.id || 0;
+        return idB - idA;
       });
     }
 
@@ -875,27 +879,38 @@ export default function Projects({
 
   const sortedAndFiltered = useMemo(() => {
     return [...filtered].sort((a, b) => {
+      let comparison = 0;
       if (sortBy === "az") {
         const nameA = a.service || a.name || "";
         const nameB = b.service || b.name || "";
-        return nameA.localeCompare(nameB);
-      }
-      if (sortBy === "priority_desc") {
+        comparison = nameA.localeCompare(nameB);
+      } else if (sortBy === "priority_desc") {
         const priorityWeight = { "High": 3, "Normal": 2, "Low": 1 };
         const wA = priorityWeight[a.priority as keyof typeof priorityWeight] || 2;
         const wB = priorityWeight[b.priority as keyof typeof priorityWeight] || 2;
-        return wB - wA;
-      }
-      if (sortBy === "priority_asc") {
+        comparison = wB - wA;
+      } else if (sortBy === "priority_asc") {
         const priorityWeight = { "High": 3, "Normal": 2, "Low": 1 };
         const wA = priorityWeight[a.priority as keyof typeof priorityWeight] || 2;
         const wB = priorityWeight[b.priority as keyof typeof priorityWeight] || 2;
-        return wA - wB;
+        comparison = wA - wB;
+      } else {
+        // Default: date_desc (latest first)
+        const timeA = new Date(a.createdAt || 0).getTime();
+        const timeB = new Date(b.createdAt || 0).getTime();
+        comparison = timeB - timeA;
       }
-      // Default: date_desc (latest first)
-      const dateA = a.createdAt || 0;
-      const dateB = b.createdAt || 0;
-      return dateB - dateA;
+
+      if (comparison !== 0) return comparison;
+
+      // Fallback sorting: latest first (date descending, then id descending)
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      if (timeA !== timeB) return timeB - timeA;
+
+      const idA = a.id || 0;
+      const idB = b.id || 0;
+      return idB - idA;
     });
   }, [filtered, sortBy]);
 

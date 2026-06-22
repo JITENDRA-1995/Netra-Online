@@ -354,7 +354,17 @@ export default function Financials({
 
         if (valA < valB) return projSortDirection === "asc" ? -1 : 1;
         if (valA > valB) return projSortDirection === "asc" ? 1 : -1;
-        return 0;
+        
+        // Fallback sorting: if values are equal, sort by id descending (latest first)
+        return (b.id || 0) - (a.id || 0);
+      });
+    } else {
+      // Default: sort latest projects first
+      filtered.sort((a, b) => {
+        const timeA = new Date(a.createdAt || a.created_at || 0).getTime();
+        const timeB = new Date(b.createdAt || b.created_at || 0).getTime();
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.id || 0) - (a.id || 0);
       });
     }
 
@@ -402,10 +412,6 @@ export default function Financials({
           case "date":
             valA = a.date ? new Date(a.date).getTime() : 0;
             valB = b.date ? new Date(b.date).getTime() : 0;
-            if (valA === valB) {
-              valA = Number(a.id) || 0;
-              valB = Number(b.id) || 0;
-            }
             break;
           case "desc":
             valA = (a.desc || "").toLowerCase();
@@ -423,7 +429,12 @@ export default function Financials({
 
         if (valA < valB) return cashbookSortDirection === "asc" ? -1 : 1;
         if (valA > valB) return cashbookSortDirection === "asc" ? 1 : -1;
-        return 0;
+        
+        // Fallback sorting: if values are equal, sort by date descending, then id descending (latest first)
+        const timeA = a.date ? new Date(a.date).getTime() : 0;
+        const timeB = b.date ? new Date(b.date).getTime() : 0;
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.id || 0) - (a.id || 0);
       });
     }
 
@@ -471,10 +482,6 @@ export default function Financials({
           case "date":
             valA = a.date ? new Date(a.date).getTime() : 0;
             valB = b.date ? new Date(b.date).getTime() : 0;
-            if (valA === valB) {
-              valA = Number(a.id) || 0;
-              valB = Number(b.id) || 0;
-            }
             break;
           case "desc":
             valA = (a.desc || "").toLowerCase();
@@ -492,7 +499,12 @@ export default function Financials({
 
         if (valA < valB) return cashbookSortDirection === "asc" ? -1 : 1;
         if (valA > valB) return cashbookSortDirection === "asc" ? 1 : -1;
-        return 0;
+        
+        // Fallback sorting: if values are equal, sort by date descending, then id descending (latest first)
+        const timeA = a.date ? new Date(a.date).getTime() : 0;
+        const timeB = b.date ? new Date(b.date).getTime() : 0;
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.id || 0) - (a.id || 0);
       });
     }
 

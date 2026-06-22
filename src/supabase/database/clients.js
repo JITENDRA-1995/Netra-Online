@@ -7,7 +7,8 @@ export const getClients = async () => {
   const { data, error } = await supabase
     .from('clients')
     .select('*')
-    .order('joined_date', { ascending: false });
+    .order('joined_date', { ascending: false })
+    .order('id', { ascending: false });
 
   if (error) throw error;
   return data;

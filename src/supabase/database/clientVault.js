@@ -60,6 +60,7 @@ export const fetchClientDashboardSummary = async (clientId) => {
       .select('*, projects(name)')
       .in('project_id', projectIds)
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .limit(10);
 
     if (!logError && logs) {
@@ -105,7 +106,8 @@ export const fetchClientProjects = async (clientId) => {
     .from('projects')
     .select('*')
     .eq('client_id', clientId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false });
 
   if (error) throw error;
 
@@ -252,7 +254,8 @@ export const fetchClientProjectMedia = async (projectId) => {
     .from('project_media')
     .select('*')
     .eq('project_id', projectId)
-    .order('uploaded_at', { ascending: false });
+    .order('uploaded_at', { ascending: false })
+    .order('id', { ascending: false });
 
   if (error) throw error;
 
@@ -283,7 +286,8 @@ export const fetchClientProjectChats = async (projectId, clientName) => {
     .from('project_chats')
     .select('*')
     .eq('project_id', projectId)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true });
 
   if (error) throw error;
 
@@ -495,7 +499,8 @@ export const fetchClientInvoices = async (clientId) => {
     .from('invoices')
     .select('*')
     .in('project_id', projectIds)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .order('invoice_no', { ascending: false });
 
   if (invError) throw invError;
 
@@ -557,6 +562,19 @@ export const fetchClientInvoices = async (clientId) => {
       });
     }
   }
+
+  // Sort the final result invoices stably so that the latest issueDate/createdAt and highest serial number are always at the top
+  resultInvoices.sort((a, b) => {
+    const timeA = new Date(a.createdAt || 0).getTime();
+    const timeB = new Date(b.createdAt || 0).getTime();
+    if (timeA !== timeB) return timeB - timeA;
+
+    const numA = a.invoiceNumber || "";
+    const numB = b.invoiceNumber || "";
+    if (numA < numB) return 1;
+    if (numA > numB) return -1;
+    return 0;
+  });
 
   return resultInvoices;
 };

@@ -369,14 +369,21 @@ export default function Clients({
     }
   };
 
-  const filtered = clients.filter(
-    (c) =>
-      c.email !== "settings@netra.graphics" && (
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.address.toLowerCase().includes(search.toLowerCase()) ||
-        c.email.toLowerCase().includes(search.toLowerCase())
-      )
-  );
+  const filtered = clients
+    .filter(
+      (c) =>
+        c.email !== "settings@netra.graphics" && (
+          c.name.toLowerCase().includes(search.toLowerCase()) ||
+          c.address.toLowerCase().includes(search.toLowerCase()) ||
+          c.email.toLowerCase().includes(search.toLowerCase())
+        )
+    )
+    .sort((a, b) => {
+      const timeA = new Date(a.joinedDate || a.joined_date || 0).getTime();
+      const timeB = new Date(b.joinedDate || b.joined_date || 0).getTime();
+      if (timeA !== timeB) return timeB - timeA;
+      return (b.id || 0) - (a.id || 0);
+    });
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">

@@ -18,7 +18,8 @@ export const getProjects = async () => {
       project_chats (*),
       project_media (*)
     `)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false });
 
   if (error) throw error;
   

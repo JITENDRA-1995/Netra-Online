@@ -39,7 +39,8 @@ export const getInvoices = async () => {
       *,
       projects (*)
     `)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .order('invoice_no', { ascending: false });
 
   if (error) throw error;
   

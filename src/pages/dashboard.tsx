@@ -620,7 +620,11 @@ export default function Dashboard({
     );
 
     return list
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .sort((a, b) => {
+        const timeDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        if (timeDiff !== 0) return timeDiff;
+        return String(b.id || "").localeCompare(String(a.id || ""));
+      })
       .slice(0, 10);
   }, [projects]);
 
@@ -1002,7 +1006,14 @@ export default function Dashboard({
   };
 
   const renderProjectsView = () => {
-    const ongoingProjects = (projects || []).filter(p => p && (p.status === 'Ongoing' || p.status === 'Active'));
+    const ongoingProjects = (projects || [])
+      .filter(p => p && (p.status === 'Ongoing' || p.status === 'Active'))
+      .sort((a, b) => {
+        const timeA = new Date(a.createdAt || 0).getTime();
+        const timeB = new Date(b.createdAt || 0).getTime();
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.id || 0) - (a.id || 0);
+      });
 
     return (
       <div className="rounded-2xl border bg-card/40 backdrop-blur-sm p-6" style={{ borderColor: '#8b5cf630' }}>
@@ -1099,7 +1110,14 @@ export default function Dashboard({
   };
 
   const renderClientsView = () => {
-    const activeClients = clients.filter(c => c.email !== 'settings@netra.graphics');
+    const activeClients = clients
+      .filter(c => c.email !== 'settings@netra.graphics')
+      .sort((a, b) => {
+        const timeA = new Date(a.joinedDate || a.joined_date || 0).getTime();
+        const timeB = new Date(b.joinedDate || b.joined_date || 0).getTime();
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.id || 0) - (a.id || 0);
+      });
 
     return (
       <div className="rounded-2xl border bg-card/40 backdrop-blur-sm p-6" style={{ borderColor: '#10b98130' }}>
@@ -1182,16 +1200,23 @@ export default function Dashboard({
   };
 
   const renderInvoicesView = () => {
-    const pendingInvoicesList = (projects || []).filter(p => {
-      if ((p.status || "").toLowerCase() === "cancelled") return false;
-      const baseQuote = parseFloat(p.quote) || 0;
-      const discountVal = parseFloat(p.discount) || 0;
-      const finalQuote = baseQuote - discountVal;
-      const isPaid = p.paymentStatus === 'paid' || (p.status || "").toLowerCase() === "completed";
-      const adv = parseFloat(p.advanceAmount) || 0;
-      const dues = isPaid ? 0 : (finalQuote - adv);
-      return dues > 0;
-    });
+    const pendingInvoicesList = (projects || [])
+      .filter(p => {
+        if ((p.status || "").toLowerCase() === "cancelled") return false;
+        const baseQuote = parseFloat(p.quote) || 0;
+        const discountVal = parseFloat(p.discount) || 0;
+        const finalQuote = baseQuote - discountVal;
+        const isPaid = p.paymentStatus === 'paid' || (p.status || "").toLowerCase() === "completed";
+        const adv = parseFloat(p.advanceAmount) || 0;
+        const dues = isPaid ? 0 : (finalQuote - adv);
+        return dues > 0;
+      })
+      .sort((a, b) => {
+        const timeA = new Date(a.createdAt || 0).getTime();
+        const timeB = new Date(b.createdAt || 0).getTime();
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.id || 0) - (a.id || 0);
+      });
 
     return (
       <div className="rounded-2xl border bg-card/40 backdrop-blur-sm p-6" style={{ borderColor: '#f59e0b30' }}>

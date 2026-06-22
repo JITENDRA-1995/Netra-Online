@@ -7,7 +7,8 @@ export const getInquiries = async () => {
   const { data, error } = await supabase
     .from('inquiries')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false });
 
   if (error) throw error;
   return data;
