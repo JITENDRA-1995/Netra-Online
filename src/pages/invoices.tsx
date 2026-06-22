@@ -446,13 +446,29 @@ export default function InvoicesPage({
     };
   };
 
+  const getHighestInvoiceSerial = (invoicesList: any[]) => {
+    let maxSerial = 22; // Start at 22, since the highest in the DB is 22
+    (invoicesList || []).forEach(inv => {
+      if (!inv.invoiceNo) return;
+      const parts = inv.invoiceNo.split('/');
+      // Ensure it is a standard project invoice (not micro-job/custom)
+      if (parts.length === 3 && parts[0] === 'NG' && !parts[2].startsWith('C')) {
+        const num = parseInt(parts[2], 10);
+        if (!isNaN(num) && num > maxSerial) {
+          maxSerial = num;
+        }
+      }
+    });
+    return maxSerial;
+  };
+
   const upToDateInvoices = useMemo(() => {
     const updated = invoices.map(getUpToDateInvoice);
     
     // Auto-inject draft invoices for active projects that don't have an explicitly saved invoice yet
     if (projects && projects.length > 0) {
-      let nextSerial = invoices.length + 1;
-      const getLocalInvoiceNumber = (date, serial) => {
+      let nextSerial = getHighestInvoiceSerial(invoices) + 1;
+      const getLocalInvoiceNumber = (date: any, serial: number) => {
         const d = new Date(date || Date.now());
         const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '');
         return `NG/${dateStr}/${serial.toString().padStart(4, '0')}`;

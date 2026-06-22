@@ -45,6 +45,7 @@ const PageLoader = () => (
 
 const queryClient = new QueryClient();
 import { supabase } from './supabase/client';
+import { getISTDateString } from './lib/utils';
 import {
   getInquiries, createInquiry, updateInquiry, deleteInquiry,
   getClients, createClientProfile, verifyClientVaultKey, updateClientProfile,
@@ -2011,21 +2012,28 @@ function App() {
   const [selectedVaultInvoices, setSelectedVaultInvoices] = useState([]);
   const [highlightedCashbookId, setHighlightedCashbookId] = useState(null);
 
-  const getInvoiceNumber = (date, serial = 1) => {
-    const d = new Date(date || Date.now());
-    const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '');
-    const serialStr = serial.toString().padStart(4, '0');
-    return `NG/${dateStr}/${serialStr}`;
+  const getHighestInvoiceSerial = (invoicesList) => {
+    let maxSerial = 22; // Start at 22, since the highest in the DB is 22
+    (invoicesList || []).forEach(inv => {
+      if (!inv.invoiceNo) return;
+      const parts = inv.invoiceNo.split('/');
+      // Ensure it is a standard project invoice (not micro-job/custom)
+      if (parts.length === 3 && parts[0] === 'NG' && !parts[2].startsWith('C')) {
+        const num = parseInt(parts[2], 10);
+        if (!isNaN(num) && num > maxSerial) {
+          maxSerial = num;
+        }
+      }
+    });
+    return maxSerial;
   };
 
   const getUniqueInvoiceNumber = (date) => {
-    let serial = invoices.length + 1;
-    let invNo = getInvoiceNumber(date, serial);
-    while (invoices.some(i => i.invoiceNo === invNo)) {
-      serial++;
-      invNo = getInvoiceNumber(date, serial);
-    }
-    return invNo;
+    const d = new Date(date || Date.now());
+    const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '');
+    const nextSerial = getHighestInvoiceSerial(invoices) + 1;
+    const serialStr = nextSerial.toString().padStart(4, '0');
+    return `NG/${dateStr}/${serialStr}`;
   };
 
   const formatCurrencyValue = (val) => {
@@ -2131,12 +2139,12 @@ function App() {
     const newInvoice = {
       invoiceNo: invNo,
       issueDate: (() => {
-                                  const isCompleted = (invoiceProject.status || '').toLowerCase() === 'completed';
+                                  const isCompleted = (p.status || '').toLowerCase() === 'completed';
                                   if (isCompleted) {
-                                    const completionLog = (invoiceProject.activityLog || invoiceProject.rawProject?.activityLog || []).find(l => l.action.toLowerCase().includes('completed') || l.action.toLowerCase().includes('final payment'));
+                                    const completionLog = (p.activityLog || p.rawProject?.activityLog || []).find(l => l.action.toLowerCase().includes('completed') || l.action.toLowerCase().includes('final payment'));
                                     if (completionLog?.raw_date) return new Date(completionLog.raw_date).toISOString();
                                   }
-                                  return invoiceProject.issueDate || (invoiceProject.createdAt ? new Date(invoiceProject.createdAt).toISOString() : new Date().toISOString());
+                                  return p.issueDate || (p.createdAt ? new Date(p.createdAt).toISOString() : new Date().toISOString());
                                 })(),
       clientName: clientNamePayload,
       projectService: p.service,
@@ -3479,12 +3487,15 @@ function App() {
   const handleIgniteProject = async (e) => {
     e.preventDefault();
     const form = e.target;
+    const btn = form.querySelector('.ignite-submit-btn');
+    if (btn && btn.disabled) return;
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = "IGNITING...";
+    }
     const formData = new FormData(form);
     const serviceVal = formData.get('service');
     const serviceName = serviceVal || "Custom Service";
-
-    const btn = form.querySelector('.ignite-submit-btn');
-    btn.innerText = "IGNITING...";
 
     try {
       let clientInfo;
@@ -3675,17 +3686,23 @@ function App() {
         }
       }
 
-      btn.innerText = "MISSION START";
+      if (btn) btn.innerText = "MISSION START";
       setTimeout(() => {
         setIsIgnitionModalOpen(false);
-        btn.innerText = "IGNITE PROJECT";
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = "IGNITE PROJECT";
+        }
         setActiveAdminModule("PROJECTS");
         setSelectedProjectTab(newProject.id);
       }, 1000);
 
     } catch (err) {
       console.error("Failed to ignite project:", err);
-      btn.innerText = "ERROR - RETRY";
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "ERROR - RETRY";
+      }
       alert("Failed to ignite project in database: " + (err.message || err.details || JSON.stringify(err)));
     }
   };

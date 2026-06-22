@@ -76,6 +76,7 @@ export default function Clients({
   const [isVaultModalOpen, setIsVaultModalOpen] = useState(false);
   const [vaultClient, setVaultClient] = useState<any | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const isCreatingSupportProjectRef = useRef(false);
 
   // Scroll chat to bottom
   useEffect(() => {
@@ -117,77 +118,125 @@ export default function Clients({
 
   // Handle Conversation Bridge project loading & general chat ignite
   const handleOpenBridge = async (client: Client) => {
+    if (isCreatingSupportProjectRef.current) return;
     setBridgeClient(client);
     setIsBridgeModalOpen(true);
     setIsBridgeLoading(true);
     setBridgeMessages([]);
     setBridgeContent("");
 
-    // Find client's projects
-    const projects = ignitionQueue.filter(p => 
-      String(p.client_id) === String(client.id) || 
-      String(p.client?.id) === String(client.id) ||
-      p.name?.trim().toLowerCase() === client.name?.trim().toLowerCase()
-    );
+    try {
+      // 1. Query Supabase directly for this client's projects to avoid stale local state issues
+      const { data: dbProjects, error: dbError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('client_id', client.id);
 
-    if (projects.length > 0) {
-      setBridgeProjects(projects);
-      setSelectedBridgeProject(projects[0]);
-      setIsBridgeLoading(false);
-    } else {
-      // Auto-create General Support & Chat project
-      try {
-        const milestoneNames = ["Discovery", "Moodboard", "Sketching", "Printing", "Final Flame"];
-        const savedProjCore = await igniteProject({
-          name: client.name,
-          service: "General Support & Chat",
-          stage: 1,
-          progress: 20,
-          status: "Active",
-          priority: "Normal",
-          alertMeDays: "",
-          description: "General support and direct communication channel between client and admin.",
-          deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          client_id: client.id,
-          qty: 1,
-          rate: 0,
-          quote: 0,
-          discountValue: "0",
-          discountType: "rs",
-          discountPercent: "0",
-          discount: 0,
-          advanceAmount: 0,
-          paymentStatus: "paid",
-          milestones: milestoneNames.map((name, idx) => ({ name, completed: name === "Discovery" }))
+      if (dbError) throw dbError;
+
+      // 2. Also match from local state just in case client_id is not set or matches by name
+      const localProjects = ignitionQueue.filter(p => 
+        String(p.client_id) === String(client.id) || 
+        String(p.client?.id) === String(client.id) ||
+        p.name?.trim().toLowerCase() === client.name?.trim().toLowerCase()
+      );
+
+      // Combine both sources
+      const allProjectsMap = new Map();
+      localProjects.forEach(p => allProjectsMap.set(p.id, p));
+      (dbProjects || []).forEach(p => {
+        allProjectsMap.set(p.id, {
+          ...p,
+          client_id: p.client_id,
+          client: p.client || { id: client.id, name: client.name, email: client.email, phone: client.phone, address: client.address }
         });
+      });
 
-        const newProj = {
-          id: savedProjCore.id,
-          name: client.name,
-          service: "General Support & Chat",
-          stage: 1,
-          progress: 20,
-          status: "Active",
-          priority: "Normal",
-          client_id: client.id,
-          client: {
-            id: client.id,
+      const combinedProjects = Array.from(allProjectsMap.values());
+
+      if (combinedProjects.length > 0) {
+        setBridgeProjects(combinedProjects);
+        setSelectedBridgeProject(combinedProjects[0]);
+      } else {
+        // Auto-create General Support & Chat project
+        isCreatingSupportProjectRef.current = true;
+        
+        // Double check in database one more time to avoid race condition
+        const { data: doubleCheckProj } = await supabase
+          .from('projects')
+          .select('id')
+          .eq('client_id', client.id)
+          .eq('service', 'General Support & Chat')
+          .maybeSingle();
+
+        if (doubleCheckProj) {
+          // It was created in parallel, fetch it
+          const { data: freshProjs } = await supabase
+            .from('projects')
+            .select('*')
+            .eq('client_id', client.id);
+          
+          const mappedProjs = (freshProjs || []).map(p => ({
+            ...p,
+            client_id: p.client_id,
+            client: p.client || { id: client.id, name: client.name, email: client.email, phone: client.phone, address: client.address }
+          }));
+          setBridgeProjects(mappedProjs);
+          setSelectedBridgeProject(mappedProjs[0] || null);
+        } else {
+          const milestoneNames = ["Discovery", "Moodboard", "Sketching", "Printing", "Final Flame"];
+          const savedProjCore = await igniteProject({
             name: client.name,
-            email: client.email,
-            phone: client.phone,
-            address: client.address
-          }
-        };
+            service: "General Support & Chat",
+            stage: 1,
+            progress: 20,
+            status: "Active",
+            priority: "Normal",
+            alertMeDays: "",
+            description: "General support and direct communication channel between client and admin.",
+            deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            client_id: client.id,
+            qty: 1,
+            rate: 0,
+            quote: 0,
+            discountValue: "0",
+            discountType: "rs",
+            discountPercent: "0",
+            discount: 0,
+            advanceAmount: 0,
+            paymentStatus: "paid",
+            milestones: milestoneNames.map((name, idx) => ({ name, completed: name === "Discovery" }))
+          });
 
-        setBridgeProjects([newProj]);
-        setSelectedBridgeProject(newProj);
-      } catch (err) {
-        console.error("Failed to auto-create support project:", err);
-        alert("Failed to initialize conversation support channel.");
-        setIsBridgeModalOpen(false);
-      } finally {
-        setIsBridgeLoading(false);
+          const newProj = {
+            id: savedProjCore.id,
+            name: client.name,
+            service: "General Support & Chat",
+            stage: 1,
+            progress: 20,
+            status: "Active",
+            priority: "Normal",
+            client_id: client.id,
+            client: {
+              id: client.id,
+              name: client.name,
+              email: client.email,
+              phone: client.phone,
+              address: client.address
+            }
+          };
+
+          setBridgeProjects([newProj]);
+          setSelectedBridgeProject(newProj);
+        }
       }
+    } catch (err) {
+      console.error("Failed to auto-create support project:", err);
+      alert("Failed to initialize conversation support channel.");
+      setIsBridgeModalOpen(false);
+    } finally {
+      isCreatingSupportProjectRef.current = false;
+      setIsBridgeLoading(false);
     }
   };
 

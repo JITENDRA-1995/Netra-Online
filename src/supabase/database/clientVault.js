@@ -417,10 +417,10 @@ export const clearClientProjectChats = async (projectId, clientName) => {
  * Fetch invoices ledger of a client
  */
 export const fetchClientInvoices = async (clientId) => {
-  // 1. Fetch client's projects to get project mapping
+  // 1. Fetch client's projects to get project mapping (with full details for virtual invoices)
   const { data: projects, error: pError } = await supabase
     .from('projects')
-    .select('id, name, status, payment_status')
+    .select('id, name, service, status, payment_status, quote, discount, advance_amount, created_at, deadline, description')
     .eq('client_id', clientId);
 
   if (pError) throw pError;
@@ -429,7 +429,7 @@ export const fetchClientInvoices = async (clientId) => {
   const projectIds = projects.map(p => p.id);
   const projectMap = new Map(projects.map(p => [p.id, p]));
 
-  // 2. Fetch invoices belonging to those projects
+  // 2. Fetch invoices belonging to those projects from database
   const { data: invoices, error: invError } = await supabase
     .from('invoices')
     .select('*')
@@ -438,29 +438,182 @@ export const fetchClientInvoices = async (clientId) => {
 
   if (invError) throw invError;
 
-  return (invoices || []).map(inv => {
-    const proj = projectMap.get(inv.project_id);
-    const status = (proj?.payment_status || '').toLowerCase() === 'paid' ? 'paid' : 'sent';
-    
-    return {
-      id: inv.id,
-      invoiceNumber: inv.invoice_no,
-      projectTitle: inv.project_service || proj?.name || 'Design Services',
-      amount: parseFloat(inv.grand_total),
-      status,
-      projectStatus: proj?.status || 'Active',
-      createdAt: inv.issue_date || inv.created_at,
-      dueDate: inv.issue_date ? new Date(new Date(inv.issue_date).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : null,
-      paidAt: status === 'paid' ? inv.created_at : null,
-      currency: 'INR'
-    };
-  });
+  const resultInvoices = [];
+
+  // Format existing invoices from the database
+  if (invoices && invoices.length > 0) {
+    invoices.forEach(inv => {
+      const proj = projectMap.get(inv.project_id);
+      const status = (proj?.payment_status || '').toLowerCase() === 'paid' ? 'paid' : 'sent';
+      
+      resultInvoices.push({
+        id: inv.id,
+        invoiceNumber: inv.invoice_no,
+        projectTitle: inv.project_service || proj?.name || 'Design Services',
+        amount: parseFloat(inv.grand_total),
+        status,
+        projectStatus: proj?.status || 'Active',
+        createdAt: inv.issue_date || inv.created_at,
+        dueDate: inv.issue_date ? new Date(new Date(inv.issue_date).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : null,
+        paidAt: status === 'paid' ? inv.created_at : null,
+        currency: 'INR'
+      });
+    });
+  }
+
+  // 3. For any project that does NOT have an invoice record in the database,
+  // we dynamically generate a virtual invoice.
+  for (const proj of projects) {
+    // Skip general support chat or projects with quote <= 0
+    if (parseFloat(proj.quote) <= 0 || (proj.service === "General Support & Chat" && parseFloat(proj.quote) <= 0)) {
+      continue;
+    }
+
+    const hasDbInvoice = (invoices || []).some(inv => inv.project_id === proj.id);
+    if (!hasDbInvoice) {
+      const subtotal = parseFloat(proj.quote) || 0;
+      const discount = parseFloat(proj.discount || 0);
+      const grandTotal = subtotal - discount;
+      
+      const createdDate = new Date(proj.created_at || Date.now());
+      const dateStr = createdDate.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '');
+      const virtualInvoiceNo = `NG/${dateStr}/${String(proj.id).padStart(4, '0')}`;
+      const status = (proj.payment_status || '').toLowerCase() === 'paid' ? 'paid' : 'sent';
+
+      resultInvoices.push({
+        id: `virtual-${proj.id}`,
+        invoiceNumber: virtualInvoiceNo,
+        projectTitle: proj.service || proj.name || 'Design Services',
+        amount: grandTotal,
+        status,
+        projectStatus: proj.status || 'Active',
+        createdAt: proj.created_at,
+        dueDate: proj.created_at ? new Date(new Date(proj.created_at).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : null,
+        paidAt: status === 'paid' ? proj.created_at : null,
+        currency: 'INR',
+        isVirtual: true
+      });
+    }
+  }
+
+  return resultInvoices;
 };
 
 /**
  * Fetch detailed invoice and generate items/bill structure
  */
 export const fetchClientInvoiceDetail = async (invoiceId) => {
+  if (typeof invoiceId === 'string' && invoiceId.startsWith('virtual-')) {
+    const projectId = parseInt(invoiceId.replace('virtual-', ''));
+    
+    const { data: proj, error: projError } = await supabase
+      .from('projects')
+      .select(`
+        *,
+        clients (*)
+      `)
+      .eq('id', projectId)
+      .single();
+      
+    if (projError) throw projError;
+    
+    const createdDate = new Date(proj.created_at || Date.now());
+    const dateStr = createdDate.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '');
+    const virtualInvoiceNo = `NG/${dateStr}/${String(proj.id).padStart(4, '0')}`;
+    
+    const subtotal = parseFloat(proj.quote) || 0;
+    const discount = parseFloat(proj.discount || 0);
+    const grandTotal = subtotal - discount;
+    
+    const status = (proj.payment_status || '').toLowerCase() === 'paid' ? 'paid' : 'sent';
+    
+    let qty = 1;
+    let rate = subtotal;
+    let descText = proj.service || 'Design Services';
+
+    if (proj.description?.startsWith("JSON_METADATA:")) {
+      try {
+        const parsed = JSON.parse(proj.description.substring(14));
+        qty = parsed.qty || 1;
+        rate = parsed.rate || (subtotal / qty);
+        descText = parsed.description || proj.service || 'Design Services';
+      } catch (e) {
+        console.error("Error parsing virtual invoice project description:", e);
+      }
+    }
+
+    const lineItems = [
+      {
+        id: 1,
+        description: descText,
+        quantity: qty,
+        unitPrice: rate,
+        total: subtotal
+      }
+    ];
+
+    let bankingDetails = {
+      bankName: "STATE BANK OF INDIA",
+      accountName: "NETRA GRAPHICS",
+      accountNumber: "20198798116",
+      ifscCode: "SBIN0060152",
+      upiId: "netragraphics@sbi"
+    };
+    let adminProfile = {
+      businessName: "NETRA GRAPHICS",
+      address: "Shreeji Complex, Opp. AaramGruh, Mendarda-Sasan Road, Mendarda-362260",
+      phone: "73590 93035",
+      email: "contact@netragraphics.com",
+      instagram: "HIRAPARASAVANPHOTOGRAPHER"
+    };
+
+    try {
+      const { data: settingsClient } = await supabase
+        .from('clients')
+        .select('address')
+        .eq('email', 'settings@netra.graphics')
+        .maybeSingle();
+        
+      if (settingsClient?.address) {
+        const parsed = JSON.parse(settingsClient.address);
+        if (parsed.banking) bankingDetails = parsed.banking;
+        if (parsed.profile) adminProfile = parsed.profile;
+      }
+    } catch (e) {
+      console.error("Error fetching system settings for client virtual invoice details:", e);
+    }
+
+    return {
+      id: invoiceId,
+      invoiceNumber: virtualInvoiceNo,
+      status,
+      projectStatus: proj.status || 'Active',
+      advanceAmount: parseFloat(proj.advance_amount || 0),
+      discount,
+      subtotal,
+      amount: grandTotal,
+      createdAt: proj.created_at,
+      dueDate: proj.created_at ? new Date(new Date(proj.created_at).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : null,
+      projectTitle: proj.service || 'Design Services',
+      currency: 'INR',
+      lineItems,
+      notes: "Thank you for trusting Netra Graphics with your brand's design and digital evolution. Payments can be processed through UPI, bank details, or directly from the administrative portal invoice link.",
+      client: proj.clients ? {
+        name: proj.clients.name,
+        email: proj.clients.email,
+        phone: proj.clients.phone,
+        address: proj.clients.address
+      } : {
+        name: proj.name,
+        email: '',
+        phone: '',
+        address: ''
+      },
+      bankingDetails,
+      adminProfile
+    };
+  }
+
   const { data: inv, error } = await supabase
     .from('invoices')
     .select(`

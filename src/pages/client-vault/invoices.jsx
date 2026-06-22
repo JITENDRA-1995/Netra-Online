@@ -29,7 +29,7 @@ export function ClientInvoices({ currentClient, onTabChange, setSelectedInvoiceI
   }, [currentClient]);
 
   const getStatusBadge = (invoice) => {
-    if (invoice.projectStatus !== 'Completed') {
+    if ((invoice.projectStatus || '').toLowerCase() !== 'completed') {
       return <Badge className="bg-cyan-500/10 text-cyan-400 border-cyan-500/20 hover:bg-cyan-500/20"><Clock className="h-3 w-3 mr-1" /> Draft</Badge>;
     }
     switch (invoice.status) {
@@ -88,7 +88,7 @@ export function ClientInvoices({ currentClient, onTabChange, setSelectedInvoiceI
                   <div className="space-y-1">
                     <div className="flex items-center gap-3">
                       <span className="font-medium text-foreground">
-                        {invoice.projectStatus !== 'Completed' ? `Draft: ${invoice.invoiceNumber}` : invoice.invoiceNumber}
+                        {(invoice.projectStatus || '').toLowerCase() !== 'completed' ? `Draft: ${invoice.invoiceNumber}` : invoice.invoiceNumber}
                       </span>
                       {getStatusBadge(invoice)}
                     </div>

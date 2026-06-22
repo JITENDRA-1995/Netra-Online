@@ -124,7 +124,7 @@ export function ClientInvoiceDetail({ invoiceId, onTabChange }) {
   };
 
   const getStatusBadge = (status) => {
-    if (invoice && invoice.projectStatus !== 'Completed') {
+    if (invoice && (invoice.projectStatus || '').toLowerCase() !== 'completed') {
       return <Badge className="bg-cyan-500/10 text-cyan-400 border-cyan-500/20"><Clock className="h-3 w-3 mr-1" /> Draft</Badge>;
     }
     switch (status) {
@@ -166,7 +166,7 @@ export function ClientInvoiceDetail({ invoiceId, onTabChange }) {
   const grandTotal = invoice.amount;
   const advance = invoice.advanceAmount || 0;
   const remaining = grandTotal - advance;
-  const isCompleted = invoice.projectStatus === 'Completed';
+  const isCompleted = (invoice.projectStatus || '').toLowerCase() === 'completed';
 
   // Fixed 6 rows logic
   const rowsPerPage = 6;

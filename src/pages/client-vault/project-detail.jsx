@@ -16,6 +16,7 @@ import {
   CreditCard
 } from "lucide-react";
 import { format } from "date-fns";
+import { supabase } from "../../supabase/client";
 
 export function ClientProjectDetail({ 
   projectId, 
@@ -30,18 +31,74 @@ export function ClientProjectDetail({
 
     const loadProjectDetail = async () => {
       try {
-        setIsLoading(true);
         const data = await fetchClientProjectDetail(projectId);
         setProject(data);
       } catch (err) {
         console.error("Error loading project detail:", err);
-      } finally {
-        setIsLoading(false);
       }
     };
 
-    loadProjectDetail();
+    // Initial load
+    setIsLoading(true);
+    loadProjectDetail().finally(() => setIsLoading(false));
+
+    // Realtime subscription to both projects and milestones
+    const channel = supabase
+      .channel(`client-project-detail-realtime-${projectId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'projects', filter: `id=eq.${projectId}` },
+        () => {
+          loadProjectDetail();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'project_milestones', filter: `project_id=eq.${projectId}` },
+        () => {
+          loadProjectDetail();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, [projectId]);
+
+  const getActivePhaseText = () => {
+    if (!project || !project.milestones || project.milestones.length === 0) {
+      return "Active";
+    }
+
+    // Sort milestones by position/order
+    const sortedMilestones = [...project.milestones].sort((a, b) => (a.order || 0) - (b.order || 0));
+    
+    // Find last completed milestone index
+    let lastCompletedIdx = -1;
+    for (let i = 0; i < sortedMilestones.length; i++) {
+      if (sortedMilestones[i].isCompleted) {
+        lastCompletedIdx = i;
+      }
+    }
+
+    if (lastCompletedIdx === -1) {
+      // None completed yet
+      return `Active [Initializing -> ${sortedMilestones[0].title} is on its way]`;
+    }
+
+    if (lastCompletedIdx === sortedMilestones.length - 1) {
+      // All completed
+      return `Active [All milestones achieved]`;
+    }
+
+    const currentCompleted = sortedMilestones[lastCompletedIdx].title;
+    const nextMilestone = sortedMilestones[lastCompletedIdx + 1].title;
+
+    return `Active [${currentCompleted} is completed -> ${nextMilestone} is on its way]`;
+  };
 
   if (isLoading) {
     return (
@@ -69,6 +126,16 @@ export function ClientProjectDetail({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes flameTravel {
+          0% { top: 0%; opacity: 0; transform: translate(-50%, 0) scale(0.8); }
+          10% { opacity: 1; transform: translate(-50%, 0) scale(1.1); }
+          50% { transform: translate(-50%, 0) scale(1.2) rotate(5deg); }
+          90% { opacity: 1; transform: translate(-50%, 0) scale(1.1); }
+          100% { top: 100%; opacity: 0; transform: translate(-50%, 0) scale(0.8); }
+        }
+      `}} />
+
       <div>
         <button 
           onClick={() => onTabChange("PROJECTS")}
@@ -113,7 +180,13 @@ export function ClientProjectDetail({
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-medium mb-1">Project Progress</h2>
-                  <p className="text-sm text-muted-foreground">Current phase: <span className="capitalize font-medium text-foreground">{project.status.replace('_', ' ')}</span></p>
+                  <p className="text-sm text-muted-foreground">
+                    Current phase: <span className="font-medium text-foreground">
+                      {project.status.toLowerCase() === 'active' || project.status.toLowerCase() === 'ongoing' 
+                        ? getActivePhaseText() 
+                        : project.status.replace('_', ' ')}
+                    </span>
+                  </p>
                 </div>
                 <div className="text-right">
                   <div className="text-3xl font-serif text-primary">{project.progressPercent}%</div>
@@ -134,7 +207,21 @@ export function ClientProjectDetail({
                       <div key={milestone.id || index} className="relative flex gap-6">
                         {/* Timeline connector line */}
                         {index !== project.milestones.length - 1 && (
-                          <div className="absolute left-3 top-8 bottom-[-2rem] w-px bg-border/60"></div>
+                          <div className="absolute left-3 top-8 bottom-[-2rem] w-px bg-border/60">
+                            {/* If this milestone is completed but the next one is not, show the traveling flame */}
+                            {milestone.isCompleted && !project.milestones[index + 1]?.isCompleted && (
+                              <div 
+                                className="absolute left-1/2 w-4 h-4 flex items-center justify-center text-xs"
+                                style={{
+                                  animation: 'flameTravel 2.5s linear infinite',
+                                  textShadow: '0 0 8px rgba(249, 115, 22, 0.8)',
+                                  zIndex: 20
+                                }}
+                              >
+                                🔥
+                              </div>
+                            )}
+                          </div>
                         )}
                         
                         <div className="relative z-10 flex-shrink-0 mt-1">
