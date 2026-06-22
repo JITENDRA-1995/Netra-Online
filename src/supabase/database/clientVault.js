@@ -413,6 +413,67 @@ export const clearClientProjectChats = async (projectId, clientName) => {
   return data;
 };
 
+const getVirtualInvoiceMap = async () => {
+  try {
+    const { data: allInvoices } = await supabase
+      .from('invoices')
+      .select('invoice_no, project_id');
+      
+    const { data: allProjects } = await supabase
+      .from('projects')
+      .select('id, name, status, created_at');
+
+    const getHighestInvoiceSerial = (invsList) => {
+      let maxSerial = 22; // Baseline
+      (invsList || []).forEach(inv => {
+        if (!inv.invoice_no) return;
+        const parts = inv.invoice_no.split('/');
+        if (parts.length === 3 && parts[0] === 'NG' && !parts[2].startsWith('C')) {
+          const num = parseInt(parts[2], 10);
+          if (!isNaN(num) && num > maxSerial) {
+            maxSerial = num;
+          }
+        }
+      });
+      return maxSerial;
+    };
+
+    let nextSerial = getHighestInvoiceSerial(allInvoices) + 1;
+    const getLocalInvoiceNumber = (date, serial) => {
+      const d = new Date(date || Date.now());
+      const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '');
+      return `NG/${dateStr}/${serial.toString().padStart(4, '0')}`;
+    };
+
+    const sortedAllProjects = [...(allProjects || [])].sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+
+    const virtualInvoiceMap = new Map();
+    sortedAllProjects.forEach(p => {
+      const isCompleted = ['completed', 'cancelled', 'closed'].includes((p.status || '').toLowerCase());
+      const isStandalone = p.is_standalone || false;
+      
+      if (!isCompleted && !isStandalone) {
+        const hasDbInvoice = (allInvoices || []).some(inv => inv.project_id === p.id);
+        if (!hasDbInvoice) {
+          const createdDate = p.created_at || new Date().toISOString();
+          let invNo = getLocalInvoiceNumber(createdDate, nextSerial);
+          while ((allInvoices || []).some(i => i.invoice_no === invNo) || Array.from(virtualInvoiceMap.values()).includes(invNo)) {
+            nextSerial++;
+            invNo = getLocalInvoiceNumber(createdDate, nextSerial);
+          }
+          virtualInvoiceMap.set(p.id, invNo);
+          nextSerial++;
+        }
+      }
+    });
+
+    return virtualInvoiceMap;
+  } catch (err) {
+    console.error("Failed to compute virtual invoice map:", err);
+    return new Map();
+  }
+};
+
 /**
  * Fetch invoices ledger of a client
  */
@@ -463,6 +524,7 @@ export const fetchClientInvoices = async (clientId) => {
 
   // 3. For any project that does NOT have an invoice record in the database,
   // we dynamically generate a virtual invoice.
+  const virtualInvoiceMap = await getVirtualInvoiceMap();
   for (const proj of projects) {
     // Skip general support chat or projects with quote <= 0
     if (parseFloat(proj.quote) <= 0 || (proj.service === "General Support & Chat" && parseFloat(proj.quote) <= 0)) {
@@ -477,7 +539,7 @@ export const fetchClientInvoices = async (clientId) => {
       
       const createdDate = new Date(proj.created_at || Date.now());
       const dateStr = createdDate.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '');
-      const virtualInvoiceNo = `NG/${dateStr}/${String(proj.id).padStart(4, '0')}`;
+      const virtualInvoiceNo = virtualInvoiceMap.get(proj.id) || `NG/${dateStr}/${String(proj.id).padStart(4, '0')}`;
       const status = (proj.payment_status || '').toLowerCase() === 'paid' ? 'paid' : 'sent';
 
       resultInvoices.push({
@@ -519,7 +581,9 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
     
     const createdDate = new Date(proj.created_at || Date.now());
     const dateStr = createdDate.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '');
-    const virtualInvoiceNo = `NG/${dateStr}/${String(proj.id).padStart(4, '0')}`;
+    
+    const virtualInvoiceMap = await getVirtualInvoiceMap();
+    const virtualInvoiceNo = virtualInvoiceMap.get(proj.id) || `NG/${dateStr}/${String(proj.id).padStart(4, '0')}`;
     
     const subtotal = parseFloat(proj.quote) || 0;
     const discount = parseFloat(proj.discount || 0);

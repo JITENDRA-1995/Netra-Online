@@ -7643,7 +7643,15 @@ function App() {
                 >
                   {(() => {
                     const rowsPerPage = 6;
-                    const existingInvoice = invoices.find(inv => inv.id === invoiceProject.id || inv.rawProject?.id === invoiceProject.id);
+                    const existingInvoice = invoices.find(inv => {
+                      if (invoiceProject.invoiceNo && inv.invoiceNo === invoiceProject.invoiceNo) {
+                        return true;
+                      }
+                      if (invoiceProject.isStandalone) {
+                        return inv.id === invoiceProject.id;
+                      }
+                      return inv.projectId === invoiceProject.id || inv.rawProject?.id === invoiceProject.id;
+                    });
                     const stableInvoiceNo = existingInvoice ? existingInvoice.invoiceNo : (invoiceProject.invoiceNo || getUniqueInvoiceNumber(invoiceProject.createdAt));
 
                     const isMicroJobInvoice = (invoiceProject.invoiceNo && invoiceProject.invoiceNo.startsWith('CMS')) || 

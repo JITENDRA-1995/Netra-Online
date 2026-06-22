@@ -114,49 +114,111 @@ export const saveInvoice = async (invoiceData) => {
     micro_job_ids: invoiceData.microJobIds || invoiceData.micro_job_ids || []
   };
 
-  try {
-    const { data, error } = await supabase
-      .from('invoices')
-      .insert([payloadWithExtras])
-      .select()
-      .single();
+  const maxAttempts = 5;
+  let attempts = 0;
+  let currentInvoiceNo = payloadWithExtras.invoice_no;
 
-    if (error) {
-      if (error.code === 'PGRST204' || error.message?.includes('client_link') || error.message?.includes('invoice_total')) {
-        console.warn("Invoices table lacks extra columns. Saving extra columns locally.");
-        const standardPayload = {
-          invoice_no: payloadWithExtras.invoice_no,
-          project_id: payloadWithExtras.project_id,
-          client_name: payloadWithExtras.client_name,
-          project_service: payloadWithExtras.project_service,
-          issue_date: payloadWithExtras.issue_date,
-          grand_total: payloadWithExtras.grand_total
-        };
-        const { data: stdData, error: stdError } = await supabase
-          .from('invoices')
-          .insert([standardPayload])
-          .select()
-          .single();
+  while (attempts < maxAttempts) {
+    try {
+      const { data, error } = await supabase
+        .from('invoices')
+        .insert([{ ...payloadWithExtras, invoice_no: currentInvoiceNo }])
+        .select()
+        .single();
 
-        if (stdError) throw stdError;
+      if (error) {
+        if (error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('unique constraint')) {
+          attempts++;
+          console.warn(`Invoice number collision for ${currentInvoiceNo}. Retrying with new serial...`);
+          const { data: dbInvoices } = await supabase.from('invoices').select('invoice_no');
+          let maxSerial = 22;
+          (dbInvoices || []).forEach(inv => {
+            if (!inv.invoice_no) return;
+            const parts = inv.invoice_no.split('/');
+            if (parts.length === 3 && parts[0] === 'NG' && !parts[2].startsWith('C')) {
+              const num = parseInt(parts[2], 10);
+              if (!isNaN(num) && num > maxSerial) maxSerial = num;
+            }
+          });
+          const nextSerial = maxSerial + 1;
+          const parts = currentInvoiceNo.split('/');
+          if (parts.length === 3) {
+            currentInvoiceNo = `${parts[0]}/${parts[1]}/${nextSerial.toString().padStart(4, '0')}`;
+          } else {
+            currentInvoiceNo = `${currentInvoiceNo}_${Date.now()}`;
+          }
+          continue;
+        }
 
-        const extras = getLocalInvoiceMetadata();
-        extras[stdData.id] = {
-          client_link: payloadWithExtras.client_link,
-          invoice_total: payloadWithExtras.invoice_total,
-          payment_status: payloadWithExtras.payment_status,
-          micro_job_ids: payloadWithExtras.micro_job_ids
-        };
-        saveLocalInvoiceMetadata(extras);
+        if (error.code === 'PGRST204' || error.message?.includes('client_link') || error.message?.includes('invoice_total')) {
+          console.warn("Invoices table lacks extra columns. Saving extra columns locally with retries.");
+          const standardPayload = {
+            invoice_no: currentInvoiceNo,
+            project_id: payloadWithExtras.project_id,
+            client_name: payloadWithExtras.client_name,
+            project_service: payloadWithExtras.project_service,
+            issue_date: payloadWithExtras.issue_date,
+            grand_total: payloadWithExtras.grand_total
+          };
 
-        return stdData;
+          let subAttempts = 0;
+          let currentSubInvoiceNo = currentInvoiceNo;
+
+          while (subAttempts < maxAttempts) {
+            const { data: stdData, error: stdError } = await supabase
+              .from('invoices')
+              .insert([{ ...standardPayload, invoice_no: currentSubInvoiceNo }])
+              .select()
+              .single();
+
+            if (stdError) {
+              if (stdError.code === '23505' || stdError.message?.includes('duplicate key') || stdError.message?.includes('unique constraint')) {
+                subAttempts++;
+                console.warn(`Sub invoice number collision for ${currentSubInvoiceNo}. Retrying...`);
+                const { data: dbInvoices } = await supabase.from('invoices').select('invoice_no');
+                let maxSerial = 22;
+                (dbInvoices || []).forEach(inv => {
+                  if (!inv.invoice_no) return;
+                  const parts = inv.invoice_no.split('/');
+                  if (parts.length === 3 && parts[0] === 'NG' && !parts[2].startsWith('C')) {
+                    const num = parseInt(parts[2], 10);
+                    if (!isNaN(num) && num > maxSerial) maxSerial = num;
+                  }
+                });
+                const nextSerial = maxSerial + 1;
+                const parts = currentSubInvoiceNo.split('/');
+                if (parts.length === 3) {
+                  currentSubInvoiceNo = `${parts[0]}/${parts[1]}/${nextSerial.toString().padStart(4, '0')}`;
+                } else {
+                  currentSubInvoiceNo = `${currentSubInvoiceNo}_${Date.now()}`;
+                }
+                standardPayload.invoice_no = currentSubInvoiceNo;
+                continue;
+              }
+              throw stdError;
+            }
+
+            const extras = getLocalInvoiceMetadata();
+            extras[stdData.id] = {
+              client_link: payloadWithExtras.client_link,
+              invoice_total: payloadWithExtras.invoice_total,
+              payment_status: payloadWithExtras.payment_status,
+              micro_job_ids: payloadWithExtras.micro_job_ids
+            };
+            saveLocalInvoiceMetadata(extras);
+            return stdData;
+          }
+        }
+        throw error;
       }
-      throw error;
+      return data;
+    } catch (err) {
+      if (attempts >= maxAttempts - 1) {
+        console.error("Failed to save invoice after retries:", err);
+        throw err;
+      }
+      attempts++;
     }
-    return data;
-  } catch (err) {
-    console.error("Failed to save invoice:", err);
-    throw err;
   }
 };
 
