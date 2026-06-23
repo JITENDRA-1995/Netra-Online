@@ -1393,6 +1393,7 @@ function App() {
   const isRefreshingProjectsRef = useRef(false);
   const hasPendingProjectsRefreshRef = useRef(false);
   const [autoOpenBridgeClientId, setAutoOpenBridgeClientId] = useState(null);
+  const [autoOpenBridgeProjectId, setAutoOpenBridgeProjectId] = useState(null);
   const [autoOpenReviewClientId, setAutoOpenReviewClientId] = useState(null);
   const [autoOpenVaultClientId, setAutoOpenVaultClientId] = useState(null);
 
@@ -2051,16 +2052,17 @@ function App() {
       setIsAdminGridActive(true);
       pushPageToHistory('admin', { activeAdminModule: 'CLIENTS', isAdminGridActive: true });
     } else if (notif.type === 'communication') {
-      const project = ignitionQueue.find(p => p.id === notif.project_id);
+      const project = ignitionQueue.find(p => String(p.id) === String(notif.project_id));
       const client_id = project?.client_id || project?.client?.id || notif.client_id;
       if (client_id) {
         setAutoOpenBridgeClientId(client_id);
+        setAutoOpenBridgeProjectId(notif.project_id);
         setActiveAdminModule("CLIENTS");
         setIsAdminGridActive(true);
         pushPageToHistory('admin', { activeAdminModule: 'CLIENTS', isAdminGridActive: true });
       }
     } else if (notif.type === 'new_asset') {
-      const project = ignitionQueue.find(p => p.id === notif.project_id);
+      const project = ignitionQueue.find(p => String(p.id) === String(notif.project_id));
       const client_id = project?.client_id || project?.client?.id || notif.client_id;
       if (client_id) {
         setAutoOpenVaultClientId(client_id);
@@ -6104,18 +6106,33 @@ function App() {
                               setActiveAdminModule("PROJECTS");
                               pushPageToHistory('admin', { activeAdminModule: "PROJECTS", isAdminGridActive: true });
                             }}
-                            onRedirectToClient={(projectId, clientId) => {
+                            onRedirectToClient={(projectId, clientId, type) => {
                               let targetClientName = null;
-                              if (clientId) {
-                                const client = clients.find(c => c.id === clientId);
+                              const resolvedClientId = clientId || (projectId ? ignitionQueue.find(p => String(p.id) === String(projectId))?.client_id : null);
+                              
+                              if (resolvedClientId) {
+                                const client = clients.find(c => String(c.id) === String(resolvedClientId));
                                 if (client) targetClientName = client.name;
                               } else if (projectId) {
-                                const project = ignitionQueue.find(p => p.id === projectId);
+                                const project = ignitionQueue.find(p => String(p.id) === String(projectId));
                                 if (project && project.client) targetClientName = project.client.name;
                               }
+
+                              if (resolvedClientId) {
+                                if (type === 'Profile Update') {
+                                  setAutoOpenReviewClientId(resolvedClientId);
+                                } else if (type === 'communication') {
+                                  setAutoOpenBridgeClientId(resolvedClientId);
+                                  setAutoOpenBridgeProjectId(projectId);
+                                } else if (type === 'new_asset') {
+                                  setAutoOpenVaultClientId(resolvedClientId);
+                                }
+                              }
+
                               if (targetClientName) {
                                 setClientsSearchQuery(targetClientName);
                                 setActiveAdminModule("CLIENTS");
+                                setIsAdminGridActive(true);
                                 pushPageToHistory('admin', { activeAdminModule: "CLIENTS", isAdminGridActive: true });
                               }
                             }}
@@ -6210,10 +6227,14 @@ function App() {
                             onDeleteClient={deleteClient}
                             initialSearch={clientsSearchQuery}
                             autoOpenBridgeClientId={autoOpenBridgeClientId}
+                            autoOpenBridgeProjectId={autoOpenBridgeProjectId}
                             autoOpenReviewClientId={autoOpenReviewClientId}
                             autoOpenVaultClientId={autoOpenVaultClientId}
                             onCloseAutoOpen={(type) => {
-                              if (type === 'bridge') setAutoOpenBridgeClientId(null);
+                              if (type === 'bridge') {
+                                setAutoOpenBridgeClientId(null);
+                                setAutoOpenBridgeProjectId(null);
+                              }
                               if (type === 'review') setAutoOpenReviewClientId(null);
                               if (type === 'vault') setAutoOpenVaultClientId(null);
                             }}

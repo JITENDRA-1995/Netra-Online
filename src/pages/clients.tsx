@@ -32,6 +32,7 @@ interface ClientsProps {
   initialSearch?: string;
   clientPortalNotifs?: any[];
   autoOpenBridgeClientId?: number | null;
+  autoOpenBridgeProjectId?: number | null;
   autoOpenReviewClientId?: number | null;
   autoOpenVaultClientId?: number | null;
   onCloseAutoOpen?: (type: 'bridge' | 'review' | 'vault') => void;
@@ -57,6 +58,7 @@ export default function Clients({
   initialSearch = "",
   clientPortalNotifs = [],
   autoOpenBridgeClientId = null,
+  autoOpenBridgeProjectId = null,
   autoOpenReviewClientId = null,
   autoOpenVaultClientId = null,
   onCloseAutoOpen
@@ -95,17 +97,17 @@ export default function Clients({
   // Real-time notification auto-open modal hooks
   useEffect(() => {
     if (autoOpenBridgeClientId) {
-      const client = clients.find(c => c.id === autoOpenBridgeClientId);
+      const client = clients.find(c => String(c.id) === String(autoOpenBridgeClientId));
       if (client) {
-        handleOpenBridge(client);
+        handleOpenBridge(client, autoOpenBridgeProjectId);
         if (onCloseAutoOpen) onCloseAutoOpen('bridge');
       }
     }
-  }, [autoOpenBridgeClientId, clients]);
+  }, [autoOpenBridgeClientId, autoOpenBridgeProjectId, clients]);
 
   useEffect(() => {
     if (autoOpenReviewClientId) {
-      const client = clients.find(c => c.id === autoOpenReviewClientId);
+      const client = clients.find(c => String(c.id) === String(autoOpenReviewClientId));
       if (client) {
         setReviewClient(client);
         setIsReviewModalOpen(true);
@@ -116,7 +118,7 @@ export default function Clients({
 
   useEffect(() => {
     if (autoOpenVaultClientId) {
-      const client = clients.find(c => c.id === autoOpenVaultClientId);
+      const client = clients.find(c => String(c.id) === String(autoOpenVaultClientId));
       if (client) {
         setVaultClient(client);
         setIsVaultModalOpen(true);
@@ -159,7 +161,7 @@ export default function Clients({
   };
 
   // Handle Conversation Bridge project loading & general chat ignite
-  const handleOpenBridge = async (client: Client) => {
+  const handleOpenBridge = async (client: Client, targetProjectId?: number | string | null) => {
     if (isCreatingSupportProjectRef.current) return;
     setBridgeClient(client);
     setIsBridgeModalOpen(true);
@@ -198,7 +200,14 @@ export default function Clients({
 
       if (combinedProjects.length > 0) {
         setBridgeProjects(combinedProjects);
-        setSelectedBridgeProject(combinedProjects[0]);
+        let projectToSelect = combinedProjects[0];
+        if (targetProjectId) {
+          const found = combinedProjects.find(p => String(p.id) === String(targetProjectId));
+          if (found) {
+            projectToSelect = found;
+          }
+        }
+        setSelectedBridgeProject(projectToSelect);
       } else {
         // Auto-create General Support & Chat project
         isCreatingSupportProjectRef.current = true;

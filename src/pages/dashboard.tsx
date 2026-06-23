@@ -104,7 +104,7 @@ interface DashboardProps {
   onMarkFlameAsRead?: (projectId: string | number) => void;
   onSnoozeFlame?: (projectId: string | number, amount: number, unit: string) => void;
   onRedirectToProject?: (project: any) => void;
-  onRedirectToClient?: (projectId: string | number | null, clientId?: string | number) => void;
+  onRedirectToClient?: (projectId: string | number | null, clientId?: string | number, type?: string) => void;
   onOpenIgnitionModal?: () => void;
   onOpenCreateClient?: () => void;
   setActiveAdminModule?: (module: string) => void;
@@ -1444,7 +1444,7 @@ export default function Dashboard({
                 <p className="text-xs text-muted-foreground mb-3">{n.message}</p>
                 <div className="flex items-center gap-2">
                   <button 
-                    onClick={() => onRedirectToClient && onRedirectToClient(n.project_id, n.client_id)}
+                    onClick={() => onRedirectToClient && onRedirectToClient(n.project_id, n.client_id, n.type)}
                     className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 transition-colors"
                   >
                     View Details
