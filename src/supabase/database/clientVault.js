@@ -618,7 +618,7 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
         const parsed = JSON.parse(proj.description.substring(14));
         qty = parsed.qty || 1;
         rate = parsed.rate || (subtotal / qty);
-        descText = parsed.description || proj.service || 'Design Services';
+        descText = proj.service || parsed.description || 'Design Services';
       } catch (e) {
         console.error("Error parsing virtual invoice project description:", e);
       }
@@ -716,14 +716,14 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
   // Line items: map from project description if JSON_METADATA is used, otherwise default
   let qty = 1;
   let rate = amount;
-  let descText = inv.project_service || inv.projects?.name || 'Design Services';
+  let descText = inv.project_service || inv.projects?.service || inv.projects?.name || 'Design Services';
 
   if (inv.projects?.description?.startsWith("JSON_METADATA:")) {
     try {
       const parsed = JSON.parse(inv.projects.description.substring(14));
       qty = parsed.qty || 1;
       rate = parsed.rate || (amount / qty);
-      descText = parsed.description || inv.project_service || inv.projects?.name || 'Design Services';
+      descText = inv.project_service || inv.projects?.service || parsed.description || inv.projects?.name || 'Design Services';
     } catch (e) {
       console.error("Error parsing invoice item JSON_METADATA:", e);
     }
