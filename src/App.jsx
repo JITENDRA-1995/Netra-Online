@@ -571,6 +571,63 @@ function ServiceSlideshowContent({ service, onClose }) {
   );
 }
 
+const groupNotifications = (notifs) => {
+  if (!notifs || notifs.length === 0) return [];
+  const groups = {};
+  
+  notifs.forEach(n => {
+    const key = `${n.client_id || 'no-client'}-${n.project_id || 'no-project'}`;
+    if (!groups[key]) {
+      groups[key] = [];
+    }
+    groups[key].push(n);
+  });
+
+  const merged = Object.values(groups).map(group => {
+    // Sort group members by raw_date desc to find the latest
+    group.sort((a, b) => b.raw_date - a.raw_date);
+    const latest = group[0];
+    
+    if (group.length === 1) {
+      return {
+        ...latest,
+        ids: [latest.id],
+        count: 1
+      };
+    }
+
+    // Determine type, title, message based on group composition
+    const types = group.map(x => x.type);
+    const allCommunication = types.every(t => t === 'communication');
+    const allAssets = types.every(t => t === 'new_asset');
+    
+    let title = latest.title;
+    let message = latest.message;
+    
+    if (allCommunication) {
+      title = `${group.length} New Messages`;
+      message = latest.message;
+    } else if (allAssets) {
+      title = `${group.length} New Assets Uploaded`;
+      message = latest.message;
+    } else {
+      title = `Multiple Updates (${group.length})`;
+      message = `Latest: ${latest.title} - ${latest.message}`;
+    }
+
+    return {
+      ...latest,
+      ids: group.map(x => x.id),
+      count: group.length,
+      title,
+      message
+    };
+  });
+
+  // Sort the final merged list by the raw_date of their latest notification (descending)
+  return merged.sort((a, b) => b.raw_date - a.raw_date);
+};
+
 function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [invoiceDefaultTab, setInvoiceDefaultTab] = useState(null);
@@ -1331,6 +1388,7 @@ function App() {
             notifs.push({
               id: `chat-${chat.id}`,
               project_id: proj.id,
+              client_id: proj.client_id || proj.client?.id,
               type: 'communication',
               title: `New Message from ${chat.sender || 'Client'}`,
               message: `Project: ${proj.service} - "${chat.text}"`,
@@ -1347,6 +1405,7 @@ function App() {
             notifs.push({
               id: `media-${media.id}`,
               project_id: proj.id,
+              client_id: proj.client_id || proj.client?.id,
               type: 'new_asset',
               title: `New Asset Uploaded`,
               message: `Project: ${proj.service} - File: ${media.name}`,
@@ -1870,14 +1929,18 @@ function App() {
     });
   }, [clientPortalNotifs, isDataLoaded]);
 
-  // Bounds-check activePopupIndex when activeClientPopups changes
+  const groupedClientPopups = useMemo(() => {
+    return groupNotifications(activeClientPopups);
+  }, [activeClientPopups]);
+
+  // Bounds-check activePopupIndex when groupedClientPopups changes
   useEffect(() => {
-    if (activeClientPopups.length === 0) {
+    if (groupedClientPopups.length === 0) {
       setActivePopupIndex(0);
-    } else if (activePopupIndex >= activeClientPopups.length) {
-      setActivePopupIndex(activeClientPopups.length - 1);
+    } else if (activePopupIndex >= groupedClientPopups.length) {
+      setActivePopupIndex(groupedClientPopups.length - 1);
     }
-  }, [activeClientPopups.length, activePopupIndex]);
+  }, [groupedClientPopups.length, activePopupIndex]);
 
   // Non-passive wheel event listener for scroll-lock card cycling
   useEffect(() => {
@@ -1885,7 +1948,7 @@ function App() {
     if (!container) return;
 
     const handleWheel = (e) => {
-      if (activeClientPopups.length <= 1) return;
+      if (groupedClientPopups.length <= 1) return;
 
       // Intercept and lock page scroll when hovering/scrolling inside the deck area
       e.preventDefault();
@@ -1897,7 +1960,7 @@ function App() {
 
       if (e.deltaY > 0) {
         // Scroll down: cycle to next popup
-        setActivePopupIndex((prev) => (prev < activeClientPopups.length - 1 ? prev + 1 : prev));
+        setActivePopupIndex((prev) => (prev < groupedClientPopups.length - 1 ? prev + 1 : prev));
         lastScrollTimeRef.current = now;
       } else if (e.deltaY < 0) {
         // Scroll up: cycle to previous popup
@@ -1910,7 +1973,7 @@ function App() {
     return () => {
       container.removeEventListener('wheel', handleWheel);
     };
-  }, [activeClientPopups.length]);
+  }, [groupedClientPopups.length]);
 
   const getPopupThemeColor = (type) => {
     switch (type) {
@@ -1940,8 +2003,9 @@ function App() {
   };
 
   const handleViewNotification = (notif) => {
-    setActiveClientPopups(prev => prev.filter(x => x.id !== notif.id));
-    markClientNotifAsRead(notif.id);
+    const targetIds = notif.ids || [notif.id];
+    setActiveClientPopups(prev => prev.filter(x => !targetIds.includes(x.id)));
+    markClientNotifAsRead(targetIds);
 
     if (notif.type === 'Profile Update') {
       setAutoOpenReviewClientId(notif.client_id);
@@ -1950,7 +2014,7 @@ function App() {
       pushPageToHistory('admin', { activeAdminModule: 'CLIENTS', isAdminGridActive: true });
     } else if (notif.type === 'communication') {
       const project = ignitionQueue.find(p => p.id === notif.project_id);
-      const client_id = project?.client_id || project?.client?.id;
+      const client_id = project?.client_id || project?.client?.id || notif.client_id;
       if (client_id) {
         setAutoOpenBridgeClientId(client_id);
         setActiveAdminModule("CLIENTS");
@@ -1959,7 +2023,7 @@ function App() {
       }
     } else if (notif.type === 'new_asset') {
       const project = ignitionQueue.find(p => p.id === notif.project_id);
-      const client_id = project?.client_id || project?.client?.id;
+      const client_id = project?.client_id || project?.client?.id || notif.client_id;
       if (client_id) {
         setAutoOpenVaultClientId(client_id);
         setActiveAdminModule("CLIENTS");
@@ -1969,9 +2033,10 @@ function App() {
     }
   };
 
-  const handleAckNotification = (id) => {
-    setActiveClientPopups(prev => prev.filter(x => x.id !== id));
-    markClientNotifAsRead(id);
+  const handleAckNotification = (ids) => {
+    const targetIds = Array.isArray(ids) ? ids : [ids];
+    setActiveClientPopups(prev => prev.filter(x => !targetIds.includes(x.id)));
+    markClientNotifAsRead(targetIds);
   };
 
   useEffect(() => {
@@ -7061,10 +7126,10 @@ function App() {
                 className="client-portal-popup-container"
                 onMouseEnter={() => setIsPopupHovered(true)}
                 onMouseLeave={() => setIsPopupHovered(false)}
-                style={{ pointerEvents: activeClientPopups.length > 0 ? 'auto' : 'none' }}
+                style={{ pointerEvents: groupedClientPopups.length > 0 ? 'auto' : 'none' }}
               >
                 <AnimatePresence>
-                  {activeClientPopups.map((popup, idx) => {
+                  {groupedClientPopups.map((popup, idx) => {
                     const offset = idx - activePopupIndex;
                     const offsetSpacing = isPopupHovered ? 24 : 10;
                     const isScrolledPast = offset < 0;
@@ -7079,7 +7144,7 @@ function App() {
                           opacity: isScrolledPast ? 0 : Math.max(0, 1 - offset * 0.35),
                           y: isScrolledPast ? -120 : offset * offsetSpacing,
                           scale: isScrolledPast ? 0.95 : Math.max(0.8, 1 - offset * 0.04),
-                          zIndex: activeClientPopups.length - offset,
+                          zIndex: groupedClientPopups.length - offset,
                         }}
                         exit={{ opacity: 0, scale: 0.9, y: -40, transition: { duration: 0.2 } }}
                         transition={{ type: "spring", damping: 30, stiffness: 300 }}
@@ -7118,16 +7183,16 @@ function App() {
                           </div>
                         </div>
                         <div className="popup-footer">
-                          {activeClientPopups.length > 1 ? (
+                          {groupedClientPopups.length > 1 ? (
                             <span className="popup-stack-helper">
-                              Stack: {activePopupIndex + 1} of {activeClientPopups.length} <span className="scroll-hint">(scroll to cycle)</span>
+                              Stack: {activePopupIndex + 1} of {groupedClientPopups.length} <span className="scroll-hint">(scroll to cycle)</span>
                             </span>
                           ) : (
                             <span className="popup-stack-helper-single">✨ Client Update</span>
                           )}
                           <div className="popup-footer-actions">
-                            <button className="popup-btn ack-btn" onClick={() => handleAckNotification(popup.id)}>
-                              ACKNOWLEDGE
+                            <button className="popup-btn ack-btn" onClick={() => handleAckNotification(popup.ids)}>
+                              ACKNOWLEDGE {popup.count > 1 ? `(${popup.count})` : ''}
                             </button>
                             <button className="popup-btn view-btn" onClick={() => handleViewNotification(popup)}>
                               VIEW Details
@@ -7140,14 +7205,14 @@ function App() {
                 </AnimatePresence>
 
                 {/* Vertical Pagination Indicators */}
-                {activeClientPopups.length > 1 && (
+                {groupedClientPopups.length > 1 && (
                   <div className="stack-indicators">
-                    {activeClientPopups.map((popup, idx) => (
+                    {groupedClientPopups.map((popup, idx) => (
                       <button
                         key={popup.id}
                         className={`stack-indicator-dot ${idx === activePopupIndex ? 'active' : ''}`}
                         onClick={() => setActivePopupIndex(idx)}
-                        title={`Go to notification ${idx + 1}`}
+                        title={`Go to group ${idx + 1}`}
                         style={{ '--glow-color': getPopupThemeColor(popup.type) }}
                       />
                     ))}
