@@ -7877,25 +7877,24 @@ input[type="number"] {
 .client-portal-popup-container {
   position: fixed;
   top: 24px;
-  left: 0;
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 440px;
+  max-width: 90vw;
+  height: 180px;
   z-index: 999999;
-  pointer-events: none;
 }
 
 .client-portal-popup {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
   pointer-events: auto;
   background: rgba(8, 12, 28, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px;
-  width: 440px;
-  max-width: 90vw;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
-  position: relative;
   overflow: hidden;
   padding: 1.25rem;
   backdrop-filter: blur(24px);
@@ -7988,11 +7987,42 @@ input[type="number"] {
 
 .popup-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   padding-top: 0.75rem;
+}
+
+.popup-stack-helper {
+  font-family: monospace;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.55);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.popup-stack-helper .scroll-hint {
+  color: var(--glow-color, #00E5FF);
+  opacity: 0.8;
+  animation: pulse-hint 2s infinite ease-in-out;
+}
+
+.popup-stack-helper-single {
+  font-family: monospace;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.popup-footer-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+@keyframes pulse-hint {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
 
 .popup-btn {
@@ -8029,6 +8059,41 @@ input[type="number"] {
 .popup-btn.ack-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
+}
+
+/* Pagination Dots Panel */
+.stack-indicators {
+  position: absolute;
+  right: -28px;
+  top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000000;
+  pointer-events: auto;
+}
+
+.stack-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+}
+
+.stack-indicator-dot:hover {
+  background: rgba(255, 255, 255, 0.5);
+  transform: scale(1.2);
+}
+
+.stack-indicator-dot.active {
+  background: var(--glow-color, #00E5FF);
+  transform: scale(1.4);
+  box-shadow: 0 0 8px var(--glow-color, #00E5FF);
 }
 
 

@@ -1313,6 +1313,10 @@ function App() {
 
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [activeClientPopups, setActiveClientPopups] = useState([]);
+  const [activePopupIndex, setActivePopupIndex] = useState(0);
+  const [isPopupHovered, setIsPopupHovered] = useState(false);
+  const popupContainerRef = useRef(null);
+  const lastScrollTimeRef = useRef(0);
   const [shownNotifIds, setShownNotifIds] = useState([]);
   const [autoOpenBridgeClientId, setAutoOpenBridgeClientId] = useState(null);
   const [autoOpenReviewClientId, setAutoOpenReviewClientId] = useState(null);
@@ -1851,11 +1855,53 @@ function App() {
             next.push(n);
           }
         });
-        return next.slice(-3);
+        return next;
       });
       setShownNotifIds(prev => [...prev, ...newNotifs.map(n => n.id)]);
     }
   }, [clientPortalNotifs, isDataLoaded, shownNotifIds]);
+
+  // Bounds-check activePopupIndex when activeClientPopups changes
+  useEffect(() => {
+    if (activeClientPopups.length === 0) {
+      setActivePopupIndex(0);
+    } else if (activePopupIndex >= activeClientPopups.length) {
+      setActivePopupIndex(activeClientPopups.length - 1);
+    }
+  }, [activeClientPopups.length, activePopupIndex]);
+
+  // Non-passive wheel event listener for scroll-lock card cycling
+  useEffect(() => {
+    const container = popupContainerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e) => {
+      if (activeClientPopups.length <= 1) return;
+
+      // Intercept and lock page scroll when hovering/scrolling inside the deck area
+      e.preventDefault();
+
+      const now = Date.now();
+      if (now - lastScrollTimeRef.current < 250) {
+        return; // Throttle to 250ms to prevent rapid wheel inertia scrolling
+      }
+
+      if (e.deltaY > 0) {
+        // Scroll down: cycle to next popup
+        setActivePopupIndex((prev) => (prev < activeClientPopups.length - 1 ? prev + 1 : prev));
+        lastScrollTimeRef.current = now;
+      } else if (e.deltaY < 0) {
+        // Scroll up: cycle to previous popup
+        setActivePopupIndex((prev) => (prev > 0 ? prev - 1 : prev));
+        lastScrollTimeRef.current = now;
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [activeClientPopups.length]);
 
   const getPopupThemeColor = (type) => {
     switch (type) {
@@ -7001,60 +7047,103 @@ function App() {
               </AnimatePresence>
 
               {/* Real-time Client Portal Notification Popup Stack */}
-              <div className="client-portal-popup-container">
+              <div 
+                ref={popupContainerRef}
+                className="client-portal-popup-container"
+                onMouseEnter={() => setIsPopupHovered(true)}
+                onMouseLeave={() => setIsPopupHovered(false)}
+                style={{ pointerEvents: activeClientPopups.length > 0 ? 'auto' : 'none' }}
+              >
                 <AnimatePresence>
-                  {activeClientPopups.map(popup => (
-                    <motion.div
-                      key={popup.id}
-                      className="client-portal-popup"
-                      layout
-                      initial={{ opacity: 0, y: -40, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-                      transition={{ type: "spring", damping: 25, stiffness: 350 }}
-                      whileHover={{ scale: 1.02 }}
-                      style={{ '--glow-color': getPopupThemeColor(popup.type) }}
-                    >
-                      <div className="popup-glow"></div>
-                      <div className="popup-body">
-                        <div 
-                          className="popup-icon-wrapper" 
-                          style={{ 
-                            color: getPopupThemeColor(popup.type),
-                            background: `${getPopupThemeColor(popup.type)}15`,
-                            borderColor: `${getPopupThemeColor(popup.type)}30`
-                          }}
-                        >
-                          <span className="popup-icon">{getPopupIcon(popup.type)}</span>
-                        </div>
-                        <div className="popup-text">
-                          <div className="popup-header-row">
-                            <span 
-                              className="popup-badge" 
-                              style={{ 
-                                color: getPopupThemeColor(popup.type),
-                                background: `${getPopupThemeColor(popup.type)}15`
-                              }}
-                            >
-                              {getPopupBadgeLabel(popup.type)}
-                            </span>
-                            <span className="popup-time">Just Now</span>
+                  {activeClientPopups.map((popup, idx) => {
+                    const offset = idx - activePopupIndex;
+                    const offsetSpacing = isPopupHovered ? 24 : 10;
+                    const isScrolledPast = offset < 0;
+
+                    return (
+                      <motion.div
+                        key={popup.id}
+                        className="client-portal-popup"
+                        layout
+                        initial={{ opacity: 0, y: -40, scale: 0.95 }}
+                        animate={{
+                          opacity: isScrolledPast ? 0 : Math.max(0, 1 - offset * 0.35),
+                          y: isScrolledPast ? -120 : offset * offsetSpacing,
+                          scale: isScrolledPast ? 0.95 : Math.max(0.8, 1 - offset * 0.04),
+                          zIndex: activeClientPopups.length - offset,
+                        }}
+                        exit={{ opacity: 0, scale: 0.9, y: -40, transition: { duration: 0.2 } }}
+                        transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                        style={{
+                          '--glow-color': getPopupThemeColor(popup.type),
+                          pointerEvents: offset === 0 ? 'auto' : 'none',
+                        }}
+                      >
+                        <div className="popup-glow"></div>
+                        <div className="popup-body">
+                          <div 
+                            className="popup-icon-wrapper" 
+                            style={{ 
+                              color: getPopupThemeColor(popup.type),
+                              background: `${getPopupThemeColor(popup.type)}15`,
+                              borderColor: `${getPopupThemeColor(popup.type)}30`
+                            }}
+                          >
+                            <span className="popup-icon">{getPopupIcon(popup.type)}</span>
                           </div>
-                          <h4 className="popup-title">{popup.title}</h4>
-                          <p className="popup-message">{popup.message}</p>
+                          <div className="popup-text">
+                            <div className="popup-header-row">
+                              <span 
+                                className="popup-badge" 
+                                style={{ 
+                                  color: getPopupThemeColor(popup.type),
+                                  background: `${getPopupThemeColor(popup.type)}15`
+                                }}
+                              >
+                                {getPopupBadgeLabel(popup.type)}
+                              </span>
+                              <span className="popup-time">Just Now</span>
+                            </div>
+                            <h4 className="popup-title">{popup.title}</h4>
+                            <p className="popup-message">{popup.message}</p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="popup-footer">
-                        <button className="popup-btn ack-btn" onClick={() => handleAckNotification(popup.id)}>
-                          ACKNOWLEDGE
-                        </button>
-                        <button className="popup-btn view-btn" onClick={() => handleViewNotification(popup)}>
-                          VIEW Details
-                        </button>
-                      </div>
-                    </motion.div>
-                  ))}
+                        <div className="popup-footer">
+                          {activeClientPopups.length > 1 ? (
+                            <span className="popup-stack-helper">
+                              Stack: {activePopupIndex + 1} of {activeClientPopups.length} <span className="scroll-hint">(scroll to cycle)</span>
+                            </span>
+                          ) : (
+                            <span className="popup-stack-helper-single">✨ Client Update</span>
+                          )}
+                          <div className="popup-footer-actions">
+                            <button className="popup-btn ack-btn" onClick={() => handleAckNotification(popup.id)}>
+                              ACKNOWLEDGE
+                            </button>
+                            <button className="popup-btn view-btn" onClick={() => handleViewNotification(popup)}>
+                              VIEW Details
+                            </button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
                 </AnimatePresence>
+
+                {/* Vertical Pagination Indicators */}
+                {activeClientPopups.length > 1 && (
+                  <div className="stack-indicators">
+                    {activeClientPopups.map((popup, idx) => (
+                      <button
+                        key={popup.id}
+                        className={`stack-indicator-dot ${idx === activePopupIndex ? 'active' : ''}`}
+                        onClick={() => setActivePopupIndex(idx)}
+                        title={`Go to notification ${idx + 1}`}
+                        style={{ '--glow-color': getPopupThemeColor(popup.type) }}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </section>
