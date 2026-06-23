@@ -1311,6 +1311,13 @@ function App() {
     }
   });
 
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [activeClientPopups, setActiveClientPopups] = useState([]);
+  const [shownNotifIds, setShownNotifIds] = useState([]);
+  const [autoOpenBridgeClientId, setAutoOpenBridgeClientId] = useState(null);
+  const [autoOpenReviewClientId, setAutoOpenReviewClientId] = useState(null);
+  const [autoOpenVaultClientId, setAutoOpenVaultClientId] = useState(null);
+
   const clientPortalNotifs = useMemo(() => {
     const notifs = [];
     ignitionQueue.forEach(proj => {
@@ -1577,8 +1584,10 @@ function App() {
         await refreshProjects();
         await refreshInvoices();
         await refreshMicroJobs();
+        setIsDataLoaded(true);
       } catch (error) {
         console.error("Failed to load data from Supabase:", error);
+        setIsDataLoaded(true);
       }
     };
     loadSupabaseData();
@@ -1723,6 +1732,7 @@ function App() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'project_chats' }, async (payload) => {
         const newMsg = payload.new;
         if (newMsg && newMsg.sender !== 'admin' && newMsg.sender !== 'SYSTEM' && newMsg.sender?.toLowerCase() !== 'admin') {
+          await refreshProjects();
           setHasNewConversation(true);
           localStorage.setItem('netra_new_conversation', 'true');
           if (adminProfile?.emailNotifications?.newMessages ?? true) {
@@ -1736,6 +1746,17 @@ function App() {
       })
       .subscribe();
 
+    // 5b. Subscribe to project_media table changes globally for asset uploads
+    const mediaGlobalChannel = supabase
+      .channel('media-global-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'project_media' }, async (payload) => {
+        const newMedia = payload.new;
+        if (newMedia && newMedia.uploaded_by !== 'admin' && newMedia.uploaded_by?.toLowerCase() !== 'admin') {
+          await refreshProjects();
+        }
+      })
+      .subscribe();
+
     return () => {
       if (supabase.removeChannel) {
         supabase.removeChannel(projectsChannel);
@@ -1744,6 +1765,7 @@ function App() {
         supabase.removeChannel(inquiriesChannel);
         supabase.removeChannel(microJobsChannel);
         supabase.removeChannel(chatsGlobalChannel);
+        supabase.removeChannel(mediaGlobalChannel);
       }
     };
   }, []);
@@ -1806,6 +1828,96 @@ function App() {
 
   const unreadClientNotifs = clientPortalNotifs.filter(n => !n.is_read);
   const hasUrgentAlert = flames.length > 0 || sparks.length > 0;
+
+  useEffect(() => {
+    const unread = clientPortalNotifs.filter(n => !n.is_read);
+    
+    // Always sync activeClientPopups with the current unread list
+    setActiveClientPopups(prev => prev.filter(p => unread.some(u => u.id === p.id)));
+
+    if (!isDataLoaded) {
+      if (unread.length > 0) {
+        setShownNotifIds(unread.map(n => n.id));
+      }
+      return;
+    }
+
+    const newNotifs = unread.filter(n => !shownNotifIds.includes(n.id));
+    if (newNotifs.length > 0) {
+      setActiveClientPopups(prev => {
+        const next = [...prev];
+        newNotifs.forEach(n => {
+          if (!next.some(x => x.id === n.id)) {
+            next.push(n);
+          }
+        });
+        return next.slice(-3);
+      });
+      setShownNotifIds(prev => [...prev, ...newNotifs.map(n => n.id)]);
+    }
+  }, [clientPortalNotifs, isDataLoaded, shownNotifIds]);
+
+  const getPopupThemeColor = (type) => {
+    switch (type) {
+      case 'communication': return '#00E5FF';
+      case 'new_asset': return '#10b981';
+      case 'Profile Update': return '#8b5cf6';
+      default: return '#f59e0b';
+    }
+  };
+
+  const getPopupIcon = (type) => {
+    switch (type) {
+      case 'communication': return '💬';
+      case 'new_asset': return '📁';
+      case 'Profile Update': return '👤';
+      default: return '🔔';
+    }
+  };
+
+  const getPopupBadgeLabel = (type) => {
+    switch (type) {
+      case 'communication': return 'New Message';
+      case 'new_asset': return 'New Asset';
+      case 'Profile Update': return 'Profile Update';
+      default: return 'Client Portal';
+    }
+  };
+
+  const handleViewNotification = (notif) => {
+    setActiveClientPopups(prev => prev.filter(x => x.id !== notif.id));
+    markClientNotifAsRead(notif.id);
+
+    if (notif.type === 'Profile Update') {
+      setAutoOpenReviewClientId(notif.client_id);
+      setActiveAdminModule("CLIENTS");
+      setIsAdminGridActive(true);
+      pushPageToHistory('admin', { activeAdminModule: 'CLIENTS', isAdminGridActive: true });
+    } else if (notif.type === 'communication') {
+      const project = ignitionQueue.find(p => p.id === notif.project_id);
+      const client_id = project?.client_id || project?.client?.id;
+      if (client_id) {
+        setAutoOpenBridgeClientId(client_id);
+        setActiveAdminModule("CLIENTS");
+        setIsAdminGridActive(true);
+        pushPageToHistory('admin', { activeAdminModule: 'CLIENTS', isAdminGridActive: true });
+      }
+    } else if (notif.type === 'new_asset') {
+      const project = ignitionQueue.find(p => p.id === notif.project_id);
+      const client_id = project?.client_id || project?.client?.id;
+      if (client_id) {
+        setAutoOpenVaultClientId(client_id);
+        setActiveAdminModule("CLIENTS");
+        setIsAdminGridActive(true);
+        pushPageToHistory('admin', { activeAdminModule: 'CLIENTS', isAdminGridActive: true });
+      }
+    }
+  };
+
+  const handleAckNotification = (id) => {
+    setActiveClientPopups(prev => prev.filter(x => x.id !== id));
+    markClientNotifAsRead(id);
+  };
 
   useEffect(() => {
     setUnreadSparksCount(sparks.length);
@@ -5939,6 +6051,14 @@ function App() {
                             onOpenEditClient={(client) => { setSelectedClient(client); setClientModalPasscode(client.accessKey || client.access_key || ""); setIsClientModalOpen(true); }}
                             onDeleteClient={deleteClient}
                             initialSearch={clientsSearchQuery}
+                            autoOpenBridgeClientId={autoOpenBridgeClientId}
+                            autoOpenReviewClientId={autoOpenReviewClientId}
+                            autoOpenVaultClientId={autoOpenVaultClientId}
+                            onCloseAutoOpen={(type) => {
+                              if (type === 'bridge') setAutoOpenBridgeClientId(null);
+                              if (type === 'review') setAutoOpenReviewClientId(null);
+                              if (type === 'vault') setAutoOpenVaultClientId(null);
+                            }}
                           />
                         )}
 
@@ -6879,6 +6999,63 @@ function App() {
                   </motion.div>
                 )}
               </AnimatePresence>
+
+              {/* Real-time Client Portal Notification Popup Stack */}
+              <div className="client-portal-popup-container">
+                <AnimatePresence>
+                  {activeClientPopups.map(popup => (
+                    <motion.div
+                      key={popup.id}
+                      className="client-portal-popup"
+                      layout
+                      initial={{ opacity: 0, y: -40, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                      transition={{ type: "spring", damping: 25, stiffness: 350 }}
+                      whileHover={{ scale: 1.02 }}
+                      style={{ '--glow-color': getPopupThemeColor(popup.type) }}
+                    >
+                      <div className="popup-glow"></div>
+                      <div className="popup-body">
+                        <div 
+                          className="popup-icon-wrapper" 
+                          style={{ 
+                            color: getPopupThemeColor(popup.type),
+                            background: `${getPopupThemeColor(popup.type)}15`,
+                            borderColor: `${getPopupThemeColor(popup.type)}30`
+                          }}
+                        >
+                          <span className="popup-icon">{getPopupIcon(popup.type)}</span>
+                        </div>
+                        <div className="popup-text">
+                          <div className="popup-header-row">
+                            <span 
+                              className="popup-badge" 
+                              style={{ 
+                                color: getPopupThemeColor(popup.type),
+                                background: `${getPopupThemeColor(popup.type)}15`
+                              }}
+                            >
+                              {getPopupBadgeLabel(popup.type)}
+                            </span>
+                            <span className="popup-time">Just Now</span>
+                          </div>
+                          <h4 className="popup-title">{popup.title}</h4>
+                          <p className="popup-message">{popup.message}</p>
+                        </div>
+                      </div>
+                      <div className="popup-footer">
+                        <button className="popup-btn ack-btn" onClick={() => handleAckNotification(popup.id)}>
+                          ACKNOWLEDGE
+                        </button>
+                        <button className="popup-btn view-btn" onClick={() => handleViewNotification(popup)}>
+                          VIEW Details
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
             </div>
           </section>
 

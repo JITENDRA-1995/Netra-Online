@@ -30,6 +30,10 @@ interface ClientsProps {
   onDeleteClient: (id: number) => void;
   initialSearch?: string;
   clientPortalNotifs?: any[];
+  autoOpenBridgeClientId?: number | null;
+  autoOpenReviewClientId?: number | null;
+  autoOpenVaultClientId?: number | null;
+  onCloseAutoOpen?: (type: 'bridge' | 'review' | 'vault') => void;
 }
 
 const INDUSTRY_COLORS = ["#00d4ff", "#8b5cf6", "#10b981", "#f59e0b", "#ec4899", "#3b82f6", "#f97316"];
@@ -50,7 +54,11 @@ export default function Clients({
   onOpenEditClient,
   onDeleteClient,
   initialSearch = "",
-  clientPortalNotifs = []
+  clientPortalNotifs = [],
+  autoOpenBridgeClientId = null,
+  autoOpenReviewClientId = null,
+  autoOpenVaultClientId = null,
+  onCloseAutoOpen
 }: ClientsProps) {
   const [search, setSearch] = useState(initialSearch);
 
@@ -82,6 +90,39 @@ export default function Clients({
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [bridgeMessages]);
+
+  // Real-time notification auto-open modal hooks
+  useEffect(() => {
+    if (autoOpenBridgeClientId) {
+      const client = clients.find(c => c.id === autoOpenBridgeClientId);
+      if (client) {
+        handleOpenBridge(client);
+        if (onCloseAutoOpen) onCloseAutoOpen('bridge');
+      }
+    }
+  }, [autoOpenBridgeClientId, clients]);
+
+  useEffect(() => {
+    if (autoOpenReviewClientId) {
+      const client = clients.find(c => c.id === autoOpenReviewClientId);
+      if (client) {
+        setReviewClient(client);
+        setIsReviewModalOpen(true);
+        if (onCloseAutoOpen) onCloseAutoOpen('review');
+      }
+    }
+  }, [autoOpenReviewClientId, clients]);
+
+  useEffect(() => {
+    if (autoOpenVaultClientId) {
+      const client = clients.find(c => c.id === autoOpenVaultClientId);
+      if (client) {
+        setVaultClient(client);
+        setIsVaultModalOpen(true);
+        if (onCloseAutoOpen) onCloseAutoOpen('vault');
+      }
+    }
+  }, [autoOpenVaultClientId, clients]);
 
   // Handle Review Approvals & Rejections
   const handleApprove = async () => {
