@@ -1375,6 +1375,8 @@ function App() {
   const popupContainerRef = useRef(null);
   const scrollTimeoutRef = useRef(null);
   const isScrollCooldownRef = useRef(false);
+  const isRefreshingProjectsRef = useRef(false);
+  const hasPendingProjectsRefreshRef = useRef(false);
   const [autoOpenBridgeClientId, setAutoOpenBridgeClientId] = useState(null);
   const [autoOpenReviewClientId, setAutoOpenReviewClientId] = useState(null);
   const [autoOpenVaultClientId, setAutoOpenVaultClientId] = useState(null);
@@ -1546,6 +1548,12 @@ function App() {
   }, [saveLoginInfo]);
 
   const refreshProjects = async () => {
+    if (isRefreshingProjectsRef.current) {
+      hasPendingProjectsRefreshRef.current = true;
+      return;
+    }
+
+    isRefreshingProjectsRef.current = true;
     try {
       const dbProjects = await getProjects();
       if (dbProjects) {
@@ -1553,6 +1561,12 @@ function App() {
       }
     } catch (err) {
       console.warn("Real-time projects refresh failed:", err);
+    } finally {
+      isRefreshingProjectsRef.current = false;
+      if (hasPendingProjectsRefreshRef.current) {
+        hasPendingProjectsRefreshRef.current = false;
+        await refreshProjects();
+      }
     }
   };
 
