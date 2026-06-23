@@ -571,6 +571,21 @@ function ServiceSlideshowContent({ service, onClose }) {
   );
 }
 
+const formatNotificationTime = (rawDate) => {
+  if (!rawDate) return 'Just Now';
+  const date = new Date(rawDate);
+  if (isNaN(date.getTime())) return 'Just Now';
+
+  // Format as e.g. "Jun 24, 12:26 AM"
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
 const groupNotifications = (notifs) => {
   if (!notifs || notifs.length === 0) return [];
   const groups = {};
@@ -7199,7 +7214,7 @@ function App() {
                               >
                                 {getPopupBadgeLabel(popup.type)}
                               </span>
-                              <span className="popup-time">Just Now</span>
+                              <span className="popup-time">{formatNotificationTime(popup.raw_date)}</span>
                             </div>
                             <h4 className="popup-title">{popup.title}</h4>
                             <p className="popup-message">{popup.message}</p>
