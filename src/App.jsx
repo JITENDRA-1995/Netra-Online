@@ -1373,7 +1373,8 @@ function App() {
   const [activePopupIndex, setActivePopupIndex] = useState(0);
   const [isPopupHovered, setIsPopupHovered] = useState(false);
   const popupContainerRef = useRef(null);
-  const lastScrollTimeRef = useRef(0);
+  const scrollTimeoutRef = useRef(null);
+  const isScrollCooldownRef = useRef(false);
   const [autoOpenBridgeClientId, setAutoOpenBridgeClientId] = useState(null);
   const [autoOpenReviewClientId, setAutoOpenReviewClientId] = useState(null);
   const [autoOpenVaultClientId, setAutoOpenVaultClientId] = useState(null);
@@ -1942,25 +1943,44 @@ function App() {
       // Intercept and lock page scroll when hovering/scrolling inside the deck area
       e.preventDefault();
 
-      const now = Date.now();
-      if (now - lastScrollTimeRef.current < 250) {
-        return; // Throttle to 250ms to prevent rapid wheel inertia scrolling
+      // Clear any existing scroll timeout
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
       }
+
+      // If we are in cooldown, we ignore this scroll tick but reset the timeout
+      // to wait for the user to stop scrolling
+      if (isScrollCooldownRef.current) {
+        scrollTimeoutRef.current = setTimeout(() => {
+          isScrollCooldownRef.current = false;
+        }, 150); // Reset cooldown 150ms after the last wheel event
+        return;
+      }
+
+      const threshold = 10; // Ignore tiny scroll noises
+      if (Math.abs(e.deltaY) < threshold) return;
 
       if (e.deltaY > 0) {
         // Scroll down: cycle to next popup
         setActivePopupIndex((prev) => (prev < groupedClientPopups.length - 1 ? prev + 1 : prev));
-        lastScrollTimeRef.current = now;
       } else if (e.deltaY < 0) {
         // Scroll up: cycle to previous popup
         setActivePopupIndex((prev) => (prev > 0 ? prev - 1 : prev));
-        lastScrollTimeRef.current = now;
       }
+
+      // Enter cooldown
+      isScrollCooldownRef.current = true;
+      scrollTimeoutRef.current = setTimeout(() => {
+        isScrollCooldownRef.current = false;
+      }, 150);
     };
 
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => {
       container.removeEventListener('wheel', handleWheel);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
     };
   }, [groupedClientPopups.length]);
 
