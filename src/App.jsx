@@ -1805,7 +1805,7 @@ function App() {
   });
 
   const unreadClientNotifs = clientPortalNotifs.filter(n => !n.is_read);
-  const hasUrgentAlert = flames.length > 0 || sparks.length > 0 || unreadClientNotifs.length > 0;
+  const hasUrgentAlert = flames.length > 0 || sparks.length > 0;
 
   useEffect(() => {
     setUnreadSparksCount(sparks.length);
@@ -1998,15 +1998,7 @@ function App() {
   const [showClientNotifHistory, setShowClientNotifHistory] = useState(false);
   const [expandedNotifGroup, setExpandedNotifGroup] = useState(null);
 
-  const prevUnreadClientNotifsCountRef = useRef(0);
-  useEffect(() => {
-    if (unreadClientNotifs.length > prevUnreadClientNotifsCountRef.current) {
-      setIsWarningDismissed(false);
-      triggerBellPulse();
-      setExpandedWarningTab('CLIENT');
-    }
-    prevUnreadClientNotifsCountRef.current = unreadClientNotifs.length;
-  }, [unreadClientNotifs.length]);
+  // Client Portal notifications no longer reset the emergency warning overlay dismissal
 
   const [selectedBatchProjects, setSelectedBatchProjects] = useState([]);
   const [selectedVaultInvoices, setSelectedVaultInvoices] = useState([]);
@@ -6533,7 +6525,7 @@ function App() {
                               <div className="warning-pulse-icon">⚠️</div>
                               <h2>CRITICAL UNRESOLVED SYSTEM ALERTS</h2>
                               <p className="warning-desc">
-                                Active project deadlines are overdue, new client inquiries (Sparks) are pending, or client portal updates require attention. 
+                                Active project deadlines are overdue or new client inquiries (Sparks) are pending. 
                                 Acknowledge or navigate to resolve them before interacting with sub-modules.
                               </p>
 
@@ -6556,15 +6548,6 @@ function App() {
                                 >
                                   <h3>NEW INQUIRIES</h3>
                                   <span className="warning-count text-[#00E5FF]">{sparks.length}</span>
-                                </div>
-                                <div 
-                                  className={`warning-details-card cursor-pointer hover:bg-white/5 transition-colors ${expandedWarningTab === 'CLIENT' ? 'border-indigo-500/40 bg-indigo-500/5' : ''}`}
-                                  onClick={() => {
-                                    setExpandedWarningTab(expandedWarningTab === 'CLIENT' ? null : 'CLIENT');
-                                  }}
-                                >
-                                  <h3>CLIENT PORTAL</h3>
-                                  <span className="warning-count text-indigo-400">{unreadClientNotifs.length}</span>
                                 </div>
                               </div>
                                 
@@ -6629,96 +6612,7 @@ function App() {
                                   ))}
                                 </div>
                               )}
-                              {expandedWarningTab === 'CLIENT' && (
-                                <div className="expanded-warning-list flex flex-col border border-white/5 rounded-2xl p-4 bg-black/40 h-full overflow-y-auto space-y-1.5 text-left w-full">
-                                  <div className="flex justify-between items-center mb-2 border-b border-white/5 pb-1">
-                                    <h4 className="text-3xs uppercase tracking-widest text-indigo-400 font-bold m-0">Client Activity:</h4>
-                                    <button 
-                                      className="text-[10px] uppercase font-bold px-2 py-1 rounded bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition-colors"
-                                      onClick={() => setShowClientNotifHistory(!showClientNotifHistory)}
-                                    >
-                                      {showClientNotifHistory ? "Show Unread" : "History"}
-                                    </button>
-                                  </div>
-                                  {(() => {
-                                    const visibleNotifs = clientPortalNotifs.filter(n => showClientNotifHistory ? n.is_read : !n.is_read);
-                                    if (visibleNotifs.length === 0) {
-                                      return <p className="text-xs text-muted-foreground text-center py-4">No {showClientNotifHistory ? 'read' : 'unread'} notifications.</p>;
-                                    }
-                                    const groupedNotifs = visibleNotifs.reduce((acc, n) => {
-                                      const key = n.client_id ? `client-${n.client_id}` : `project-${n.project_id}`;
-                                      if (!acc[key]) {
-                                        let targetClientName = null;
-                                        if (n.type === 'Profile Update' || n.client_id) {
-                                          const client = clients.find(c => c.id === n.client_id);
-                                          if (client) targetClientName = client.name;
-                                        } else {
-                                          const project = ignitionQueue.find(p => p.id === n.project_id);
-                                          if (project && project.client) targetClientName = project.client.name;
-                                        }
-                                        acc[key] = {
-                                          id: key,
-                                          targetClientName: targetClientName || 'Unknown',
-                                          project_id: n.project_id,
-                                          client_id: n.client_id,
-                                          messages: []
-                                        };
-                                      }
-                                      acc[key].messages.push(n);
-                                      return acc;
-                                    }, {});
 
-                                    return Object.values(groupedNotifs).map(group => (
-                                      <div key={group.id} className="flex flex-col border border-white/5 rounded-xl bg-black/20 overflow-hidden">
-                                        <div 
-                                          className="p-2 cursor-pointer hover:bg-white/5 transition-colors flex justify-between items-center"
-                                          onClick={() => setExpandedNotifGroup(expandedNotifGroup === group.id ? null : group.id)}
-                                        >
-                                          <span className="font-bold text-xs text-indigo-300 truncate">{group.targetClientName}</span>
-                                          <span className="text-3xs text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">{group.messages.length}</span>
-                                        </div>
-                                        <AnimatePresence>
-                                          {expandedNotifGroup === group.id && (
-                                            <motion.div
-                                              initial={{ height: 0, opacity: 0 }}
-                                              animate={{ height: 'auto', opacity: 1 }}
-                                              exit={{ height: 0, opacity: 0 }}
-                                              className="border-t border-white/5 bg-black/40 flex flex-col"
-                                            >
-                                              {group.messages.map(n => (
-                                                <div 
-                                                  key={n.id} 
-                                                  className="p-2 hover:bg-white/5 cursor-pointer transition-colors text-xs flex justify-between items-center text-foreground border-b border-white/5 last:border-0"
-                                                  onClick={() => {
-                                                    const allIdsInGroup = group.messages.map(m => m.id);
-                                                    markClientNotifAsRead(allIdsInGroup);
-                                                    
-                                                    let targetClientName = group.targetClientName;
-                                                    if (targetClientName && targetClientName !== 'Unknown') {
-                                                      setClientsSearchQuery(targetClientName);
-                                                      setActiveAdminModule("CLIENTS");
-                                                      setIsAdminGridActive(true);
-                                                      setIsWarningDismissed(true);
-                                                      setExpandedWarningTab(null);
-                                                      pushPageToHistory('admin', { activeAdminModule: 'CLIENTS', isAdminGridActive: true });
-                                                    } else {
-                                                      setIsWarningDismissed(true);
-                                                      setExpandedWarningTab(null);
-                                                    }
-                                                  }}
-                                                >
-                                                  <span className="font-semibold truncate pr-2 opacity-80">{n.message}</span>
-                                                  <span className="text-3xs text-indigo-400/60 uppercase tracking-wider">{n.type}</span>
-                                                </div>
-                                              ))}
-                                            </motion.div>
-                                          )}
-                                        </AnimatePresence>
-                                      </div>
-                                    ));
-                                  })()}
-                                </div>
-                              )}
                             </div>
                           </div>
 
