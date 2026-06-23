@@ -630,7 +630,7 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
         description: descText,
         quantity: qty,
         unitPrice: rate,
-        total: subtotal
+        total: subtotal - discount
       }
     ];
 
@@ -712,17 +712,19 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
 
   const status = (inv.projects?.payment_status || '').toLowerCase() === 'paid' ? 'paid' : 'sent';
   const amount = parseFloat(inv.grand_total);
+  const discount = parseFloat(inv.projects?.discount || 0);
+  const subtotal = parseFloat(inv.projects?.quote || amount + discount);
 
   // Line items: map from project description if JSON_METADATA is used, otherwise default
   let qty = 1;
-  let rate = amount;
+  let rate = subtotal;
   let descText = inv.project_service || inv.projects?.service || inv.projects?.name || 'Design Services';
 
   if (inv.projects?.description?.startsWith("JSON_METADATA:")) {
     try {
       const parsed = JSON.parse(inv.projects.description.substring(14));
       qty = parsed.qty || 1;
-      rate = parsed.rate || (amount / qty);
+      rate = parsed.rate || (subtotal / qty);
       descText = inv.project_service || inv.projects?.service || parsed.description || inv.projects?.name || 'Design Services';
     } catch (e) {
       console.error("Error parsing invoice item JSON_METADATA:", e);
@@ -735,7 +737,7 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
       description: descText,
       quantity: qty,
       unitPrice: rate,
-      total: amount
+      total: subtotal - discount
     }
   ];
 
@@ -771,8 +773,8 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
     console.error("Error fetching system settings for client invoice details:", e);
   }
 
-  const discount = parseFloat(inv.projects?.discount || 0);
-  const subtotal = parseFloat(inv.projects?.quote || amount + discount);
+  const discountVal = parseFloat(inv.projects?.discount || 0);
+  const subtotalVal = parseFloat(inv.projects?.quote || amount + discountVal);
 
   return {
     id: inv.id,
@@ -780,9 +782,9 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
     status,
     projectStatus: inv.projects?.status || 'Active',
     advanceAmount: inv.projects?.advance_amount || 0,
-    discount,
-    subtotal,
-    amount,
+    discount: discountVal,
+    subtotal: subtotalVal,
+    amount: subtotalVal - discountVal,
     createdAt: inv.issue_date || inv.created_at,
     dueDate: inv.issue_date ? new Date(new Date(inv.issue_date).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : null,
     projectTitle: inv.projects?.name || inv.project_service || 'Design Services',
