@@ -1837,29 +1837,38 @@ function App() {
     const unread = clientPortalNotifs.filter(n => !n.is_read);
     
     // Always sync activeClientPopups with the current unread list
-    setActiveClientPopups(prev => prev.filter(p => unread.some(u => u.id === p.id)));
+    setActiveClientPopups(prev => {
+      const filtered = prev.filter(p => unread.some(u => u.id === p.id));
+      const isUnchanged = filtered.length === prev.length && filtered.every((item, idx) => item.id === prev[idx].id);
+      return isUnchanged ? prev : filtered;
+    });
 
     if (!isDataLoaded) {
-      if (unread.length > 0) {
-        setShownNotifIds(unread.map(n => n.id));
-      }
+      setShownNotifIds(prev => {
+        const unreadIds = unread.map(n => n.id);
+        const isDifferent = unreadIds.length !== prev.length || unreadIds.some(id => !prev.includes(id));
+        return isDifferent ? unreadIds : prev;
+      });
       return;
     }
 
-    const newNotifs = unread.filter(n => !shownNotifIds.includes(n.id));
-    if (newNotifs.length > 0) {
-      setActiveClientPopups(prev => {
-        const next = [...prev];
-        newNotifs.forEach(n => {
-          if (!next.some(x => x.id === n.id)) {
-            next.push(n);
-          }
+    setShownNotifIds(prevShown => {
+      const newNotifs = unread.filter(n => !prevShown.includes(n.id));
+      if (newNotifs.length > 0) {
+        setActiveClientPopups(prevPopups => {
+          const next = [...prevPopups];
+          newNotifs.forEach(n => {
+            if (!next.some(x => x.id === n.id)) {
+              next.push(n);
+            }
+          });
+          return next;
         });
-        return next;
-      });
-      setShownNotifIds(prev => [...prev, ...newNotifs.map(n => n.id)]);
-    }
-  }, [clientPortalNotifs, isDataLoaded, shownNotifIds]);
+        return [...prevShown, ...newNotifs.map(n => n.id)];
+      }
+      return prevShown;
+    });
+  }, [clientPortalNotifs, isDataLoaded]);
 
   // Bounds-check activePopupIndex when activeClientPopups changes
   useEffect(() => {
