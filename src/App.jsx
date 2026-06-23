@@ -1374,7 +1374,6 @@ function App() {
   const [isPopupHovered, setIsPopupHovered] = useState(false);
   const popupContainerRef = useRef(null);
   const lastScrollTimeRef = useRef(0);
-  const [shownNotifIds, setShownNotifIds] = useState([]);
   const [autoOpenBridgeClientId, setAutoOpenBridgeClientId] = useState(null);
   const [autoOpenReviewClientId, setAutoOpenReviewClientId] = useState(null);
   const [autoOpenVaultClientId, setAutoOpenVaultClientId] = useState(null);
@@ -1903,29 +1902,19 @@ function App() {
     });
 
     if (!isDataLoaded) {
-      setShownNotifIds(prev => {
-        const unreadIds = unread.map(n => n.id);
-        const isDifferent = unreadIds.length !== prev.length || unreadIds.some(id => !prev.includes(id));
-        return isDifferent ? unreadIds : prev;
-      });
       return;
     }
 
-    setShownNotifIds(prevShown => {
-      const newNotifs = unread.filter(n => !prevShown.includes(n.id));
-      if (newNotifs.length > 0) {
-        setActiveClientPopups(prevPopups => {
-          const next = [...prevPopups];
-          newNotifs.forEach(n => {
-            if (!next.some(x => x.id === n.id)) {
-              next.push(n);
-            }
-          });
-          return next;
-        });
-        return [...prevShown, ...newNotifs.map(n => n.id)];
-      }
-      return prevShown;
+    // Populate activeClientPopups with all unread notifications
+    setActiveClientPopups(prev => {
+      const next = [...prev];
+      unread.forEach(n => {
+        if (!next.some(x => x.id === n.id)) {
+          next.push(n);
+        }
+      });
+      const isUnchanged = next.length === prev.length && next.every((item, idx) => item.id === prev[idx].id);
+      return isUnchanged ? prev : next;
     });
   }, [clientPortalNotifs, isDataLoaded]);
 
