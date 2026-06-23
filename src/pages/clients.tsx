@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Search, Pencil, Trash2, Building2, Mail, Phone, Calendar, Key, Copy, Share2, UserCheck, MessageSquare, Send, FileText, X, AlertCircle, FolderOpen } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Building2, Mail, Phone, Calendar, Key, Copy, Share2, UserCheck, MessageSquare, Send, FileText, X, AlertCircle, FolderOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "../supabase/client";
@@ -16,6 +16,7 @@ interface Client {
   address: string;
   status: string;
   joinedDate?: string;
+  joined_date?: string;
   gst?: string;
   accessKey?: string;
   access_key?: string;
