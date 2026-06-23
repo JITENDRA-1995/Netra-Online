@@ -2523,6 +2523,44 @@ function App() {
   const [selectedCashbookEntry, setSelectedCashbookEntry] = useState(null);
   const [customPaymentPrompt, setCustomPaymentPrompt] = useState(null);
 
+  const [editCategoryVal, setEditCategoryVal] = useState("");
+
+  const incomeCategories = useMemo(() => {
+    const defaults = ["Service", "Other"];
+    const set = new Set(defaults);
+    (cashbookEntries || []).forEach(e => {
+      if (e.type === "INCOME" && e.category) {
+        set.add(e.category);
+      }
+    });
+    return Array.from(set);
+  }, [cashbookEntries]);
+
+  const expenseCategories = useMemo(() => {
+    const defaults = ["Software", "Hardware", "Marketing", "Salary", "Rent", "Other"];
+    const set = new Set(defaults);
+    (cashbookEntries || []).forEach(e => {
+      if (e.type === "EXPENSE" && e.category) {
+        set.add(e.category);
+      }
+    });
+    return Array.from(set);
+  }, [cashbookEntries]);
+
+  const getCategoryLabel = (cat) => {
+    if (cat === "Service") return "Service Income";
+    if (cat === "Salary") return "Salary/Wages";
+    return cat;
+  };
+
+  useEffect(() => {
+    if (selectedCashbookEntry) {
+      setEditCategoryVal(selectedCashbookEntry.category || "");
+    } else {
+      setEditCategoryVal("");
+    }
+  }, [selectedCashbookEntry]);
+
 
   const cashbookMetrics = useMemo(() => {
     let totalExpense = 0;
@@ -3888,6 +3926,10 @@ function App() {
   const handleAddCashbookEntry = (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
+    let category = formData.get('category');
+    if (category === 'CUSTOM') {
+      category = formData.get('customCategory')?.trim() || 'Other';
+    }
     const newEntry = {
       id: Date.now(),
       date: formData.get('date'),
@@ -3895,7 +3937,8 @@ function App() {
       amount: parseFloat(formData.get('amount')),
       type: formData.get('type'),
       mode: formData.get('mode'),
-      category: formData.get('category')
+      category: category,
+      details: formData.get('details')?.trim() || ""
     };
     setCashbookEntries(prev => [newEntry, ...prev]);
     e.target.reset();
@@ -4259,6 +4302,10 @@ function App() {
   const handleUpdateCashbookEntry = (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
+    let category = formData.get('category');
+    if (category === 'CUSTOM') {
+      category = formData.get('customCategory')?.trim() || 'Other';
+    }
     const updatedEntry = {
       ...selectedCashbookEntry,
       date: formData.get('date'),
@@ -4266,7 +4313,8 @@ function App() {
       amount: parseFloat(formData.get('amount')),
       type: formData.get('type'),
       mode: formData.get('mode'),
-      category: formData.get('category')
+      category: category,
+      details: formData.get('details')?.trim() || ""
     };
     setCashbookEntries(prev => prev.map(entry => entry.id === selectedCashbookEntry.id ? updatedEntry : entry));
     setIsCashbookEditModalOpen(false);
@@ -6754,15 +6802,52 @@ function App() {
                                   </div>
                                   <div className="input-group">
                                     <label>Category</label>
-                                    <select name="category" defaultValue={selectedCashbookEntry.category}>
-                                      <option value="Software">Software</option>
-                                      <option value="Hardware">Hardware</option>
-                                      <option value="Marketing">Marketing</option>
-                                      <option value="Salary">Salary/Wages</option>
-                                      <option value="Rent">Rent</option>
-                                      <option value="Service">Service Income</option>
-                                      <option value="Other">Other</option>
+                                    <select
+                                      name="category"
+                                      value={editCategoryVal}
+                                      onChange={(e) => setEditCategoryVal(e.target.value)}
+                                    >
+                                      {selectedCashbookEntry.type === "INCOME" ? (
+                                        <>
+                                          {incomeCategories.map(cat => (
+                                            <option key={cat} value={cat}>{getCategoryLabel(cat)}</option>
+                                          ))}
+                                          <option value="CUSTOM">Manual Entry...</option>
+                                        </>
+                                      ) : (
+                                        <>
+                                          {expenseCategories.map(cat => (
+                                            <option key={cat} value={cat}>{getCategoryLabel(cat)}</option>
+                                          ))}
+                                          <option value="CUSTOM">Manual Entry...</option>
+                                        </>
+                                      )}
                                     </select>
+                                  </div>
+                                </div>
+
+                                {editCategoryVal === "CUSTOM" && (
+                                  <div className="form-row" style={{ marginTop: '0.5rem' }}>
+                                    <div className="input-group" style={{ gridColumn: 'span 2' }}>
+                                      <label>Enter Custom Category</label>
+                                      <input
+                                        type="text"
+                                        name="customCategory"
+                                        placeholder="e.g. Fuel, Office Supplies"
+                                        required
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="form-row">
+                                  <div className="input-group" style={{ gridColumn: 'span 2' }}>
+                                    <label>Additional Details</label>
+                                    <textarea
+                                      name="details"
+                                      defaultValue={selectedCashbookEntry.details || ""}
+                                      placeholder="Enter optional details..."
+                                    />
                                   </div>
                                 </div>
 

@@ -522,6 +522,44 @@ export default function Financials({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [modalEntryType, setModalEntryType] = useState<"INCOME" | "EXPENSE">("INCOME");
 
+  const [selectedCategoryVal, setSelectedCategoryVal] = useState("");
+
+  const incomeCategories = useMemo(() => {
+    const defaults = ["Service", "Other"];
+    const set = new Set(defaults);
+    (cashbookEntries || []).forEach(e => {
+      if (e.type === "INCOME" && e.category) {
+        set.add(e.category);
+      }
+    });
+    return Array.from(set);
+  }, [cashbookEntries]);
+
+  const expenseCategories = useMemo(() => {
+    const defaults = ["Software", "Hardware", "Marketing", "Salary", "Rent", "Other"];
+    const set = new Set(defaults);
+    (cashbookEntries || []).forEach(e => {
+      if (e.type === "EXPENSE" && e.category) {
+        set.add(e.category);
+      }
+    });
+    return Array.from(set);
+  }, [cashbookEntries]);
+
+  const getCategoryLabel = (cat: string) => {
+    if (cat === "Service") return "Service Income";
+    if (cat === "Salary") return "Salary/Wages";
+    return cat;
+  };
+
+  useEffect(() => {
+    if (isAddModalOpen) {
+      setSelectedCategoryVal(modalEntryType === "INCOME" ? "Service" : "Software");
+    } else {
+      setSelectedCategoryVal("");
+    }
+  }, [isAddModalOpen, modalEntryType]);
+
   const monthlyFlowData = useMemo(() => {
     const monthsList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const now = new Date();
@@ -1459,7 +1497,17 @@ export default function Financials({
                             <td className="p-3">
                               <div className="flex flex-col">
                                 <span className="font-bold text-foreground">{entry.desc}</span>
-                                <span className="text-3xs text-muted-foreground mt-0.5">{entry.category}</span>
+                                <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-3xs text-muted-foreground">
+                                  <span>{getCategoryLabel(entry.category)}</span>
+                                  {entry.details && (
+                                    <>
+                                      <span className="text-white/20">•</span>
+                                      <span className="italic max-w-[200px] truncate" title={entry.details}>
+                                        {entry.details}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </td>
                             <td className="p-3">
@@ -1588,7 +1636,17 @@ export default function Financials({
                             <td className="p-3">
                               <div className="flex flex-col">
                                 <span className="font-bold text-foreground">{entry.desc}</span>
-                                <span className="text-3xs text-muted-foreground mt-0.5">{entry.category}</span>
+                                <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-3xs text-muted-foreground">
+                                  <span>{getCategoryLabel(entry.category)}</span>
+                                  {entry.details && (
+                                    <>
+                                      <span className="text-white/20">•</span>
+                                      <span className="italic max-w-[200px] truncate" title={entry.details}>
+                                        {entry.details}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </td>
                             <td className="p-3">
@@ -1746,23 +1804,54 @@ export default function Financials({
 
                 <div className="space-y-1.5">
                   <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Category</label>
-                  <select name="category" className="w-full h-10 px-3 bg-[#0a0f1e] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 font-bold">
+                  <select
+                    name="category"
+                    value={selectedCategoryVal}
+                    onChange={(e) => setSelectedCategoryVal(e.target.value)}
+                    className="w-full h-10 px-3 bg-[#0a0f1e] border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 font-bold"
+                  >
                     {modalEntryType === "INCOME" ? (
                       <>
-                        <option value="Service">Service Income</option>
-                        <option value="Other">Other</option>
+                        {incomeCategories.map(cat => (
+                          <option key={cat} value={cat}>{getCategoryLabel(cat)}</option>
+                        ))}
+                        <option value="CUSTOM">Manual Entry...</option>
                       </>
                     ) : (
                       <>
-                        <option value="Software">Software</option>
-                        <option value="Hardware">Hardware</option>
-                        <option value="Marketing">Marketing</option>
-                        <option value="Salary">Salary/Wages</option>
-                        <option value="Rent">Rent</option>
-                        <option value="Other">Other</option>
+                        {expenseCategories.map(cat => (
+                          <option key={cat} value={cat}>{getCategoryLabel(cat)}</option>
+                        ))}
+                        <option value="CUSTOM">Manual Entry...</option>
                       </>
                     )}
                   </select>
+                </div>
+
+                {selectedCategoryVal === "CUSTOM" && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-1.5"
+                  >
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Enter Custom Category</label>
+                    <Input
+                      type="text"
+                      name="customCategory"
+                      placeholder="e.g. Fuel, Office Supplies"
+                      required
+                      className="bg-white/5 border-white/10 text-xs rounded-xl"
+                    />
+                  </motion.div>
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Additional Details</label>
+                  <textarea
+                    name="details"
+                    placeholder="Enter optional details..."
+                    className="w-full min-h-[60px] max-h-[120px] px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-xs text-foreground outline-none focus:border-cyan-400 font-medium resize-y"
+                  />
                 </div>
 
                 <Button type="submit" className="w-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold text-xs rounded-xl py-5 cursor-pointer">
