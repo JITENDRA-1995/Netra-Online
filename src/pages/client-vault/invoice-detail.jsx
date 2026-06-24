@@ -184,11 +184,13 @@ export function ClientInvoiceDetail({ invoiceId, onTabChange }) {
           >
             <ArrowLeft className="h-4 w-4" /> Back to Invoices
           </button>
-          <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-serif font-medium tracking-tight">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+            <h1 className="text-2xl sm:text-3xl font-serif font-medium tracking-tight break-words">
               {!isCompleted ? "Draft Invoice" : "Invoice"} {invoice.invoiceNumber}
             </h1>
-            {getStatusBadge(invoice.status)}
+            <div className="flex shrink-0">
+              {getStatusBadge(invoice.status)}
+            </div>
           </div>
         </div>
         
@@ -212,17 +214,19 @@ export function ClientInvoiceDetail({ invoiceId, onTabChange }) {
         </div>
       </div>
 
-      {/* Main Printed Invoice Card Sheet */}
-      <div 
-        className="invoice-page-unit invoice-print"
-        style={{
-          width: '800px', height: '1130px', background: '#fff',
-          borderRadius: '8px', overflow: 'hidden',
-          display: 'flex', flexDirection: 'column', position: 'relative',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.2)', margin: '0 auto 30px',
-          color: '#000', fontFamily: 'sans-serif'
-        }}
-      >
+      {/* Scrollable Container for Invoice Sheet */}
+      <div className="w-full overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+        {/* Main Printed Invoice Card Sheet */}
+        <div 
+          className="invoice-page-unit invoice-print"
+          style={{
+            width: '800px', height: '1130px', background: '#fff',
+            borderRadius: '8px', overflow: 'hidden',
+            display: 'flex', flexDirection: 'column', position: 'relative',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.2)', margin: '0 auto 30px',
+            color: '#000', fontFamily: 'sans-serif'
+          }}
+        >
         {/* Red & Black High Fidelity Banner */}
         <div style={{
           background: 'linear-gradient(115deg, #d32f2f 58%, #222 58.2%)',
@@ -454,5 +458,6 @@ export function ClientInvoiceDetail({ invoiceId, onTabChange }) {
         </div>
       </div>
     </div>
+  </div>
   );
 }
