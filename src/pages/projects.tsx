@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Search, Pencil, Trash2, FileText, SlidersHorizontal, Grid, List, Eye, ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, FileText, SlidersHorizontal, Grid, List, Eye, ArrowUpDown, ChevronUp, ChevronDown, UploadCloud, MessageSquare, X, Send, Lock, Unlock, File, DownloadCloud } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -181,6 +181,8 @@ export default function Projects({
   const [isQuickJobModalOpen, setIsQuickJobModalOpen] = useState(false);
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
   const [showStepperProjectId, setShowStepperProjectId] = useState<number | null>(null);
+  const [assetDropProject, setAssetDropProject] = useState<any | null>(null);
+  const [chatProject, setChatProject] = useState<any | null>(null);
 
   const [isEditJobModalOpen, setIsEditJobModalOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<any | null>(null);
@@ -1752,6 +1754,32 @@ export default function Projects({
                       <Button
                         size="icon"
                         variant="ghost"
+                        className="w-7 h-7 rounded-lg hover:bg-indigo-500/10 hover:text-indigo-400 border border-white/5"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAssetDropProject(project);
+                        }}
+                        title="Asset Drop — Share files with client"
+                        data-testid={`button-asset-drop-project-${project.id}`}
+                      >
+                        <UploadCloud className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="w-7 h-7 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-400 border border-white/5"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setChatProject(project);
+                        }}
+                        title="Communication — Chat with client"
+                        data-testid={`button-chat-project-${project.id}`}
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         className="w-7 h-7 rounded-lg hover:bg-red-500/10 hover:text-red-400 border border-white/5"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -3151,6 +3179,283 @@ export default function Projects({
         )}
       </AnimatePresence>
 
+      {/* ── Asset Drop Modal ─────────────────────────────────────── */}
+      <AnimatePresence>
+        {assetDropProject && (
+          <ProjectAssetDropModal
+            project={assetDropProject}
+            clientName={clients.find(c => c.id === assetDropProject.client_id)?.name || 'Client'}
+            onClose={() => setAssetDropProject(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Chat / Communication Modal ────────────────────────────── */}
+      <AnimatePresence>
+        {chatProject && (
+          <ProjectChatModal
+            project={chatProject}
+            clientName={clients.find(c => c.id === chatProject.client_id)?.name || 'Client'}
+            onClose={() => setChatProject(null)}
+          />
+        )}
+      </AnimatePresence>
+
     </motion.div>
+  );
+}
+
+/* ==========================================================================
+   PROJECT ASSET DROP MODAL
+   ========================================================================== */
+function ProjectAssetDropModal({ project, clientName, onClose }: { project: any; clientName: string; onClose: () => void }) {
+  const [assets, setAssets] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [activeCommentId, setActiveCommentId] = useState<any>(null);
+  const [commentText, setCommentText] = useState('');
+  const clientId = project.client_id;
+
+  const fetchAssets = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase.from('client_assets').select('*').eq('client_id', clientId).order('created_at', { ascending: false });
+    if (!error && data) setAssets(data);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchAssets();
+    const sub = supabase.channel(`admin-asset-drop-${clientId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'client_assets', filter: `client_id=eq.${clientId}` }, fetchAssets)
+      .subscribe();
+    return () => { supabase.removeChannel(sub); };
+  }, [clientId]);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const fileExt = file.name.split('.').pop();
+    const filePath = `vault/${clientId}_ADMIN_${Date.now()}.${fileExt}`;
+    let publicUrl = '';
+    const { error: uploadError } = await supabase.storage.from('studio-vault').upload(filePath, file);
+    if (uploadError) { publicUrl = URL.createObjectURL(file); }
+    else { const { data: urlData } = supabase.storage.from('studio-vault').getPublicUrl(filePath); publicUrl = urlData.publicUrl; }
+    await supabase.from('client_assets').insert([{ client_id: clientId, name: file.name, file_url: publicUrl, file_type: file.type, size: file.size, is_locked: false, uploaded_by: 'ADMIN', comments: [] }]);
+    fetchAssets();
+    setUploading(false);
+  };
+
+  const toggleLock = async (asset: any) => {
+    await supabase.from('client_assets').update({ is_locked: !asset.is_locked }).eq('id', asset.id);
+    fetchAssets();
+  };
+
+  const deleteAsset = async (asset: any) => {
+    if (!confirm('Delete this asset?')) return;
+    await supabase.from('client_assets').delete().eq('id', asset.id);
+    fetchAssets();
+  };
+
+  const addComment = async (asset: any) => {
+    if (!commentText.trim()) return;
+    const updated = [...(asset.comments || []), { text: commentText, author: 'ADMIN', created_at: new Date().toISOString() }];
+    await supabase.from('client_assets').update({ comments: updated }).eq('id', asset.id);
+    setCommentText('');
+    fetchAssets();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-[#0a0f1e] border border-white/10 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}>
+        <div className="p-4 border-b border-white/5 flex items-center justify-between bg-black/20">
+          <div>
+            <h3 className="text-lg font-black text-white flex items-center gap-2 tracking-wider uppercase"><UploadCloud className="w-5 h-5 text-indigo-400" /> Asset Drop</h3>
+            <p className="text-xs text-muted-foreground uppercase tracking-widest mt-1">{project.name} · Client: {clientName}</p>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-white p-2"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-4 flex gap-4 border-b border-white/5 bg-black/10 items-center">
+          <label className="flex items-center gap-2 bg-indigo-500/20 text-indigo-400 px-4 py-2 rounded-lg cursor-pointer hover:bg-indigo-500/30 transition-colors text-xs font-bold uppercase tracking-wider border border-indigo-500/20">
+            <UploadCloud className="w-4 h-4" /> {uploading ? 'Uploading...' : 'Drop Asset'}
+            <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
+          </label>
+          <p className="text-xs text-muted-foreground ml-auto">Visible to the client in their Global Asset Vault.</p>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6">
+          {isLoading ? (
+            <div className="text-center text-muted-foreground py-10 text-xs tracking-widest uppercase animate-pulse">Loading Vault...</div>
+          ) : assets.length === 0 ? (
+            <div className="text-center text-muted-foreground/30 py-20 flex flex-col items-center gap-4">
+              <UploadCloud className="w-12 h-12 opacity-50" />
+              <span className="text-xs uppercase tracking-widest">Vault is empty. Drop assets to share with client.</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {assets.map(asset => {
+                const isImg = (asset.file_type || '').toLowerCase().startsWith('image/') || /\.(jpg|jpeg|png|webp|gif)$/i.test(asset.name || '');
+                return (
+                  <div key={asset.id} className="border border-white/10 rounded-xl overflow-hidden bg-black/40 flex flex-col relative" style={{ minHeight: '260px' }}>
+                    <div className="h-36 bg-black/50 border-b border-white/5 relative flex items-center justify-center overflow-hidden">
+                      {isImg ? <img src={asset.file_url} className={`w-full h-full object-cover ${asset.is_locked ? 'opacity-20 blur-[2px]' : ''}`} alt={asset.name} /> : <File className="w-10 h-10 text-white/20" />}
+                      {asset.is_locked && <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none"><Lock className="w-6 h-6 text-white/50 mb-1" /><span className="text-white/50 font-black tracking-widest uppercase text-xs">LOCKED</span></div>}
+                    </div>
+                    <div className="p-3 flex-1 flex flex-col justify-between">
+                      <div>
+                        <p className="text-xs font-semibold text-white truncate mb-0.5">{asset.name}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex justify-between">
+                          <span>{((asset.size || 0) / 1024 / 1024).toFixed(2)} MB</span>
+                          <span className={asset.uploaded_by === 'ADMIN' ? 'text-indigo-400' : 'text-cyan-400'}>{asset.uploaded_by}</span>
+                        </p>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 mt-2 border-t border-white/5">
+                        <button onClick={() => toggleLock(asset)} className={`p-1.5 rounded text-xs font-bold flex items-center gap-1.5 uppercase tracking-wider ${asset.is_locked ? 'bg-amber-500/20 text-amber-400' : 'bg-green-500/20 text-green-400'}`}>
+                          {asset.is_locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}{asset.is_locked ? ' Locked' : ' Unlocked'}
+                        </button>
+                        <div className="flex gap-1">
+                          <button onClick={() => setActiveCommentId(activeCommentId === asset.id ? null : asset.id)} className="p-1.5 bg-cyan-500/10 text-cyan-400 rounded hover:bg-cyan-500/20 relative">
+                            <MessageSquare className="w-3.5 h-3.5" />{(asset.comments?.length || 0) > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-cyan-500 rounded-full" />}
+                          </button>
+                          <a href={asset.file_url} target="_blank" rel="noreferrer" className="p-1.5 bg-white/5 text-white/60 rounded hover:bg-white/10"><DownloadCloud className="w-3.5 h-3.5" /></a>
+                          <button onClick={() => deleteAsset(asset)} className="p-1.5 bg-red-500/10 text-red-400 rounded hover:bg-red-500/20"><Trash2 className="w-3.5 h-3.5" /></button>
+                        </div>
+                      </div>
+                    </div>
+                    <AnimatePresence>
+                      {activeCommentId === asset.id && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute inset-0 bg-black/95 flex flex-col p-3 z-10">
+                          <div className="flex justify-between items-center mb-3">
+                            <h4 className="text-xs uppercase tracking-widest text-cyan-400 font-bold">Comments</h4>
+                            <button onClick={() => setActiveCommentId(null)} className="text-muted-foreground hover:text-white"><X className="w-3 h-3" /></button>
+                          </div>
+                          <div className="flex-1 overflow-y-auto space-y-2 mb-2">
+                            {(asset.comments || []).length === 0 ? <p className="text-[10px] text-muted-foreground uppercase text-center mt-8">No comments yet.</p>
+                              : (asset.comments || []).map((c: any, i: number) => (
+                                <div key={i} className={`p-2 rounded-lg text-xs ${c.author === 'ADMIN' ? 'bg-indigo-500/20 ml-4' : 'bg-white/5 mr-4'}`}>
+                                  <span className="text-[9px] text-muted-foreground uppercase block mb-1">{c.author}</span>
+                                  <p className="text-white/90">{c.text}</p>
+                                </div>
+                              ))}
+                          </div>
+                          <div className="flex gap-2 mt-auto">
+                            <input type="text" value={commentText} onChange={e => setCommentText(e.target.value)} onKeyDown={e => e.key === 'Enter' && addComment(asset)} placeholder="Type comment..." className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-cyan-500/50" />
+                            <button onClick={() => addComment(asset)} className="bg-cyan-500 text-black px-2 py-1.5 rounded hover:bg-cyan-400"><Send className="w-3 h-3" /></button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+/* ==========================================================================
+   PROJECT CHAT MODAL
+   ========================================================================== */
+function ProjectChatModal({ project, clientName, onClose }: { project: any; clientName: string; onClose: () => void }) {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [content, setContent] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setIsLoading(true);
+      const { data, error } = await supabase.from('project_chats').select('*').eq('project_id', project.id).order('created_at', { ascending: true });
+      if (!error && data) {
+        setMessages(data.map((m: any) => ({ id: m.id, sender: m.sender, text: m.message, time: new Date(m.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) })));
+      }
+      setIsLoading(false);
+    };
+    load();
+    const sub = supabase.channel(`admin-chat-modal-${project.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'project_chats', filter: `project_id=eq.${project.id}` }, (payload) => {
+        const m = payload.new as any;
+        setMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, { id: m.id, sender: m.sender, text: m.message, time: new Date(m.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) }]);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'project_chats', filter: `project_id=eq.${project.id}` }, (payload) => {
+        setMessages(prev => prev.filter(x => x.id !== (payload.old as any).id));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(sub); };
+  }, [project.id]);
+
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  const handleSend = async () => {
+    if (!content.trim() || isSending) return;
+    setIsSending(true);
+    try {
+      await supabase.from('project_chats').insert([{ project_id: project.id, sender: 'Admin', message: content.trim() }]);
+      setContent('');
+    } catch (err) { console.error('Failed to send:', err); } finally { setIsSending(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-[#0a0f1e] border border-white/10 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}>
+        <div className="p-4 border-b border-white/5 flex items-center justify-between bg-black/20">
+          <div>
+            <h3 className="text-lg font-black text-white flex items-center gap-2 tracking-wider uppercase"><MessageSquare className="w-5 h-5 text-cyan-400" /> Communication</h3>
+            <p className="text-xs text-muted-foreground uppercase tracking-widest mt-1">{project.name} · {clientName}</p>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-white p-2"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground text-xs uppercase tracking-widest animate-pulse py-16">Loading messages...</div>
+          ) : messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground/30 gap-3">
+              <MessageSquare className="w-10 h-10 opacity-30" />
+              <span className="text-xs uppercase tracking-widest">No messages yet. Start the conversation.</span>
+            </div>
+          ) : messages.map(msg => {
+            const isAdmin = (msg.sender || '').toLowerCase() === 'admin';
+            return (
+              <div key={msg.id} className={`flex gap-2.5 max-w-[85%] ${isAdmin ? 'ml-auto flex-row-reverse' : ''}`}>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-1 ${isAdmin ? 'bg-indigo-500/30 text-indigo-400' : 'bg-cyan-500/20 text-cyan-400'}`}>
+                  {(msg.sender || 'U').charAt(0).toUpperCase()}
+                </div>
+                <div className={`space-y-1 ${isAdmin ? 'items-end' : ''}`}>
+                  <div className={`flex items-baseline gap-2 ${isAdmin ? 'justify-end' : ''}`}>
+                    <span className="text-[10px] font-semibold text-foreground">{msg.sender}</span>
+                    <span className="text-[9px] text-muted-foreground">{msg.time}</span>
+                  </div>
+                  <div className={`p-3 rounded-2xl text-xs leading-relaxed ${isAdmin ? 'bg-indigo-500/20 text-indigo-100 rounded-tr-sm' : 'bg-white/5 text-white/80 rounded-tl-sm border border-white/5'}`}>
+                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div ref={messagesEndRef} />
+        </div>
+        <div className="p-4 bg-black/20 border-t border-white/5">
+          <div className="flex items-end gap-3">
+            <textarea value={content} onChange={e => setContent(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+              placeholder="Type a message as Admin... (Enter to send, Shift+Enter for new line)"
+              rows={2} disabled={isSending}
+              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white outline-none focus:border-cyan-500/50 resize-none placeholder:text-muted-foreground/50"
+            />
+            <button onClick={handleSend} disabled={!content.trim() || isSending}
+              className="h-[52px] w-[52px] shrink-0 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
   );
 }
