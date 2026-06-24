@@ -524,6 +524,51 @@ export default function Financials({
 
   const [selectedCategoryVal, setSelectedCategoryVal] = useState("");
 
+  const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
+  const [editingCategoryName, setEditingCategoryName] = useState<string | null>(null);
+  const [newCatNameInput, setNewCatNameInput] = useState("");
+  const [editCatTab, setEditCatTab] = useState<"INCOME" | "EXPENSE">("INCOME");
+
+  const handleRenameCategory = (oldName: string, newName: string, type: "INCOME" | "EXPENSE") => {
+    if (!newName.trim()) return;
+    if (oldName === newName) {
+      setEditingCategoryName(null);
+      return;
+    }
+    setCashbookEntries(prev => prev.map(entry => {
+      if (entry.type === type && entry.category === oldName) {
+        return { ...entry, category: newName.trim() };
+      }
+      return entry;
+    }));
+    if (selectedCategoryVal === oldName) {
+      setSelectedCategoryVal(newName.trim());
+    }
+    toast({
+      title: "Category Renamed",
+      description: `Successfully renamed "${oldName}" to "${newName.trim()}" in all matching entries.`
+    });
+    setEditingCategoryName(null);
+  };
+
+  const handleDeleteCategory = (catName: string, type: "INCOME" | "EXPENSE") => {
+    if (window.confirm(`Are you sure you want to delete the category "${catName}"? All matching cashbook entries will be reassigned to "Other".`)) {
+      setCashbookEntries(prev => prev.map(entry => {
+        if (entry.type === type && entry.category === catName) {
+          return { ...entry, category: "Other" };
+        }
+        return entry;
+      }));
+      if (selectedCategoryVal === catName) {
+        setSelectedCategoryVal("Other");
+      }
+      toast({
+        title: "Category Deleted",
+        description: `Successfully removed category "${catName}" and reassigned affected entries to "Other".`
+      });
+    }
+  };
+
   const incomeCategories = useMemo(() => {
     const defaults = ["Service", "Other"];
     const set = new Set(defaults);
@@ -1803,7 +1848,19 @@ export default function Financials({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Category</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Category</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditCatTab(modalEntryType);
+                        setIsManageCategoriesOpen(true);
+                      }}
+                      className="text-3xs uppercase tracking-wider font-extrabold text-cyan-400 hover:text-cyan-300 bg-transparent border-none cursor-pointer p-0"
+                    >
+                      ⚙ Manage
+                    </button>
+                  </div>
                   <select
                     name="category"
                     value={selectedCategoryVal}
@@ -1863,6 +1920,140 @@ export default function Financials({
         )}
       </AnimatePresence>
 
+      {/* Manage Categories Modal Overlay */}
+      <AnimatePresence>
+        {isManageCategoriesOpen && (
+          <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              className="w-full max-w-sm bg-[#0a0f1e] border border-white/10 rounded-2xl p-6 space-y-4 shadow-2xl relative"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+            >
+              <button
+                onClick={() => { setIsManageCategoriesOpen(false); setEditingCategoryName(null); }}
+                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground text-lg cursor-pointer bg-transparent border-none outline-none font-bold"
+              >
+                ×
+              </button>
+              
+              <div>
+                <h3 className="font-bold text-foreground text-base flex items-center gap-2 uppercase tracking-wider">
+                  MANAGE CATEGORIES
+                </h3>
+                <p className="text-xs text-muted-foreground">Edit or delete custom ledger categories</p>
+              </div>
+
+              <div className="flex bg-white/5 border border-white/10 rounded-xl p-0.5" style={{ marginBottom: '1rem' }}>
+                <button
+                  type="button"
+                  className={`flex-1 py-1.5 rounded-lg text-2xs font-extrabold transition-all cursor-pointer ${
+                    editCatTab === 'INCOME'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground bg-transparent border border-transparent'
+                  }`}
+                  onClick={() => { setEditCatTab('INCOME'); setEditingCategoryName(null); }}
+                >
+                  INCOME
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-1.5 rounded-lg text-2xs font-extrabold transition-all cursor-pointer ${
+                    editCatTab === 'EXPENSE'
+                      ? 'bg-rose-500/20 text-rose-400 border border-rose-500/20 shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground bg-transparent border border-transparent'
+                  }`}
+                  onClick={() => { setEditCatTab('EXPENSE'); setEditingCategoryName(null); }}
+                >
+                  EXPENSE
+                </button>
+              </div>
+
+              <div className="max-h-[220px] overflow-y-auto pr-1 space-y-2 scrollbar-thin">
+                {(() => {
+                  const list = editCatTab === "INCOME"
+                    ? incomeCategories.filter(cat => !["Service", "Other"].includes(cat))
+                    : expenseCategories.filter(cat => !["Software", "Hardware", "Marketing", "Salary", "Rent", "Other"].includes(cat));
+
+                  if (list.length === 0) {
+                    return <p className="text-muted-foreground text-center text-xs py-4">No custom categories found for this type.</p>;
+                  }
+
+                  return list.map(cat => {
+                    const isEditing = editingCategoryName === cat;
+                    return (
+                      <div
+                        key={cat}
+                        className="flex items-center justify-between bg-white/[0.03] border border-white/5 rounded-xl p-2.5"
+                      >
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={newCatNameInput}
+                            onChange={(e) => setNewCatNameInput(e.target.value)}
+                            autoFocus
+                            className="flex-1 bg-black/40 border border-white/10 text-white rounded-lg px-2 py-1 text-xs outline-none mr-2 focus:border-cyan-400"
+                          />
+                        ) : (
+                          <span className="text-white text-xs font-bold truncate max-w-[200px]" title={cat}>{cat}</span>
+                        )}
+
+                        <div className="flex gap-1">
+                          {isEditing ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleRenameCategory(cat, newCatNameInput, editCatTab)}
+                                className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2 py-1 rounded-lg text-xs cursor-pointer hover:bg-emerald-500/20 font-bold"
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingCategoryName(null)}
+                                className="bg-rose-500/10 border border-rose-500/20 text-rose-400 px-2 py-1 rounded-lg text-xs cursor-pointer hover:bg-rose-500/20 font-bold"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => { setEditingCategoryName(cat); setNewCatNameInput(cat); }}
+                                className="bg-white/5 hover:bg-white/10 text-cyan-400 p-1.5 rounded-lg cursor-pointer"
+                                title="Edit category name"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCategory(cat, editCatTab)}
+                                className="bg-white/5 hover:bg-white/10 text-rose-400 p-1.5 rounded-lg cursor-pointer"
+                                title="Delete category"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              <Button
+                type="button"
+                className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-xl py-4 cursor-pointer mt-2"
+                onClick={() => { setIsManageCategoriesOpen(false); setEditingCategoryName(null); }}
+              >
+                CLOSE
+              </Button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </motion.div>
   );

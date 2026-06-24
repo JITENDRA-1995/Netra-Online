@@ -5,7 +5,7 @@ import './Login.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
-import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ChevronLeft, X, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail, Menu, Volume2, VolumeX, Coins, Phone, MapPin } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ChevronLeft, X, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail, Menu, Volume2, VolumeX, Coins, Phone, MapPin, Pencil, Trash2 } from 'lucide-react';
 
 // Lazy loaded page components to optimize bundle size and load performance
 const Dashboard = React.lazy(() => import('@/pages/dashboard'));
@@ -1278,6 +1278,52 @@ function App() {
   const [editRate, setEditRate] = useState("");
   const [editQuote, setEditQuote] = useState("");
   const [editLastCalculatedBy, setEditLastCalculatedBy] = useState("rate");
+
+  // Category management states for Cashbook
+  const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
+  const [editingCategoryName, setEditingCategoryName] = useState(null);
+  const [newCatNameInput, setNewCatNameInput] = useState("");
+  const [editCatTab, setEditCatTab] = useState("INCOME");
+
+  const handleRenameCategory = (oldName, newName, type) => {
+    if (!newName.trim()) return;
+    if (oldName === newName) {
+      setEditingCategoryName(null);
+      return;
+    }
+    setCashbookEntries(prev => prev.map(entry => {
+      if (entry.type === type && entry.category === oldName) {
+        return { ...entry, category: newName.trim() };
+      }
+      return entry;
+    }));
+    if (editCategoryVal === oldName) {
+      setEditCategoryVal(newName.trim());
+    }
+    toast({
+      title: "Category Renamed",
+      description: `Successfully renamed "${oldName}" to "${newName.trim()}" in all matching entries.`
+    });
+    setEditingCategoryName(null);
+  };
+
+  const handleDeleteCategory = (catName, type) => {
+    if (window.confirm(`Are you sure you want to delete the category "${catName}"? All matching cashbook entries will be reassigned to "Other".`)) {
+      setCashbookEntries(prev => prev.map(entry => {
+        if (entry.type === type && entry.category === catName) {
+          return { ...entry, category: "Other" };
+        }
+        return entry;
+      }));
+      if (editCategoryVal === catName) {
+        setEditCategoryVal("Other");
+      }
+      toast({
+        title: "Category Deleted",
+        description: `Successfully removed category "${catName}" and reassigned affected entries to "Other".`
+      });
+    }
+  };
 
   // Qty or Rate changes → recalculate Quote (unless user is typing in Quote field)
   useEffect(() => {
@@ -7057,7 +7103,19 @@ function App() {
                                     </select>
                                   </div>
                                   <div className="input-group">
-                                    <label>Category</label>
+                                    <div className="flex justify-between items-center" style={{ marginBottom: '0.2rem' }}>
+                                      <label style={{ margin: 0 }}>Category</label>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditCatTab(selectedCashbookEntry.type);
+                                          setIsManageCategoriesOpen(true);
+                                        }}
+                                        style={{ background: 'none', border: 'none', color: '#00d4ff', fontSize: '10px', cursor: 'pointer', fontWeight: 'bold', textTransform: 'uppercase', padding: 0 }}
+                                      >
+                                        ⚙ Manage
+                                      </button>
+                                    </div>
                                     <select
                                       name="category"
                                       value={editCategoryVal}
@@ -7116,6 +7174,149 @@ function App() {
                                   </button>
                                 </div>
                               </form>
+                            </motion.div>
+                          </div>
+                        )}
+                      </AnimatePresence>
+
+                      {/* Manage Categories Modal Overlay */}
+                      <AnimatePresence>
+                        {isManageCategoriesOpen && (
+                          <div className="modal-overlay" style={{ zIndex: 1100 }}>
+                            <motion.div
+                              className="ignition-modal"
+                              style={{ maxWidth: '400px', width: '100%' }}
+                              initial={{ scale: 0.8, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0.8, opacity: 0 }}
+                            >
+                              <button className="close-modal" onClick={() => { setIsManageCategoriesOpen(false); setEditingCategoryName(null); }}>×</button>
+                              <div className="modal-header">
+                                <h2>MANAGE CATEGORIES</h2>
+                                <p>Edit or delete custom ledger categories</p>
+                              </div>
+
+                              <div className="client-type-selector" style={{ marginBottom: '1.2rem' }}>
+                                <button
+                                  type="button"
+                                  className={`type-btn ${editCatTab === 'INCOME' ? 'active' : ''}`}
+                                  onClick={() => { setEditCatTab('INCOME'); setEditingCategoryName(null); }}
+                                >
+                                  INCOME
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`type-btn ${editCatTab === 'EXPENSE' ? 'active' : ''}`}
+                                  onClick={() => { setEditCatTab('EXPENSE'); setEditingCategoryName(null); }}
+                                >
+                                  EXPENSE
+                                </button>
+                              </div>
+
+                              <div style={{ maxHeight: '250px', overflowY: 'auto', paddingRight: '4px', marginBottom: '1rem' }} className="scrollbar-thin">
+                                {(() => {
+                                  const list = editCatTab === "INCOME"
+                                    ? incomeCategories.filter(cat => !["Service", "Other"].includes(cat))
+                                    : expenseCategories.filter(cat => !["Software", "Hardware", "Marketing", "Salary", "Rent", "Other"].includes(cat));
+
+                                  if (list.length === 0) {
+                                    return <p className="dim-text" style={{ fontSize: '11px', textAlign: 'center', padding: '1rem 0' }}>No custom categories found for this type.</p>;
+                                  }
+
+                                  return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                                      {list.map(cat => {
+                                        const isEditing = editingCategoryName === cat;
+                                        return (
+                                          <div
+                                            key={cat}
+                                            style={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'space-between',
+                                              background: 'rgba(255,255,255,0.03)',
+                                              border: '1px solid rgba(255,255,255,0.05)',
+                                              borderRadius: '10px',
+                                              padding: '0.6rem 0.8rem',
+                                            }}
+                                          >
+                                            {isEditing ? (
+                                              <input
+                                                type="text"
+                                                value={newCatNameInput}
+                                                onChange={(e) => setNewCatNameInput(e.target.value)}
+                                                autoFocus
+                                                style={{
+                                                  flex: 1,
+                                                  background: 'rgba(0,0,0,0.2)',
+                                                  border: '1px solid rgba(255,255,255,0.1)',
+                                                  color: '#fff',
+                                                  borderRadius: '6px',
+                                                  padding: '0.2rem 0.4rem',
+                                                  fontSize: '11px',
+                                                  outline: 'none',
+                                                  marginRight: '0.5rem'
+                                                }}
+                                              />
+                                            ) : (
+                                              <span style={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>{cat}</span>
+                                            )}
+
+                                            <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                              {isEditing ? (
+                                                <>
+                                                  <button
+                                                    type="button"
+                                                    style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#10b981', padding: '0.25rem 0.5rem', borderRadius: '6px', cursor: 'pointer', fontSize: '10px', fontWeight: 'bold' }}
+                                                    onClick={() => handleRenameCategory(cat, newCatNameInput, editCatTab)}
+                                                  >
+                                                    Save
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    style={{ background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.2)', color: '#f43f5e', padding: '0.25rem 0.5rem', borderRadius: '6px', cursor: 'pointer', fontSize: '10px', fontWeight: 'bold' }}
+                                                    onClick={() => setEditingCategoryName(null)}
+                                                  >
+                                                    Cancel
+                                                  </button>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <button
+                                                    type="button"
+                                                    style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#00d4ff', padding: '0.35rem', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                    onClick={() => { setEditingCategoryName(cat); setNewCatNameInput(cat); }}
+                                                    title="Edit category name"
+                                                  >
+                                                    <Pencil className="w-3 h-3" />
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    style={{ background: 'rgba(244,63,94,0.05)', border: 'none', color: '#f43f5e', padding: '0.35rem', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                    onClick={() => handleDeleteCategory(cat, editCatTab)}
+                                                    title="Delete category"
+                                                  >
+                                                    <Trash2 className="w-3 h-3" />
+                                                  </button>
+                                                </>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+
+                              <button
+                                type="button"
+                                className="cancel-mission-btn"
+                                style={{ width: '100%', padding: '0.8rem', fontSize: '11px' }}
+                                onClick={() => { setIsManageCategoriesOpen(false); setEditingCategoryName(null); }}
+                              >
+                                CLOSE
+                              </button>
                             </motion.div>
                           </div>
                         )}
