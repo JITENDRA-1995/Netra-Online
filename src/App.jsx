@@ -3983,6 +3983,17 @@ function App() {
           if (dbInquiries && dbInquiries.length > 0) {
             setInquiries(dbInquiries);
           }
+
+          // Send positive WhatsApp greeting confirmation
+          if (prefillData.phone) {
+            const msg = `Namaste ${prefillData.clientName}! We have received and accepted your spark for "${serviceName}" at Netra Graphics. Our team is super excited to work with you and start the ignition process! Let's build something exceptional.`;
+            let cleanedPhone = prefillData.phone.replace(/\D/g, "");
+            while (cleanedPhone.startsWith("0")) {
+              cleanedPhone = cleanedPhone.substring(1);
+            }
+            const finalPhone = cleanedPhone.length === 10 ? "91" + cleanedPhone : cleanedPhone;
+            window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+          }
         } catch (e) {
           console.error("Failed to update inquiry status on auto-ignition:", e);
         }

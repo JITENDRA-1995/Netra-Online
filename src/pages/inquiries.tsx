@@ -348,28 +348,13 @@ export default function Inquiries({
                           className="w-7 h-7 hover:bg-emerald-500/10 hover:text-emerald-400 rounded-lg border border-white/5"
                           title="Accept Spark"
                           onClick={() => {
-                            // 1. Auto-Ignite project and open Ignition Modal
-                            handleIgniteFromInquiry(inq);
-                            
-                            // 2. Update local and backend inquiry status to "Ignited"
-                            updateInquiry(inq.id, { status: "Ignited" }).catch(err => {
-                              console.error("Failed to update status in Supabase:", err);
-                            });
-                            setInquiries(prev => prev.map(i => i.id === inq.id ? { ...i, status: "Ignited" } : i));
-                            
-                            // 3. Send positive WhatsApp greeting confirmation
-                            const msg = `Namaste ${inq.name}! We have received and accepted your spark for "${inq.service}" at Netra Graphics. Our team is super excited to work with you and start the ignition process! Let's build something exceptional.`;
-                             let cleanedPhone = inq.phone.replace(/\D/g, "");
-                             while (cleanedPhone.startsWith("0")) {
-                               cleanedPhone = cleanedPhone.substring(1);
-                             }
-                             const finalPhone = cleanedPhone.length === 10 ? "91" + cleanedPhone : cleanedPhone;
-                             window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, '_blank');
-                            
-                            toast({
-                              title: "Spark Accepted!",
-                              description: "Launching WhatsApp confirmation and opening Ignition parameters."
-                            });
+                             // 1. Auto-Ignite project and open Ignition Modal
+                             handleIgniteFromInquiry(inq);
+                             
+                             toast({
+                               title: "Spark Accepted!",
+                               description: "Opening Project Ignition parameters."
+                             });
                           }}
                         >
                           <Check className="w-3.5 h-3.5" />
