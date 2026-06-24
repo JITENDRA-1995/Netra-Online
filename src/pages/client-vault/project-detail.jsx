@@ -20,6 +20,7 @@ import { supabase } from "../../supabase/client";
 
 export function ClientProjectDetail({ 
   projectId, 
+  currentClient,
   onTabChange, 
   setSelectedProjectId 
 }) {
@@ -145,8 +146,8 @@ export function ClientProjectDetail({
         </button>
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="space-y-2">
-            <h1 className="text-3xl font-serif font-medium tracking-tight">{project.title}</h1>
-            <p className="text-muted-foreground max-w-2xl">{project.description || 'No description provided.'}</p>
+            <h1 className="text-3xl font-serif font-medium tracking-tight">{currentClient?.name || project.title}</h1>
+            <p className="text-muted-foreground max-w-2xl">{project.service || 'No service specified.'}</p>
           </div>
           <div className="flex gap-3">
             <Button 

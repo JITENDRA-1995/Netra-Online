@@ -7573,6 +7573,7 @@ function App() {
                 {activeClientTab === 'PROJECT_DETAIL' && (
                   <ClientProjectDetail
                     projectId={selectedClientProjectId}
+                    currentClient={currentClient}
                     onTabChange={setActiveClientTab}
                     setSelectedProjectId={setSelectedClientProjectId}
                   />
