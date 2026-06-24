@@ -695,11 +695,11 @@ export default function Financials({
             Netra Empire Accounts Calibration
           </p>
         </div>
-        <div className="flex w-full sm:w-auto overflow-x-auto scrollbar-none gap-1.5 p-1 rounded-xl bg-white/5 border border-white/10 max-w-full shrink-0">
+        <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-1.5 p-1 rounded-xl bg-white/5 border border-white/10 shrink-0">
           <Button
             size="sm"
             variant={financialTab === "OVERVIEW" ? "secondary" : "ghost"}
-            className={`rounded-lg text-xs font-semibold tracking-wider shrink-0 ${financialTab === "OVERVIEW" ? "bg-white/10 text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
+            className={`rounded-lg text-xs font-semibold tracking-wider shrink-0 w-full sm:w-auto justify-center ${financialTab === "OVERVIEW" ? "bg-white/10 text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
             onClick={() => setFinancialTab("OVERVIEW")}
           >
             FINANCIAL OVERVIEW
@@ -707,7 +707,7 @@ export default function Financials({
           <Button
             size="sm"
             variant={financialTab === "PROJECTS" ? "secondary" : "ghost"}
-            className={`rounded-lg text-xs font-semibold tracking-wider shrink-0 ${financialTab === "PROJECTS" ? "bg-white/10 text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
+            className={`rounded-lg text-xs font-semibold tracking-wider shrink-0 w-full sm:w-auto justify-center ${financialTab === "PROJECTS" ? "bg-white/10 text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
             onClick={() => setFinancialTab("PROJECTS")}
           >
             IGNITION QUEUE
@@ -715,12 +715,11 @@ export default function Financials({
           <Button
             size="sm"
             variant={financialTab === "CASHBOOK" ? "secondary" : "ghost"}
-            className={`rounded-lg text-xs font-semibold tracking-wider shrink-0 ${financialTab === "CASHBOOK" ? "bg-white/10 text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
+            className={`rounded-lg text-xs font-semibold tracking-wider shrink-0 w-full sm:w-auto justify-center ${financialTab === "CASHBOOK" ? "bg-white/10 text-emerald-400" : "text-muted-foreground hover:text-foreground"}`}
             onClick={() => setFinancialTab("CASHBOOK")}
           >
             CASHBOOK ENTRIES
           </Button>
-
         </div>
       </motion.div>
 
@@ -933,9 +932,9 @@ export default function Financials({
       )}
 
       {financialTab === "PROJECTS" && (
-        <motion.div variants={containerVariants} className="space-y-6 flex flex-col h-[calc(100vh-180px)]">
+        <motion.div variants={containerVariants} className="space-y-6 flex flex-col h-auto sm:h-[calc(100vh-180px)]">
           {/* Ledger Table Container */}
-          <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 flex flex-col flex-1 overflow-hidden space-y-4">
+          <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 flex flex-col flex-1 overflow-visible sm:overflow-hidden space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h3 className="font-bold text-foreground text-lg">Ledger & Ignition Queue</h3>
@@ -1308,8 +1307,8 @@ export default function Financials({
       )}
 
       {financialTab === "CASHBOOK" && (
-        <motion.div variants={containerVariants} className="space-y-6 flex flex-col h-[calc(100vh-180px)]">
-          <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 flex flex-col flex-1 overflow-hidden space-y-4">
+        <motion.div variants={containerVariants} className="space-y-6 flex flex-col h-auto sm:h-[calc(100vh-180px)]">
+          <motion.div variants={itemVariants} className="rounded-2xl border border-white/5 bg-card/40 backdrop-blur-sm p-5 flex flex-col flex-1 overflow-visible sm:overflow-hidden space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h3 className="font-bold text-foreground text-base">
@@ -1320,7 +1319,7 @@ export default function Financials({
                 </p>
               </div>
               
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto justify-between sm:justify-start">
                 {/* INCOME / EXPENSE Mode Toggle */}
                 <div className="flex bg-white/5 border border-white/10 rounded-xl p-0.5">
                   <button

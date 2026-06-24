@@ -6410,6 +6410,12 @@ input[type="number"] {
   flex-direction: column;
   padding: 2.2rem 1.2rem;
   box-sizing: border-box;
+  overflow-y: auto;
+  scrollbar-width: none; /* Hide scrollbar for Firefox */
+}
+
+.admin-sidebar::-webkit-scrollbar {
+  display: none; /* Hide scrollbar for Chrome/Safari */
 }
 
 .sidebar-branding {
@@ -6731,19 +6737,45 @@ input[type="number"] {
 /* Responsiveness helper for actions panel */
 @media (max-width: 1200px) {
   .invoice-actions-panel {
-    position: static;
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    top: auto;
     transform: none;
-    width: 100%;
-    margin: 30px auto 0;
+    width: auto;
+    margin: 0;
     flex-direction: row;
     justify-content: center;
     gap: 15px;
-    background: rgba(8, 12, 22, 0.9);
+    background: rgba(8, 12, 22, 0.95);
+    z-index: 10500;
   }
   .invoice-actions-panel .action-btn {
     width: auto;
     flex: 1;
     max-width: 200px;
+  }
+  .invoice-paper {
+    padding-bottom: 110px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .invoice-actions-panel {
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+    padding: 8px;
+    gap: 6px;
+  }
+  .invoice-actions-panel .action-btn {
+    padding: 6px 4px !important;
+    font-size: 0.58rem !important;
+    letter-spacing: 0.5px !important;
+  }
+  .invoice-paper {
+    padding-bottom: 80px !important;
   }
 }
 
@@ -6796,10 +6828,16 @@ input[type="number"] {
     width: 260px !important;
     height: 100vh !important;
     z-index: 9999 !important; /* Overlay everything */
-    padding: 2.2rem 1.2rem !important;
+    padding: 1.2rem 1rem !important; /* Reduced vertical padding */
     align-items: stretch !important;
     display: flex !important;
     transition: left 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    overflow-y: auto !important;
+    scrollbar-width: none !important;
+  }
+
+  .admin-sidebar::-webkit-scrollbar {
+    display: none !important;
   }
 
   .admin-sidebar.mobile-open {
@@ -6810,7 +6848,7 @@ input[type="number"] {
   .sidebar-menu-link {
     width: 100% !important;
     height: auto !important;
-    padding: 0.85rem 1rem !important;
+    padding: 0.6rem 0.85rem !important; /* Tighter padding on mobile */
     justify-content: flex-start !important;
     border-radius: 8px !important;
     gap: 0.85rem !important;
@@ -6818,7 +6856,7 @@ input[type="number"] {
 
   .sidebar-notifications-trigger {
     width: 100% !important;
-    padding: 0.85rem 1rem !important;
+    padding: 0.6rem 0.85rem !important; /* Tighter padding on mobile */
     justify-content: flex-start !important;
     height: auto !important;
     border-radius: 8px !important;
@@ -6830,10 +6868,14 @@ input[type="number"] {
   .sidebar-logout-btn {
     width: 100% !important;
     height: auto !important;
-    padding: 0.85rem 1rem !important;
+    padding: 0.6rem 0.85rem !important; /* Tighter padding on mobile */
     justify-content: flex-start !important;
     border-radius: 8px !important;
     gap: 0.85rem !important;
+  }
+
+  .sidebar-footer {
+    gap: 0.6rem !important; /* Reduced gap in footer */
   }
 
   /* Offset Spacing Adjustments - Remove sidebar padding on mobile for full width! */
@@ -8280,6 +8322,22 @@ input[type="number"] {
   background: var(--glow-color, #00E5FF);
   transform: scale(1.4);
   box-shadow: 0 0 8px var(--glow-color, #00E5FF);
+}
+
+@media (max-width: 768px) {
+  .module-title {
+    font-size: 1.8rem !important;
+    letter-spacing: 4px !important;
+  }
+  .active-module-header {
+    margin-bottom: 1.5rem !important;
+  }
+}
+
+@media (hover: none) {
+  .client-card-actions {
+    opacity: 0.8 !important;
+  }
 }
 
 

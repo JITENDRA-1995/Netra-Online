@@ -1789,11 +1789,11 @@ export default function InvoicesPage({
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             {/* Tabs for Saved Invoices and Draft Invoices */}
-            <div className="flex gap-1 p-0.5 rounded-lg bg-white/5 border border-white/5 mr-2 overflow-x-auto scrollbar-none max-w-full shrink-0 flex-nowrap">
+            <div className="flex flex-col sm:flex-row gap-1 p-1 rounded-lg bg-white/5 border border-white/5 mr-2 w-full sm:w-auto shrink-0">
               <Button
                 variant={invoiceTab === "SAVED" ? "secondary" : "ghost"}
                 size="sm"
-                className={`h-7 rounded-md text-[10px] font-bold tracking-wider px-3 shrink-0 ${
+                className={`h-7 rounded-md text-[10px] font-bold tracking-wider px-3 shrink-0 w-full sm:w-auto justify-center ${
                   invoiceTab === "SAVED" 
                     ? "bg-white/10 text-cyan-400" 
                     : "text-muted-foreground hover:text-foreground"
@@ -1805,7 +1805,7 @@ export default function InvoicesPage({
               <Button
                 variant={invoiceTab === "DRAFT" ? "secondary" : "ghost"}
                 size="sm"
-                className={`h-7 rounded-md text-[10px] font-bold tracking-wider px-3 shrink-0 ${
+                className={`h-7 rounded-md text-[10px] font-bold tracking-wider px-3 shrink-0 w-full sm:w-auto justify-center ${
                   invoiceTab === "DRAFT" 
                     ? "bg-white/10 text-amber-400" 
                     : "text-muted-foreground hover:text-foreground"
@@ -1817,7 +1817,7 @@ export default function InvoicesPage({
               <Button
                 variant={invoiceTab === "CUSTOM" ? "secondary" : "ghost"}
                 size="sm"
-                className={`h-7 rounded-md text-[10px] font-bold tracking-wider px-3 shrink-0 ${
+                className={`h-7 rounded-md text-[10px] font-bold tracking-wider px-3 shrink-0 w-full sm:w-auto justify-center ${
                   invoiceTab === "CUSTOM" 
                     ? "bg-white/10 text-teal-400" 
                     : "text-muted-foreground hover:text-foreground"
@@ -1829,7 +1829,7 @@ export default function InvoicesPage({
               <Button
                 variant={invoiceTab === "MICRO_JOB" ? "secondary" : "ghost"}
                 size="sm"
-                className={`h-7 rounded-md text-[10px] font-bold tracking-wider px-3 shrink-0 ${
+                className={`h-7 rounded-md text-[10px] font-bold tracking-wider px-3 shrink-0 w-full sm:w-auto justify-center ${
                   invoiceTab === "MICRO_JOB" 
                     ? "bg-white/10 text-purple-400" 
                     : "text-muted-foreground hover:text-foreground"

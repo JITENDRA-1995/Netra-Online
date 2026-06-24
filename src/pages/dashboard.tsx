@@ -722,7 +722,7 @@ export default function Dashboard({
           <div className="xl:col-span-2 space-y-6">
             {/* Revenue Trend Chart */}
             <div className="rounded-2xl border bg-card/40 backdrop-blur-sm p-6" style={{ borderColor: '#00d4ff20' }}>
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
                   <h3 className="font-bold text-foreground text-lg">Revenue Trend</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -731,7 +731,7 @@ export default function Dashboard({
                 </div>
                 
                 {/* Year, Month, Day selector */}
-                <div className="flex bg-[#0c101d] border border-white/10 rounded-xl p-0.5 gap-1 self-end">
+                <div className="flex bg-[#0c101d] border border-white/10 rounded-xl p-0.5 gap-1 w-full sm:w-auto justify-between sm:justify-start self-start sm:self-auto">
                   <button 
                     type="button"
                     onClick={() => setRevenueGranularity('day')} 
@@ -755,45 +755,49 @@ export default function Dashboard({
                   </button>
                 </div>
               </div>
-              <ResponsiveContainer width="100%" height={210}>
-                <BarChart
-                  data={revenueChartData}
-                  margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-                >
-                  <defs>
-                    <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#00d4ff" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#00d4ff" stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="label" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip
-                    contentStyle={{
-                      background: "rgba(10,15,30,0.95)",
-                      border: "1px solid rgba(0,212,255,0.2)",
-                      borderRadius: "12px",
-                      color: "#fff",
-                    }}
-                    formatter={(value: number) => [`₹${value.toLocaleString()}`, ""]}
-                  />
-                  <Bar 
-                    dataKey="value" 
-                    name="Revenue" 
-                    fill="url(#revenueGrad)" 
-                    radius={[6, 6, 0, 0]} 
-                    background={{ fill: 'transparent', cursor: 'pointer' }}
-                    onClick={(data) => handleBarClick(data, 'INCOME', revenueGranularity)} 
-                    style={{ cursor: 'pointer' }}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="w-full overflow-x-auto scrollbar-thin pb-2">
+                <div className="min-w-[600px] h-[210px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={revenueChartData}
+                      margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                    >
+                      <defs>
+                        <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#00d4ff" stopOpacity={0.4} />
+                          <stop offset="100%" stopColor="#00d4ff" stopOpacity={0.05} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                      <XAxis dataKey="label" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip
+                        contentStyle={{
+                          background: "rgba(10,15,30,0.95)",
+                          border: "1px solid rgba(0,212,255,0.2)",
+                          borderRadius: "12px",
+                          color: "#fff",
+                        }}
+                        formatter={(value: number) => [`₹${value.toLocaleString()}`, ""]}
+                      />
+                      <Bar 
+                        dataKey="value" 
+                        name="Revenue" 
+                        fill="url(#revenueGrad)" 
+                        radius={[6, 6, 0, 0]} 
+                        background={{ fill: 'transparent', cursor: 'pointer' }}
+                        onClick={(data) => handleBarClick(data, 'INCOME', revenueGranularity)} 
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
 
             {/* Expense Graph */}
             <div className="rounded-2xl border bg-card/40 backdrop-blur-sm p-6" style={{ borderColor: '#ef444420' }}>
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
                   <h3 className="font-bold text-foreground text-lg text-red-400">Expense Graph</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -802,7 +806,7 @@ export default function Dashboard({
                 </div>
                 
                 {/* Year, Month, Day selector */}
-                <div className="flex bg-[#0c101d] border border-white/10 rounded-xl p-0.5 gap-1 self-end">
+                <div className="flex bg-[#0c101d] border border-white/10 rounded-xl p-0.5 gap-1 w-full sm:w-auto justify-between sm:justify-start self-start sm:self-auto">
                   <button 
                     type="button"
                     onClick={() => setExpenseGranularity('day')} 
@@ -826,40 +830,44 @@ export default function Dashboard({
                   </button>
                 </div>
               </div>
-              <ResponsiveContainer width="100%" height={210}>
-                <BarChart
-                  data={expenseChartData}
-                  margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-                >
-                  <defs>
-                    <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#ef4444" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#ef4444" stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="label" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip
-                    contentStyle={{
-                      background: "rgba(30,10,10,0.95)",
-                      border: "1px solid rgba(239,68,68,0.2)",
-                      borderRadius: "12px",
-                      color: "#fff",
-                    }}
-                    formatter={(value: number) => [`₹${value.toLocaleString()}`, ""]}
-                  />
-                  <Bar 
-                    dataKey="value" 
-                    name="Expense" 
-                    fill="url(#expenseGrad)" 
-                    radius={[6, 6, 0, 0]} 
-                    background={{ fill: 'transparent', cursor: 'pointer' }}
-                    onClick={(data) => handleBarClick(data, 'EXPENSE', expenseGranularity)} 
-                    style={{ cursor: 'pointer' }}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="w-full overflow-x-auto scrollbar-thin pb-2">
+                <div className="min-w-[600px] h-[210px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={expenseChartData}
+                      margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                    >
+                      <defs>
+                        <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#ef4444" stopOpacity={0.4} />
+                          <stop offset="100%" stopColor="#ef4444" stopOpacity={0.05} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                      <XAxis dataKey="label" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip
+                        contentStyle={{
+                          background: "rgba(30,10,10,0.95)",
+                          border: "1px solid rgba(239,68,68,0.2)",
+                          borderRadius: "12px",
+                          color: "#fff",
+                        }}
+                        formatter={(value: number) => [`₹${value.toLocaleString()}`, ""]}
+                      />
+                      <Bar 
+                        dataKey="value" 
+                        name="Expense" 
+                        fill="url(#expenseGrad)" 
+                        radius={[6, 6, 0, 0]} 
+                        background={{ fill: 'transparent', cursor: 'pointer' }}
+                        onClick={(data) => handleBarClick(data, 'EXPENSE', expenseGranularity)} 
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           </div>
 

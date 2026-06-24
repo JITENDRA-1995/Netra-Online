@@ -180,6 +180,7 @@ export default function Projects({
   };
   const [isQuickJobModalOpen, setIsQuickJobModalOpen] = useState(false);
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
+  const [showStepperProjectId, setShowStepperProjectId] = useState<number | null>(null);
 
   const [isEditJobModalOpen, setIsEditJobModalOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<any | null>(null);
@@ -1131,7 +1132,7 @@ export default function Projects({
         }
       `}</style>
       {/* Header */}
-      <motion.div variants={itemVariants} className="flex items-center justify-between">
+      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl font-black tracking-tight bg-gradient-to-r from-cyan-400 to-indigo-400 bg-clip-text text-transparent" data-testid="heading-projects">
             Projects
@@ -1144,21 +1145,57 @@ export default function Projects({
               : `${projects.length} total projects`}
           </p>
         </div>
+        <div className="hidden sm:flex items-center gap-2">
+          {activeTab === "Missions" ? (
+            <Button
+              onClick={onOpenIgnitionModal}
+              className="bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 gap-2 font-bold text-xs rounded-xl"
+              data-testid="button-create-project"
+            >
+              <Plus className="w-4 h-4" />
+              START NEW IGNITION
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setIsQuickJobModalOpen(true)}
+                className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 gap-2 font-bold text-xs rounded-xl"
+                data-testid="button-log-microjob"
+              >
+                <Plus className="w-4 h-4" />
+                LOG NEW JOB
+              </Button>
+              {microJobs.length > 0 && (
+                <Button
+                  onClick={() => setIsClearAllModalOpen(true)}
+                  className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 gap-2 font-bold text-xs rounded-xl"
+                  title="Purge all micro-jobs, invoices and financial entries"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  CLEAR ALL
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </motion.div>
+
+      {/* Status Selector & Filters Toggle */}
+      <motion.div variants={itemVariants} className="flex gap-3 items-center flex-wrap">
+        {/* Mobile-only Action Buttons */}
         {activeTab === "Missions" ? (
           <Button
             onClick={onOpenIgnitionModal}
-            className="bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 gap-2 font-bold text-xs rounded-xl"
-            data-testid="button-create-project"
+            className="flex sm:hidden h-9 px-4 text-xs font-bold rounded-xl border bg-cyan-500/10 hover:bg-cyan-500/20 border-cyan-500/30 text-cyan-400 gap-2 uppercase tracking-wide cursor-pointer w-full justify-center shadow-[0_0_15px_rgba(6,182,212,0.15)]"
           >
             <Plus className="w-4 h-4" />
             START NEW IGNITION
           </Button>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex sm:hidden items-center gap-2 w-full">
             <Button
               onClick={() => setIsQuickJobModalOpen(true)}
-              className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 gap-2 font-bold text-xs rounded-xl"
-              data-testid="button-log-microjob"
+              className="h-9 px-4 text-xs font-bold rounded-xl border bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400 gap-2 flex flex-1 uppercase justify-center cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               LOG NEW JOB
@@ -1166,8 +1203,7 @@ export default function Projects({
             {microJobs.length > 0 && (
               <Button
                 onClick={() => setIsClearAllModalOpen(true)}
-                className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 gap-2 font-bold text-xs rounded-xl"
-                title="Purge all micro-jobs, invoices and financial entries"
+                className="h-9 px-4 text-xs font-bold rounded-xl border bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-400 gap-2 flex flex-1 uppercase justify-center cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
                 CLEAR ALL
@@ -1175,10 +1211,7 @@ export default function Projects({
             )}
           </div>
         )}
-      </motion.div>
 
-      {/* Status Selector & Filters Toggle */}
-      <motion.div variants={itemVariants} className="flex gap-3 items-center flex-wrap">
         {showCompletedTab ? (
           <Button
             onClick={() => {
@@ -1503,25 +1536,31 @@ export default function Projects({
                     >
                       {categoryVal.slice(0, 2)}
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       {layoutMode === "grid" ? (
                         <div className="flex flex-col gap-2">
                           {/* Row 1: Visionary Name (styled like service tag) */}
                           <div className="flex items-center">
                             <span className="text-xs text-muted-foreground mr-1.5">Visionary:</span>
                             <Badge
-                              className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5"
+                              className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5 truncate max-w-[130px] sm:max-w-none"
                               style={{
                                 background: `${categoryColor}15`,
                                 color: categoryColor,
                               }}
+                              title={clientName}
                             >
                               {clientName}
                             </Badge>
                           </div>
                           {/* Row 2: Service Details (Project Name / Category, styled like visionary name) */}
                           <div className="flex items-center">
-                            <h3 className="font-bold text-sm text-black bg-white px-2 py-0.5 rounded-md border border-white/20 shadow-sm">{serviceName}</h3>
+                            <h3 
+                              className="font-bold text-sm text-black bg-white px-2 py-0.5 rounded-md border border-white/20 shadow-sm truncate max-w-[170px] sm:max-w-none"
+                              title={serviceName}
+                            >
+                              {serviceName}
+                            </h3>
                           </div>
                           {/* Row 3: Status and Service Tag (styled with a thin border and colored text) */}
                           <div className="flex items-center gap-2 flex-wrap">
@@ -1582,11 +1621,12 @@ export default function Projects({
                             <h3 className="font-bold text-sm flex items-center gap-1.5">
                               <span className="text-muted-foreground font-normal">Visionary:</span>
                               <Badge
-                                className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5"
+                                className="text-3xs uppercase tracking-wider font-extrabold border-0 px-2 py-0.5 truncate max-w-[130px] sm:max-w-none"
                                 style={{
                                   background: `${categoryColor}15`,
                                   color: categoryColor,
                                 }}
+                                title={clientName}
                               >
                                 {clientName}
                               </Badge>
@@ -1613,7 +1653,7 @@ export default function Projects({
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 flex-wrap">
-                            <span>Service: <strong className="font-bold text-black bg-white px-2 py-0.5 rounded-md border border-white/20 shadow-sm">{serviceName}</strong></span>
+                            <span>Service: <strong className="font-bold text-black bg-white px-2 py-0.5 rounded-md border border-white/20 shadow-sm inline-block truncate max-w-[140px] sm:max-w-none align-bottom" title={serviceName}>{serviceName}</strong></span>
                             {project.deadline && (
                               <>
                                 <span>·</span>
@@ -1725,7 +1765,13 @@ export default function Projects({
                   </div>
                 </div>
 
-                <div className="mt-5 space-y-2.5 group/progress relative">
+                <div 
+                  className="mt-5 space-y-2.5 group/progress relative cursor-pointer select-none"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowStepperProjectId(prev => prev === project.id ? null : project.id);
+                  }}
+                >
                   {/* Progress bar line representation */}
                   <div className="flex items-center gap-3">
                     <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -1742,7 +1788,14 @@ export default function Projects({
 
                   {/* Easy Progress Stepper */}
                   {statusVal !== "completed" && (
-                    <div className="overflow-hidden transition-all duration-300 max-h-0 opacity-0 group-hover/progress:max-h-12 group-hover/progress:opacity-100 pt-0 group-hover/progress:pt-2">
+                    <div 
+                      className={`overflow-hidden transition-all duration-300 ${
+                        showStepperProjectId === project.id 
+                          ? "max-h-12 opacity-100 pt-2" 
+                          : "max-h-0 opacity-0 group-hover/progress:max-h-12 group-hover/progress:opacity-100 pt-0 group-hover/progress:pt-2"
+                      }`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="flex justify-between items-center gap-2 flex-wrap">
                         {[
                           { label: "Discover", val: 20 },

@@ -526,7 +526,7 @@ export default function Clients({
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="client-card-actions flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button 
                       size="icon" 
                       variant="ghost" 
@@ -703,7 +703,7 @@ export default function Clients({
       {/* Review Changes Modal */}
       <AnimatePresence>
         {isReviewModalOpen && reviewClient && reviewClient.pending_profile_update && (
-          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
@@ -810,7 +810,7 @@ export default function Clients({
       {/* Conversation Bridge Modal */}
       <AnimatePresence>
         {isBridgeModalOpen && bridgeClient && (
-          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
@@ -828,17 +828,17 @@ export default function Clients({
               className="relative w-full max-w-3xl h-[600px] rounded-2xl border border-white/10 bg-[#0a0f1e]/95 shadow-2xl backdrop-blur-md text-left overflow-hidden flex flex-col justify-between"
             >
               {/* Header */}
-              <div className="p-4 border-b border-white/5 flex items-center justify-between">
-                <div>
+              <div className="p-4 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative">
+                <div className="flex-1 min-w-0 pr-8 sm:pr-0">
                   <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-wider">
-                    <MessageSquare className="w-4 h-4 text-cyan-400 animate-pulse" />
-                    Conversation Bridge
+                    <MessageSquare className="w-4 h-4 text-cyan-400 animate-pulse flex-shrink-0" />
+                    <span className="truncate">Conversation Bridge</span>
                   </h3>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5 truncate">
                     Client: {bridgeClient.name} | Live Real-time Sync
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                   {bridgeProjects.length > 1 && (
                     <select
                       value={selectedBridgeProject?.id || ""}
@@ -846,7 +846,7 @@ export default function Clients({
                         const proj = bridgeProjects.find(p => String(p.id) === e.target.value);
                         if (proj) setSelectedBridgeProject(proj);
                       }}
-                      className="bg-white/5 border border-white/10 text-2xs text-white rounded-lg px-2 py-1 max-w-[180px] focus:outline-none"
+                      className="bg-white/5 border border-white/10 text-2xs text-white rounded-lg px-2 py-1 max-w-[180px] focus:outline-none flex-grow sm:flex-grow-0"
                     >
                       {bridgeProjects.map(p => (
                         <option key={p.id} value={p.id} className="bg-[#0a0f1e] text-white">
@@ -874,7 +874,7 @@ export default function Clients({
                       setIsBridgeModalOpen(false);
                       setSelectedBridgeProject(null);
                     }}
-                    className="w-8 h-8 rounded-lg text-muted-foreground hover:text-white"
+                    className="w-8 h-8 rounded-lg text-muted-foreground hover:text-white absolute right-4 top-4 sm:relative sm:right-auto sm:top-auto"
                   >
                     <X className="w-4 h-4" />
                   </Button>

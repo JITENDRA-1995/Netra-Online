@@ -6975,9 +6975,9 @@ function App() {
                                           {flames.map(f => (
                                             <div 
                                               key={f.id} 
-                                              className="p-2 hover:bg-white/5 rounded-xl transition-colors text-xs flex justify-between items-center text-foreground"
+                                              className="p-2 hover:bg-white/5 rounded-xl transition-colors text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-2 text-foreground text-left w-full"
                                             >
-                                              <div className="flex-1 cursor-pointer flex flex-col items-start gap-1 min-w-0" onClick={() => {
+                                              <div className="cursor-pointer flex flex-col items-start gap-1 min-w-0 w-full sm:w-auto flex-1" onClick={() => {
                                                 setProjectsSearchQuery(getProjectClientName(f));
                                                 setSelectedProjectTab(f.id);
                                                 setActiveAdminModule("PROJECTS");
@@ -6986,16 +6986,16 @@ function App() {
                                                 setExpandedWarningTab(null);
                                                 pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: true });
                                               }}>
-                                                <span className="font-semibold truncate w-full pr-2">{getProjectClientName(f)}</span>
+                                                <span className="font-semibold truncate w-full text-left">{getProjectClientName(f)}</span>
                                                 <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">Due {new Date(f.deadline).toLocaleDateString()}</span>
                                               </div>
-                                              <div className="flex items-center gap-1 ml-2">
-                                                <input type="number" min="1" className="w-12 bg-black/50 border border-white/10 rounded px-1 py-0.5 text-center text-xs text-white" defaultValue="1" id={`snooze-amt-${f.id}`} onClick={e => e.stopPropagation()} />
-                                                <select className="bg-black/50 border border-white/10 rounded px-1 py-0.5 text-xs text-muted-foreground cursor-pointer outline-none" id={`snooze-unit-${f.id}`} onClick={e => e.stopPropagation()}>
+                                              <div className="flex items-center gap-1.5 sm:ml-2 w-full sm:w-auto justify-start sm:justify-end shrink-0">
+                                                <input type="number" min="1" className="w-12 bg-black/50 border border-white/10 rounded px-2 py-1 text-center text-xs text-white h-7" defaultValue="1" id={`snooze-amt-${f.id}`} onClick={e => e.stopPropagation()} />
+                                                <select className="bg-black/50 border border-white/10 rounded px-1.5 py-1 text-xs text-muted-foreground cursor-pointer outline-none h-7 font-semibold" id={`snooze-unit-${f.id}`} onClick={e => e.stopPropagation()}>
                                                   <option value="HOURS">Hrs</option>
                                                   <option value="MINUTES">Min</option>
                                                 </select>
-                                                <button className="text-3xs bg-[#ff5e00]/20 text-[#ff5e00] px-2 py-1 rounded hover:bg-[#ff5e00]/40 transition-colors uppercase font-bold" onClick={(e) => {
+                                                <button className="text-3xs bg-[#ff5e00]/20 text-[#ff5e00] px-3 py-1 rounded hover:bg-[#ff5e00]/40 transition-colors uppercase font-bold h-7" onClick={(e) => {
                                                   e.stopPropagation();
                                                   const amt = document.getElementById(`snooze-amt-${f.id}`).value;
                                                   const unit = document.getElementById(`snooze-unit-${f.id}`).value;
@@ -7031,11 +7031,11 @@ function App() {
                                                 pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: true });
                                               }}
                                             >
-                                              <div className="flex flex-col items-start gap-1 min-w-0">
-                                                <span className="font-semibold truncate w-full pr-2 text-left">{s.name || s.clientName}</span>
-                                                <span className="text-[10px] text-muted-foreground">{s.email || "No direct link"}</span>
+                                              <div className="flex flex-col items-start gap-1 min-w-0 flex-1 pr-2">
+                                                <span className="font-semibold truncate w-full text-left">{s.name || s.clientName}</span>
+                                                <span className="text-[10px] text-muted-foreground truncate w-full text-left">{s.email || "No direct link"}</span>
                                               </div>
-                                              <span className="text-3xs text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">{s.service || "General Inquiry"}</span>
+                                              <span className="text-3xs text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20 shrink-0 whitespace-nowrap">{s.service || "General Inquiry"}</span>
                                             </div>
                                           ))}
                                         </div>
