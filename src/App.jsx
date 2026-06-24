@@ -4940,7 +4940,16 @@ function App() {
     const emailVal = document.getElementById('email').value;
     const phoneVal = document.getElementById('phone').value;
     const visionVal = document.getElementById('vision').value;
-    const serviceVal = selectedProject || "General Inquiry";
+    
+    let serviceVal = selectedProject || "General Inquiry";
+    if (selectedProject === "Other / Custom Service") {
+      const customInput = document.getElementById('custom-service-input');
+      if (customInput && customInput.value.trim()) {
+        serviceVal = customInput.value.trim();
+      } else {
+        serviceVal = "Custom Service";
+      }
+    }
 
     // Strip leading zeros from phone number to ensure WhatsApp redirection compatibility
     let cleanedPhoneVal = phoneVal.trim();
@@ -5548,11 +5557,33 @@ function App() {
                                       {s.title}
                                     </div>
                                   ))}
+                                  <div
+                                    className="dropdown-item-new"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedProject("Other / Custom Service");
+                                      setDropdownOpen(false);
+                                    }}
+                                  >
+                                    Other / Custom Service
+                                  </div>
                                 </motion.div>
                               )}
                             </AnimatePresence>
                           </div>
                         </div>
+                        
+                        {selectedProject === "Other / Custom Service" && (
+                          <div className="form-group-new full-width" style={{ marginBottom: '1.5rem' }}>
+                            <label htmlFor="custom-service-input">SPECIFY CUSTOM SERVICE</label>
+                            <input 
+                              type="text" 
+                              id="custom-service-input" 
+                              required 
+                              placeholder="e.g. Package Designing, Custom Illustration, etc." 
+                            />
+                          </div>
+                        )}
                         
                         <div className="form-group-new full-width">
                           <label htmlFor="vision">PROJECT DETAILS</label>

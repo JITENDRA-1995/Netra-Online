@@ -7121,6 +7121,78 @@ input[type="number"] {
   background: linear-gradient(90deg, #8b5cf6, #00e5ff);
 }
 
+/* Responsive adjustments for service slideshow on mobile devices */
+@media (max-width: 768px) {
+  .service-slideshow-overlay {
+    padding: 0.5rem;
+  }
+  
+  .service-slideshow-container {
+    height: 70vh;
+    max-height: 480px;
+    border-radius: 16px;
+  }
+  
+  .service-slideshow-viewport img,
+  .service-slideshow-viewport video {
+    object-fit: contain !important;
+  }
+  
+  .service-slideshow-close {
+    top: 1rem;
+    right: 1rem;
+    width: 2.2rem;
+    height: 2.2rem;
+  }
+  
+  .service-slideshow-mute {
+    top: 1rem;
+    right: 3.5rem;
+    width: 2.2rem;
+    height: 2.2rem;
+  }
+  
+  .service-slideshow-nav-btn {
+    width: 2.2rem;
+    height: 2.2rem;
+    top: 50%;
+  }
+  
+  .service-slideshow-nav-btn.prev {
+    left: 0.5rem;
+  }
+  
+  .service-slideshow-nav-btn.next {
+    right: 0.5rem;
+  }
+  
+  .service-slideshow-caption {
+    bottom: 1rem;
+    left: 1rem;
+    right: 1rem;
+  }
+  
+  .service-slideshow-caption-box {
+    padding: 0.6rem 0.8rem;
+    max-width: 75%;
+    border-radius: 12px;
+  }
+  
+  .service-slideshow-caption-box h4 {
+    font-size: 0.85rem;
+  }
+  
+  .service-slideshow-caption-box span {
+    font-size: 0.6rem;
+    margin-bottom: 1px;
+  }
+  
+  .service-slideshow-counter {
+    font-size: 0.65rem;
+    padding: 0.3rem 0.6rem;
+  }
+}
+
 /* ──────────────────────────────────────────────────────── */
 /* ── URGENT ALARM WARNING SYSTEM & DARK RED THEME ── */
 /* ──────────────────────────────────────────────────────── */

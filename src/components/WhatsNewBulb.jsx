@@ -4,14 +4,14 @@ import { Lightbulb, X, CheckCircle2 } from 'lucide-react';
 
 export function WhatsNewBulb({ isClientPortal = false }) {
   const [showBulb, setShowBulb] = useState(() => {
-    return localStorage.getItem(`netra_whatsnew_v254_${isClientPortal ? 'client' : 'admin'}`) !== 'true';
+    return localStorage.getItem(`netra_whatsnew_v255_${isClientPortal ? 'client' : 'admin'}`) !== 'true';
   });
   const [isOpen, setIsOpen] = useState(false);
 
   if (!showBulb) return null;
 
   const handleGotIt = () => {
-    localStorage.setItem(`netra_whatsnew_v254_${isClientPortal ? 'client' : 'admin'}`, 'true');
+    localStorage.setItem(`netra_whatsnew_v255_${isClientPortal ? 'client' : 'admin'}`, 'true');
     setShowBulb(false);
     setIsOpen(false);
   };
@@ -21,7 +21,7 @@ export function WhatsNewBulb({ isClientPortal = false }) {
       <button 
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(true); }}
         className={`flex items-center justify-center gap-2 p-2 rounded-lg transition-colors border ${isClientPortal ? 'bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20' : 'bg-transparent border-transparent text-amber-400 hover:bg-white/5 mx-2'}`}
-        title="What's New in v2.5.4"
+        title="What's New in v2.5.5"
       >
         <Lightbulb className={`w-5 h-5 ${isClientPortal ? '' : 'animate-pulse'} ${isOpen ? 'fill-amber-400' : ''}`} />
         {isClientPortal && <span className="text-sm font-semibold tracking-wider pr-1">What's New</span>}
@@ -43,7 +43,7 @@ export function WhatsNewBulb({ isClientPortal = false }) {
                 </div>
                 <div>
                   <h3 className="text-xl font-black text-white tracking-widest uppercase">Idea Spark</h3>
-                  <p className="text-xs text-amber-400/80 uppercase tracking-widest mt-1">Netra OS v2.5.4 Update</p>
+                  <p className="text-xs text-amber-400/80 uppercase tracking-widest mt-1">Netra OS v2.5.5 Update</p>
                 </div>
                 <button onClick={() => setIsOpen(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-white p-2">
                   <X className="w-5 h-5" />
@@ -53,15 +53,15 @@ export function WhatsNewBulb({ isClientPortal = false }) {
               {/* Content */}
               <div className="p-6 space-y-4">
                 <p className="text-sm text-white/80 leading-relaxed mb-4">
-                  We've rolled out Netra OS v2.5.4 with Progressive Web App (PWA) support and a fully redesigned system alerts interface!
+                  We've rolled out Netra OS v2.5.5 with Progressive Web App (PWA) support, responsive media viewers, and a fully redesigned alerts interface!
                 </p>
                 
                 <ul className="space-y-3">
                   <li className="flex gap-3 items-start">
                     <CheckCircle2 className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="text-sm font-bold text-white">App Installation (PWA)</h4>
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Install Netra Graphics directly onto your phone's home screen or desktop dock for a clean, borderless standalone app experience.</p>
+                      <h4 className="text-sm font-bold text-white">Responsive Portfolio Slideshow</h4>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Optimized the fullscreen portfolio slideshow viewer for mobile viewports. Showcase photos and videos now fit completely without cropping on narrow screens.</p>
                     </div>
                   </li>
                   <li className="flex gap-3 items-start">
@@ -69,6 +69,13 @@ export function WhatsNewBulb({ isClientPortal = false }) {
                     <div>
                       <h4 className="text-sm font-bold text-white">System Alerts Redesign</h4>
                       <p className="text-xs text-muted-foreground mt-1 leading-relaxed">A premium split-screen overlay layout featuring vertical action button stacks on the left and dynamic horizontal tab selectors on the right to resolve pending deadlines and new inquiries quickly.</p>
+                    </div>
+                  </li>
+                  <li className="flex gap-3 items-start">
+                    <CheckCircle2 className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-sm font-bold text-white">App Installation (PWA)</h4>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Install Netra Graphics directly onto your phone's home screen or desktop dock for a clean, borderless standalone app experience.</p>
                     </div>
                   </li>
                   <li className="flex gap-3 items-start">
