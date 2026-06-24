@@ -241,10 +241,13 @@ export function ClientCollaboration({
           <span>Projects ({projects.length})</span>
         </Button>
         
-        <div className="text-center max-w-[150px] truncate">
+        <div className="text-center max-w-[160px]">
           <span className="font-semibold text-sm block truncate">
             {selectedProject ? selectedProject.title : "No Project Selected"}
           </span>
+          {selectedProject?.service && (
+            <span className="text-[10px] text-primary/80 block truncate">{selectedProject.service}</span>
+          )}
         </div>
 
         <Button 
@@ -310,7 +313,14 @@ export function ClientCollaboration({
                     }`}
                   >
                     <div className="flex justify-between items-start w-full gap-2">
-                      <span className="font-medium text-xs md:text-sm line-clamp-1 flex-1">{proj.title}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-xs md:text-sm line-clamp-1 block">{proj.title}</span>
+                        {proj.service && (
+                          <span className={`text-[10px] line-clamp-1 block mt-0.5 ${
+                            isActive ? 'text-primary/70' : 'text-muted-foreground/70'
+                          }`}>{proj.service}</span>
+                        )}
+                      </div>
                       <Badge variant="outline" className="text-[9px] uppercase px-1 py-0.2 shrink-0 border-border/50">
                         {proj.status?.replace('_', ' ')}
                       </Badge>
@@ -338,8 +348,13 @@ export function ClientCollaboration({
               <div className="px-4 py-3 border-b border-border/50 bg-secondary/5 flex items-center justify-between">
                 <div>
                   <h3 className="font-semibold text-sm md:text-base text-foreground line-clamp-1">{selectedProject.title}</h3>
-                  <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                    <span className="capitalize text-[11px] font-medium text-primary bg-primary/5 px-2 py-0.5 rounded-md border border-primary/10">
+                  <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground flex-wrap">
+                    {selectedProject.service && (
+                      <span className="capitalize text-[11px] font-semibold text-primary bg-primary/8 px-2 py-0.5 rounded-md border border-primary/15">
+                        {selectedProject.service}
+                      </span>
+                    )}
+                    <span className="capitalize text-[10px] font-medium text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-md border border-border/30">
                       {selectedProject.category || "design"}
                     </span>
                     {selectedProject.deadline && (
