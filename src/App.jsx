@@ -2266,7 +2266,7 @@ function App() {
   const [microJobs, setMicroJobs] = useState([]);
   const [redirectBackToMicroJob, setRedirectBackToMicroJob] = useState(false);
   const [redirectBackToProjectEdit, setRedirectBackToProjectEdit] = useState(null);
-  const [expandedWarningTab, setExpandedWarningTab] = useState(null); // 'DEADLINES' | 'INQUIRIES' | null
+  const [expandedWarningTab, setExpandedWarningTab] = useState('DEADLINES'); // 'DEADLINES' | 'INQUIRIES'
   const [showClientNotifHistory, setShowClientNotifHistory] = useState(false);
   const [expandedNotifGroup, setExpandedNotifGroup] = useState(null);
 
@@ -6812,138 +6812,159 @@ function App() {
 
                       {/* Fullscreen Alert Warning Overlay */}
                       <AnimatePresence>
-                        {isAdminGridActive && hasUrgentAlert && !isWarningDismissed && (
-                          <motion.div
-                            className="fullscreen-warning-overlay"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.3 }}
-                          >
-                            <div className="fullscreen-warning-content">
-                              <div className="warning-pulse-icon">⚠️</div>
-                              <h2>CRITICAL UNRESOLVED SYSTEM ALERTS</h2>
-                              <p className="warning-desc">
-                                Active project deadlines are overdue or new client inquiries (Sparks) are pending. 
-                                Acknowledge or navigate to resolve them before interacting with sub-modules.
-                              </p>
+                        {isAdminGridActive && hasUrgentAlert && !isWarningDismissed && (() => {
+                          const activeTab = expandedWarningTab || (flames.length > 0 ? 'DEADLINES' : 'INQUIRIES');
+                          return (
+                            <motion.div
+                              className="fullscreen-warning-overlay"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.3 }}
+                            >
+                              <div className="fullscreen-warning-grid">
+                                {/* Left column: Info & Actions */}
+                                <div className="warning-left-panel">
+                                  <div className="warning-pulse-icon">⚠️</div>
+                                  <h2>CRITICAL UNRESOLVED SYSTEM ALERTS</h2>
+                                  <p className="warning-desc">
+                                    Active project deadlines are overdue or new client inquiries (Sparks) are pending. 
+                                    Acknowledge or navigate to resolve them before interacting with sub-modules.
+                                  </p>
 
-                              <div className="warning-content-wrapper">
-                                <div className="warning-details-row">
-                                <div 
-                                  className={`warning-details-card cursor-pointer hover:bg-white/5 transition-colors ${expandedWarningTab === 'DEADLINES' ? 'border-[#ff5e00]/40 bg-[#ff5e00]/5' : ''}`}
-                                  onClick={() => {
-                                    setExpandedWarningTab(expandedWarningTab === 'DEADLINES' ? null : 'DEADLINES');
-                                  }}
-                                >
-                                  <h3>PENDING DEADLINES</h3>
-                                  <span className="warning-count text-[#ff5e00]">{flames.length}</span>
-                                </div>
-                                <div 
-                                  className={`warning-details-card cursor-pointer hover:bg-white/5 transition-colors ${expandedWarningTab === 'INQUIRIES' ? 'border-cyan-500/40 bg-cyan-500/5' : ''}`}
-                                  onClick={() => {
-                                    setExpandedWarningTab(expandedWarningTab === 'INQUIRIES' ? null : 'INQUIRIES');
-                                  }}
-                                >
-                                  <h3>NEW INQUIRIES</h3>
-                                  <span className="warning-count text-[#00E5FF]">{sparks.length}</span>
-                                </div>
-                              </div>
-                                
-                                <div className="expanded-warning-container w-full flex-1 flex flex-col justify-center min-w-0">
-                                  {/* Expanded List Selection */}
-                                  {expandedWarningTab === 'DEADLINES' && flames.length > 0 && (
-                                <div className="expanded-warning-list flex flex-col border border-white/5 rounded-2xl p-4 bg-black/40 h-full overflow-y-auto space-y-1.5 text-left w-full">
-                                  <h4 className="text-3xs uppercase tracking-widest text-[#ff5e00] font-bold mb-2 border-b border-white/5 pb-1">Select Project to Redirect:</h4>
-                                  {flames.map(f => (
-                                    <div 
-                                      key={f.id} 
-                                      className="p-2 hover:bg-white/5 rounded-xl transition-colors text-xs flex justify-between items-center text-foreground"
-                                    >
-                                      <div className="flex-1 cursor-pointer flex flex-col items-start gap-1 min-w-0" onClick={() => {
-                                        setProjectsSearchQuery(getProjectClientName(f));
-                                        setSelectedProjectTab(f.id);
-                                        setActiveAdminModule("PROJECTS");
-                                        setIsAdminGridActive(true);
-                                        setIsWarningDismissed(true);
-                                        setExpandedWarningTab(null);
-                                        pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: true });
-                                      }}>
-                                        <span className="font-semibold truncate w-full pr-2">{getProjectClientName(f)}</span>
-                                        <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">Due {new Date(f.deadline).toLocaleDateString()}</span>
-                                      </div>
-                                      <div className="flex items-center gap-1 ml-2">
-                                        <input type="number" min="1" className="w-12 bg-black/50 border border-white/10 rounded px-1 py-0.5 text-center text-xs text-white" defaultValue="1" id={`snooze-amt-${f.id}`} onClick={e => e.stopPropagation()} />
-                                        <select className="bg-black/50 border border-white/10 rounded px-1 py-0.5 text-xs text-muted-foreground cursor-pointer outline-none" id={`snooze-unit-${f.id}`} onClick={e => e.stopPropagation()}>
-                                          <option value="HOURS">Hrs</option>
-                                          <option value="MINUTES">Min</option>
-                                        </select>
-                                        <button className="text-3xs bg-[#ff5e00]/20 text-[#ff5e00] px-2 py-1 rounded hover:bg-[#ff5e00]/40 transition-colors uppercase font-bold" onClick={(e) => {
-                                          e.stopPropagation();
-                                          const amt = document.getElementById(`snooze-amt-${f.id}`).value;
-                                          const unit = document.getElementById(`snooze-unit-${f.id}`).value;
-                                          handleSnooze(f.id, Number(amt), unit);
-                                        }}>Snooze</button>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              {expandedWarningTab === 'INQUIRIES' && sparks.length > 0 && (
-                                <div className="expanded-warning-list flex flex-col border border-white/5 rounded-2xl p-4 bg-black/40 h-full overflow-y-auto space-y-1.5 text-left w-full">
-                                  <h4 className="text-3xs uppercase tracking-widest text-[#00E5FF] font-bold mb-2 border-b border-white/5 pb-1">Select Inquiry to Redirect:</h4>
-                                  {sparks.map(s => (
-                                    <div 
-                                      key={s.id} 
-                                      className="p-2 hover:bg-white/5 rounded-xl cursor-pointer transition-colors text-xs flex justify-between items-center text-foreground"
+                                  <div className="warning-actions-stack">
+                                    <button 
+                                      className="warning-btn primary-warning-btn"
                                       onClick={() => {
-                                        setInquiriesSearchQuery(s.name || s.clientName);
-                                        setActiveAdminModule("INQUIRIES");
-                                        setIsAdminGridActive(true);
-                                        setIsWarningDismissed(true);
-                                        setExpandedWarningTab(null);
-                                        pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: true });
+                                        setIsAdminGridActive(false);
+                                        setIsWarningDismissed(false);
+                                        pushPageToHistory('admin', { activeAdminModule: 'DASHBOARD', isAdminGridActive: false });
                                       }}
                                     >
-                                      <span className="font-semibold">{s.name || s.clientName}</span>
-                                      <span className="text-3xs text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">{s.service || "General Inquiry"}</span>
-                                    </div>
-                                  ))}
+                                      RETURN TO MODULES GRID
+                                    </button>
+                                    <button 
+                                      className="warning-btn secondary-warning-btn"
+                                      onClick={() => setIsWarningDismissed(true)}
+                                    >
+                                      ACKNOWLEDGE & PROCEED
+                                    </button>
+                                    <button 
+                                      className="warning-btn success-warning-btn"
+                                      onClick={markAllAlertsAsRead}
+                                    >
+                                      MARK ALL AS READ
+                                    </button>
+                                  </div>
                                 </div>
-                              )}
 
-                            </div>
-                          </div>
+                                {/* Right column: Horizontal tab selectors and matching list details */}
+                                <div className="warning-right-panel">
+                                  <div className="warning-tab-bar">
+                                    <button 
+                                      className={`warning-tab-btn ${activeTab === 'DEADLINES' ? 'active-deadlines' : ''}`}
+                                      onClick={() => setExpandedWarningTab('DEADLINES')}
+                                      type="button"
+                                    >
+                                      <span className="tab-title">PENDING DEADLINES</span>
+                                      <span className="tab-badge bg-[#ff5e00]/20 text-[#ff5e00] border border-[#ff5e00]/30">{flames.length}</span>
+                                    </button>
+                                    <button 
+                                      className={`warning-tab-btn ${activeTab === 'INQUIRIES' ? 'active-inquiries' : ''}`}
+                                      onClick={() => setExpandedWarningTab('INQUIRIES')}
+                                      type="button"
+                                    >
+                                      <span className="tab-title">NEW INQUIRIES</span>
+                                      <span className="tab-badge bg-cyan-500/20 text-[#00E5FF] border border-cyan-500/30">{sparks.length}</span>
+                                    </button>
+                                  </div>
 
+                                  <div className="warning-tab-content">
+                                    {activeTab === 'DEADLINES' && (
+                                      flames.length > 0 ? (
+                                        <div className="expanded-warning-list flex flex-col border border-white/5 rounded-2xl p-4 bg-black/40 h-full overflow-y-auto space-y-1.5 text-left w-full">
+                                          <h4 className="text-3xs uppercase tracking-widest text-[#ff5e00] font-bold mb-2 border-b border-white/5 pb-1">Select Project to Redirect:</h4>
+                                          {flames.map(f => (
+                                            <div 
+                                              key={f.id} 
+                                              className="p-2 hover:bg-white/5 rounded-xl transition-colors text-xs flex justify-between items-center text-foreground"
+                                            >
+                                              <div className="flex-1 cursor-pointer flex flex-col items-start gap-1 min-w-0" onClick={() => {
+                                                setProjectsSearchQuery(getProjectClientName(f));
+                                                setSelectedProjectTab(f.id);
+                                                setActiveAdminModule("PROJECTS");
+                                                setIsAdminGridActive(true);
+                                                setIsWarningDismissed(true);
+                                                setExpandedWarningTab(null);
+                                                pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: true });
+                                              }}>
+                                                <span className="font-semibold truncate w-full pr-2">{getProjectClientName(f)}</span>
+                                                <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">Due {new Date(f.deadline).toLocaleDateString()}</span>
+                                              </div>
+                                              <div className="flex items-center gap-1 ml-2">
+                                                <input type="number" min="1" className="w-12 bg-black/50 border border-white/10 rounded px-1 py-0.5 text-center text-xs text-white" defaultValue="1" id={`snooze-amt-${f.id}`} onClick={e => e.stopPropagation()} />
+                                                <select className="bg-black/50 border border-white/10 rounded px-1 py-0.5 text-xs text-muted-foreground cursor-pointer outline-none" id={`snooze-unit-${f.id}`} onClick={e => e.stopPropagation()}>
+                                                  <option value="HOURS">Hrs</option>
+                                                  <option value="MINUTES">Min</option>
+                                                </select>
+                                                <button className="text-3xs bg-[#ff5e00]/20 text-[#ff5e00] px-2 py-1 rounded hover:bg-[#ff5e00]/40 transition-colors uppercase font-bold" onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  const amt = document.getElementById(`snooze-amt-${f.id}`).value;
+                                                  const unit = document.getElementById(`snooze-unit-${f.id}`).value;
+                                                  handleSnooze(f.id, Number(amt), unit);
+                                                }}>Snooze</button>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <div className="warning-empty-state">
+                                          <div className="empty-icon text-[#ff5e00]">✓</div>
+                                          <p className="empty-title">All Deadlines Clear</p>
+                                          <p className="empty-desc">No overdue projects require your immediate calibration.</p>
+                                        </div>
+                                      )
+                                    )}
 
-
-                              <div className="warning-actions">
-                                <button 
-                                  className="warning-btn primary-warning-btn"
-                                  onClick={() => {
-                                    setIsAdminGridActive(false);
-                                    setIsWarningDismissed(false);
-                                    pushPageToHistory('admin', { activeAdminModule: 'DASHBOARD', isAdminGridActive: false });
-                                  }}
-                                >
-                                  RETURN TO MODULES GRID
-                                </button>
-                                <button 
-                                  className="warning-btn secondary-warning-btn"
-                                  onClick={() => setIsWarningDismissed(true)}
-                                >
-                                  ACKNOWLEDGE & PROCEED
-                                </button>
-                                <button 
-                                  className="warning-btn success-warning-btn"
-                                  onClick={markAllAlertsAsRead}
-                                >
-                                  MARK ALL AS READ
-                                </button>
+                                    {activeTab === 'INQUIRIES' && (
+                                      sparks.length > 0 ? (
+                                        <div className="expanded-warning-list flex flex-col border border-white/5 rounded-2xl p-4 bg-black/40 h-full overflow-y-auto space-y-1.5 text-left w-full">
+                                          <h4 className="text-3xs uppercase tracking-widest text-[#00E5FF] font-bold mb-2 border-b border-white/5 pb-1">Select Inquiry to Redirect:</h4>
+                                          {sparks.map(s => (
+                                            <div 
+                                              key={s.id} 
+                                              className="p-2 hover:bg-white/5 rounded-xl cursor-pointer transition-colors text-xs flex justify-between items-center text-foreground"
+                                              onClick={() => {
+                                                setInquiriesSearchQuery(s.name || s.clientName);
+                                                setActiveAdminModule("INQUIRIES");
+                                                setIsAdminGridActive(true);
+                                                setIsWarningDismissed(true);
+                                                setExpandedWarningTab(null);
+                                                pushPageToHistory('admin', { activeAdminModule: 'INQUIRIES', isAdminGridActive: true });
+                                              }}
+                                            >
+                                              <div className="flex flex-col items-start gap-1 min-w-0">
+                                                <span className="font-semibold truncate w-full pr-2 text-left">{s.name || s.clientName}</span>
+                                                <span className="text-[10px] text-muted-foreground">{s.email || "No direct link"}</span>
+                                              </div>
+                                              <span className="text-3xs text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">{s.service || "General Inquiry"}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <div className="warning-empty-state">
+                                          <div className="empty-icon text-cyan-400">📥</div>
+                                          <p className="empty-title">Inquiries Clear</p>
+                                          <p className="empty-desc">No new Sparks require digital response calibration.</p>
+                                        </div>
+                                      )
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          </motion.div>
-                        )}
+                            </motion.div>
+                          );
+                        })()}
                       </AnimatePresence>
 
                       <AnimatePresence>
