@@ -138,7 +138,7 @@ export function ClientProjectMessages({
             <ArrowLeft className="h-4 w-4" /> Back to Project
           </button>
           <h1 className="text-2xl font-serif font-medium tracking-tight">Messages</h1>
-          <p className="text-muted-foreground text-sm">{project?.title || "..."}</p>
+          <p className="text-muted-foreground text-sm">{currentClient?.name || project?.title || "..."}</p>
         </div>
         <Button
           variant="ghost"
@@ -165,12 +165,14 @@ export function ClientProjectMessages({
                 <div key={message.id} className={`flex gap-3 max-w-[85%] ${isClient ? 'ml-auto flex-row-reverse' : ''}`}>
                   <Avatar className="h-8 w-8 mt-1">
                     <AvatarFallback className={isClient ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}>
-                      {message.senderName?.charAt(0).toUpperCase()}
+                      {(isClient ? currentClient?.name : message.senderName)?.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div className={`space-y-1 ${isClient ? 'items-end' : ''}`}>
                     <div className={`flex items-baseline gap-2 ${isClient ? 'justify-end' : ''}`}>
-                      <span className="text-xs font-medium">{message.senderName}</span>
+                      <span className="text-xs font-medium">
+                        {isClient ? currentClient?.name : message.senderName}
+                      </span>
                       <span className="text-[10px] text-muted-foreground">
                         {message.createdAt ? format(new Date(message.createdAt), 'MMM d, h:mm a') : ''}
                       </span>

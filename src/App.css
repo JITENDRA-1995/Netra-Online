@@ -8105,8 +8105,10 @@ input[type="number"] {
 .client-portal-popup-container {
   position: fixed;
   top: 24px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin-left: auto;
+  margin-right: auto;
   width: 440px;
   max-width: 90vw;
   height: 180px;
@@ -8299,6 +8301,18 @@ input[type="number"] {
   gap: 8px;
   z-index: 1000000;
   pointer-events: auto;
+}
+
+@media (max-width: 640px) {
+  .stack-indicators {
+    right: 0;
+    left: 0;
+    top: auto;
+    bottom: -22px;
+    flex-direction: row;
+    justify-content: center;
+    gap: 8px;
+  }
 }
 
 .stack-indicator-dot {

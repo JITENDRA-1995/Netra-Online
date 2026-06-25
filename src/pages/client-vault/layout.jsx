@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -22,10 +22,15 @@ import {
   Sun,
   Moon,
   FolderOpen,
-  Menu
+  Menu,
+  X,
+  Bell
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { WhatsNewBulb } from "../../components/WhatsNewBulb";
+import { supabase } from "../../supabase/client";
+import { fetchClientProjects } from "../../supabase/database/clientVault";
+import { AnimatePresence, motion } from "framer-motion";
 
 function ClientSidebarTrigger() {
   const { toggleSidebar } = useSidebar();
@@ -56,9 +61,235 @@ function ClientVaultLayoutContent({
   onLogout, 
   theme,
   setTheme,
+  setSelectedProjectId,
+  setSelectedInvoiceId,
   children 
 }) {
   const { setOpenMobile, isMobile } = useSidebar();
+
+  const [notifications, setNotifications] = useState([]);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [clientProjectIds, setClientProjectIds] = useState([]);
+  const clientProjectIdsRef = useRef([]);
+
+  // Fetch client projects to identify which project IDs belong to this client
+  useEffect(() => {
+    if (!currentClient?.id) return;
+    const loadProjects = async () => {
+      try {
+        const data = await fetchClientProjects(currentClient.id);
+        if (data) {
+          const ids = data.map(p => p.id);
+          setClientProjectIds(ids);
+          clientProjectIdsRef.current = ids;
+        }
+      } catch (err) {
+        console.error("Error loading client projects for notifications:", err);
+      }
+    };
+    loadProjects();
+  }, [currentClient]);
+
+  const checkIsClientProject = async (projectId, clientId) => {
+    try {
+      const { data } = await supabase.from('projects').select('id, client_id').eq('id', projectId).single();
+      return data && String(data.client_id) === String(clientId);
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const handleViewNotif = (notif) => {
+    // 1. Dismiss/remove notification
+    setNotifications(prev => prev.filter(x => x.id !== notif.id));
+
+    // 2. Perform navigation based on notification type
+    if (notif.type === 'final_invoice') {
+      // Navigate to the specific invoice
+      if (setSelectedInvoiceId && notif.invoice_id) {
+        setSelectedInvoiceId(notif.invoice_id);
+        onTabChange("INVOICE_DETAIL");
+      } else {
+        onTabChange("INVOICES");
+      }
+    } else if (notif.type === 'communication') {
+      // Navigate to the specific project's communication/chat
+      if (setSelectedProjectId && notif.project_id) {
+        setSelectedProjectId(notif.project_id);
+      }
+      onTabChange("COMMUNICATION");
+    } else if (notif.type === 'new_asset') {
+      // Navigate to the project's asset detail
+      if (setSelectedProjectId && notif.project_id) {
+        setSelectedProjectId(notif.project_id);
+        onTabChange("PROJECT_DETAIL");
+      } else {
+        onTabChange("GLOBAL_ASSETS");
+      }
+    } else if (['project_ignited', 'project_completed', 'milestone_changed'].includes(notif.type)) {
+      // Navigate to the specific project detail
+      if (setSelectedProjectId && notif.project_id) {
+        setSelectedProjectId(notif.project_id);
+        onTabChange("PROJECT_DETAIL");
+      } else {
+        onTabChange("PROJECTS");
+      }
+    }
+  };
+
+  // Set up real-time subscriptions
+  useEffect(() => {
+    if (!currentClient?.id) return;
+
+    // 1. Projects subscription (for ignition and milestones/completion)
+    const projectsChannel = supabase
+      .channel(`client-portal-projects-${currentClient.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, async (payload) => {
+        if (payload.new && String(payload.new.client_id) === String(currentClient.id)) {
+          if (payload.eventType === 'INSERT') {
+            const newNotif = {
+              id: `ignite-${payload.new.id}-${Date.now()}`,
+              project_id: payload.new.id,
+              type: 'project_ignited',
+              title: '🚀 Project Ignited!',
+              message: `Your project "${payload.new.service || payload.new.title}" has been successfully started.`,
+              timestamp: new Date()
+            };
+            setNotifications(prev => [newNotif, ...prev]);
+            setIsMinimized(false);
+            clientProjectIdsRef.current = [...new Set([...clientProjectIdsRef.current, payload.new.id])];
+            setClientProjectIds(clientProjectIdsRef.current);
+          } else if (payload.eventType === 'UPDATE') {
+            if (payload.new.status === 'Completed' && payload.old?.status !== 'Completed') {
+              const newNotif = {
+                id: `completed-${payload.new.id}-${Date.now()}`,
+                project_id: payload.new.id,
+                type: 'project_completed',
+                title: '🎉 Project Completed!',
+                message: `Congratulations! Your project "${payload.new.service || payload.new.title}" is completed.`,
+                timestamp: new Date()
+              };
+              setNotifications(prev => [newNotif, ...prev]);
+              setIsMinimized(false);
+            } else if (payload.new.progressPercent !== payload.old?.progressPercent) {
+              const newNotif = {
+                id: `milestone-${payload.new.id}-${payload.new.progressPercent}-${Date.now()}`,
+                project_id: payload.new.id,
+                type: 'milestone_changed',
+                title: '🎯 Milestone Updated',
+                message: `Project "${payload.new.service || payload.new.title}" progress is now at ${payload.new.progressPercent}%.`,
+                timestamp: new Date()
+              };
+              setNotifications(prev => [newNotif, ...prev]);
+              setIsMinimized(false);
+            }
+          }
+        }
+      })
+      .subscribe();
+
+    // 2. Project Media subscription (for deliverables)
+    const mediaChannel = supabase
+      .channel(`client-portal-media-${currentClient.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'project_media' }, async (payload) => {
+        const newMedia = payload.new;
+        if (newMedia && newMedia.uploaded_by?.toLowerCase() === 'admin') {
+          const isClientProject = clientProjectIdsRef.current.includes(newMedia.project_id) || 
+            await checkIsClientProject(newMedia.project_id, currentClient.id);
+
+          if (isClientProject) {
+            const newNotif = {
+              id: `media-${newMedia.id}-${Date.now()}`,
+              project_id: newMedia.project_id,
+              type: 'new_asset',
+              title: '📁 New Asset Added',
+              message: `A new deliverable "${newMedia.file_name || 'file'}" is ready in your vault.`,
+              timestamp: new Date()
+            };
+            setNotifications(prev => [newNotif, ...prev]);
+            setIsMinimized(false);
+          }
+        }
+      })
+      .subscribe();
+
+    // 3. Project Chats subscription (for communication)
+    const chatsChannel = supabase
+      .channel(`client-portal-chats-${currentClient.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'project_chats' }, async (payload) => {
+        const newMsg = payload.new;
+        if (newMsg && newMsg.sender?.toLowerCase() === 'admin') {
+          const isClientProject = clientProjectIdsRef.current.includes(newMsg.project_id) || 
+            await checkIsClientProject(newMsg.project_id, currentClient.id);
+
+          if (isClientProject) {
+            const newNotif = {
+              id: `chat-${newMsg.id}-${Date.now()}`,
+              project_id: newMsg.project_id,
+              type: 'communication',
+              title: '💬 New Message from Netra',
+              message: `"${newMsg.message.substring(0, 50)}${newMsg.message.length > 50 ? '...' : ''}"`,
+              timestamp: new Date()
+            };
+            setNotifications(prev => [newNotif, ...prev]);
+            setIsMinimized(false);
+          }
+        }
+      })
+      .subscribe();
+
+    // 4. Invoices subscription (for invoice updates)
+    const invoicesChannel = supabase
+      .channel(`client-portal-invoices-${currentClient.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, async (payload) => {
+        if (payload.new && String(payload.new.client_id) === String(currentClient.id)) {
+          if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && payload.new.status !== payload.old?.status)) {
+            const newNotif = {
+              id: `invoice-${payload.new.id}-${Date.now()}`,
+              invoice_id: payload.new.id,
+              type: 'final_invoice',
+              title: '🧾 New Invoice Details',
+              message: `Invoice #${payload.new.invoice_number || 'draft'} for ₹${payload.new.amount || payload.new.total} is ${payload.new.status || 'generated'}.`,
+              timestamp: new Date()
+            };
+            setNotifications(prev => [newNotif, ...prev]);
+            setIsMinimized(false);
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      projectsChannel.unsubscribe();
+      mediaChannel.unsubscribe();
+      chatsChannel.unsubscribe();
+      invoicesChannel.unsubscribe();
+    };
+  }, [currentClient]);
+
+  const getNotifColor = (type) => {
+    switch (type) {
+      case 'project_ignited': return '#06b6d4'; // Cyan
+      case 'milestone_changed': return '#8b5cf6'; // Purple
+      case 'new_asset': return '#10b981'; // Emerald
+      case 'communication': return '#3b82f6'; // Blue
+      case 'project_completed': return '#eab308'; // Amber
+      case 'final_invoice': return '#f43f5e'; // Rose
+      default: return '#64748b'; // Slate
+    }
+  };
+
+  const getNotifIconEmoji = (type) => {
+    switch (type) {
+      case 'project_ignited': return '🚀';
+      case 'milestone_changed': return '🎯';
+      case 'new_asset': return '📁';
+      case 'communication': return '💬';
+      case 'project_completed': return '🎉';
+      case 'final_invoice': return '🧾';
+      default: return '🔔';
+    }
+  };
 
   const handleTabChange = (tab) => {
     onTabChange(tab);
@@ -173,6 +404,138 @@ function ClientVaultLayoutContent({
           {children}
         </div>
       </main>
+
+      {/* Real-time Client Portal Notification System */}
+      <div className="fixed top-4 right-4 left-4 md:left-auto md:max-w-sm w-auto md:w-full z-50 pointer-events-none flex flex-col items-end gap-3">
+        {/* Minimized Bubble */}
+        <AnimatePresence>
+          {isMinimized && notifications.length > 0 && (
+            <motion.button
+              initial={{ scale: 0, y: -50 }}
+              animate={{ 
+                scale: 1, 
+                y: 0,
+                transition: { type: "spring", stiffness: 300, damping: 20 }
+              }}
+              exit={{ scale: 0, y: -20 }}
+              onClick={() => setIsMinimized(false)}
+              className={`pointer-events-auto mr-12 md:mr-16 flex items-center justify-center w-12 h-12 rounded-full shadow-lg border cursor-pointer relative active:scale-95 transition-shadow duration-300
+                ${theme === 'dark' 
+                  ? 'bg-slate-900/90 text-cyan-400 border-cyan-500/30 hover:shadow-[0_0_20px_rgba(6,182,212,0.4)]' 
+                  : 'bg-white/95 text-cyan-500 border-cyan-200 hover:shadow-[0_0_15px_rgba(6,182,212,0.25)]'
+                }`}
+              style={{
+                outline: 'none'
+              }}
+              title="Restore client notifications"
+            >
+              {/* Pulse Ring */}
+              <span className="absolute -inset-0.5 rounded-full bg-cyan-500/10 animate-ping opacity-75" />
+              
+              {/* Icon */}
+              <Bell className="w-5 h-5 animate-pulse" />
+              
+              {/* Badge Counter */}
+              <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-sm">
+                {notifications.length}
+              </span>
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        {/* Notification Popup Stack */}
+        <AnimatePresence>
+          {!isMinimized && notifications.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -30, scale: 0.8 }}
+              className="w-full flex flex-col gap-3 pointer-events-auto"
+            >
+              {/* Render notifications (up to 3) */}
+              {notifications.slice(0, 3).map((notif, index) => {
+                const isTop = index === 0;
+                return (
+                  <motion.div
+                    key={notif.id}
+                    layout
+                    initial={{ opacity: 0, x: 50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    className={`relative p-4 rounded-2xl border backdrop-blur-md shadow-xl transition-all duration-300 w-full flex gap-3
+                      ${theme === 'dark' 
+                        ? 'bg-slate-950/95 text-slate-100 border-slate-800' 
+                        : 'bg-white/95 text-slate-800 border-slate-200'
+                      }`}
+                  >
+                    {/* Color indicator stripe */}
+                    <div 
+                      className="absolute left-0 top-3 bottom-3 w-1 rounded-r-md"
+                      style={{ backgroundColor: getNotifColor(notif.type) }}
+                    />
+                    
+                    {/* Icon container */}
+                    <div 
+                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-lg"
+                      style={{ 
+                        background: `${getNotifColor(notif.type)}15`,
+                        color: getNotifColor(notif.type)
+                      }}
+                    >
+                      {getNotifIconEmoji(notif.type)}
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0 pr-6">
+                      <h4 className="font-bold text-xs uppercase tracking-wider mb-0.5 text-foreground flex items-center gap-1.5">
+                        {notif.title}
+                        {isTop && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                        )}
+                      </h4>
+                      <p className={`text-xs leading-relaxed ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                        {notif.message}
+                      </p>
+                      
+                      <div className="flex items-center gap-4 mt-2">
+                        <button
+                          onClick={() => setIsMinimized(true)}
+                          className={`text-[10px] font-bold uppercase tracking-wider hover:underline flex items-center gap-1
+                            ${theme === 'dark' ? 'text-cyan-400 hover:text-cyan-300' : 'text-cyan-600 hover:text-cyan-500'}`}
+                        >
+                          Minimize
+                        </button>
+                        <button
+                          onClick={() => handleViewNotif(notif)}
+                          className={`text-[10px] font-bold uppercase tracking-wider hover:underline
+                            ${theme === 'dark' ? 'text-cyan-400 hover:text-cyan-300' : 'text-cyan-600 hover:text-cyan-500'}`}
+                        >
+                          View
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Close button */}
+                    <button 
+                      onClick={() => setNotifications(prev => prev.filter(x => x.id !== notif.id))}
+                      className={`absolute top-3 right-3 p-1 rounded-md transition-colors cursor-pointer
+                        ${theme === 'dark' ? 'hover:bg-white/5 text-slate-500 hover:text-slate-300' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-600'}`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </motion.div>
+                );
+              })}
+
+              {notifications.length > 3 && (
+                <div className={`text-right text-[10px] font-semibold pr-2 -mt-1 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                  + {notifications.length - 3} more notifications
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

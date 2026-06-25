@@ -1527,7 +1527,7 @@ export default function Projects({
                 data-testid={`card-project-${project.id}`}
               >
                 <div className="flex items-start justify-between flex-wrap gap-4">
-                  <div className="flex items-start gap-4">
+                  <div className={`flex items-start gap-4 min-w-0 ${layoutMode === "grid" ? "w-full" : "flex-1"}`}>
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold uppercase"
                       style={{
@@ -1556,9 +1556,9 @@ export default function Projects({
                             </Badge>
                           </div>
                           {/* Row 2: Service Details (Project Name / Category, styled like visionary name) */}
-                          <div className="flex items-center">
+                          <div>
                             <h3 
-                              className="font-bold text-sm text-black bg-white px-2 py-0.5 rounded-md border border-white/20 shadow-sm truncate max-w-[170px] sm:max-w-none"
+                              className="font-bold text-sm text-black bg-white px-2 py-0.5 rounded-md border border-white/20 shadow-sm truncate max-w-full inline-block"
                               title={serviceName}
                             >
                               {serviceName}
@@ -3425,11 +3425,11 @@ function ProjectChatModal({ project, clientName, onClose }: { project: any; clie
             return (
               <div key={msg.id} className={`flex gap-2.5 max-w-[85%] ${isAdmin ? 'ml-auto flex-row-reverse' : ''}`}>
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-1 ${isAdmin ? 'bg-indigo-500/30 text-indigo-400' : 'bg-cyan-500/20 text-cyan-400'}`}>
-                  {(msg.sender || 'U').charAt(0).toUpperCase()}
+                  {(isAdmin ? msg.sender : clientName || 'U').charAt(0).toUpperCase()}
                 </div>
                 <div className={`space-y-1 ${isAdmin ? 'items-end' : ''}`}>
                   <div className={`flex items-baseline gap-2 ${isAdmin ? 'justify-end' : ''}`}>
-                    <span className="text-[10px] font-semibold text-foreground">{msg.sender}</span>
+                    <span className="text-[10px] font-semibold text-foreground">{isAdmin ? msg.sender : clientName}</span>
                     <span className="text-[9px] text-muted-foreground">{msg.time}</span>
                   </div>
                   <div className={`p-3 rounded-2xl text-xs leading-relaxed ${isAdmin ? 'bg-indigo-500/20 text-indigo-100 rounded-tr-sm' : 'bg-white/5 text-white/80 rounded-tl-sm border border-white/5'}`}>

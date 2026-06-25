@@ -5,7 +5,8 @@ import {
   fetchClientProjectChats, 
   sendClientChatMessage, 
   subscribeToClientChats,
-  clearClientProjectChats
+  clearClientProjectChats,
+  fetchClientProjectMedia
 } from "../../supabase/database/clientVault";
 import { supabase } from "../../supabase/client";
 import { Card, CardContent } from "../../components/ui/card";
@@ -120,17 +121,20 @@ export function ClientCollaboration({
         setIsChatsLoading(false);
       }
 
-      // Load Assets (Unified Global Vault)
+      // Load Assets (Project Deliverables for Communication Vault)
       try {
         setIsAssetsLoading(true);
-        if (currentClient?.id) {
-          const { data, error } = await supabase.from('client_assets').select('*').eq('client_id', currentClient.id).order('created_at', { ascending: false });
-          if (!error && data) {
-            setAssets(data);
-          }
-        }
+        const mediaList = await fetchClientProjectMedia(selectedProject.id);
+        const mapped = mediaList.map(m => ({
+          id: m.id,
+          name: m.name,
+          file_url: m.downloadUrl,
+          file_type: m.fileType,
+          is_locked: !m.canDownload
+        }));
+        setAssets(mapped);
       } catch (err) {
-        console.error("Error loading unified assets:", err);
+        console.error("Error loading project deliverables:", err);
       } finally {
         setIsAssetsLoading(false);
       }
@@ -314,7 +318,7 @@ export function ClientCollaboration({
                   >
                     <div className="flex justify-between items-start w-full gap-2">
                       <div className="flex-1 min-w-0">
-                        <span className="font-medium text-xs md:text-sm line-clamp-1 block">{proj.title}</span>
+                        <span className="font-medium text-xs md:text-sm line-clamp-1 block">{currentClient?.name || proj.title}</span>
                         {proj.service && (
                           <span className={`text-[10px] line-clamp-1 block mt-0.5 ${
                             isActive ? 'text-primary/70' : 'text-muted-foreground/70'
@@ -347,7 +351,7 @@ export function ClientCollaboration({
               {/* Chat Header */}
               <div className="px-4 py-3 border-b border-border/50 bg-secondary/5 flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold text-sm md:text-base text-foreground line-clamp-1">{selectedProject.title}</h3>
+                  <h3 className="font-semibold text-sm md:text-base text-foreground line-clamp-1">{currentClient?.name || selectedProject.title}</h3>
                   <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground flex-wrap">
                     {selectedProject.service && (
                       <span className="capitalize text-[11px] font-semibold text-primary bg-primary/8 px-2 py-0.5 rounded-md border border-primary/15">
@@ -400,12 +404,14 @@ export function ClientCollaboration({
                       >
                         <Avatar className="h-8 w-8 mt-1 border border-border shrink-0">
                           <AvatarFallback className={isClient ? "bg-primary text-primary-foreground font-semibold" : "bg-muted text-muted-foreground"}>
-                            {message.senderName?.charAt(0).toUpperCase() || 'C'}
+                            {(isClient ? currentClient?.name : message.senderName)?.charAt(0).toUpperCase() || 'C'}
                           </AvatarFallback>
                         </Avatar>
                         <div className={`space-y-1 ${isClient ? 'items-end' : ''}`}>
                           <div className={`flex items-baseline gap-2 ${isClient ? 'justify-end' : ''}`}>
-                            <span className="text-xs font-semibold text-foreground">{message.senderName}</span>
+                            <span className="text-xs font-semibold text-foreground">
+                              {isClient ? currentClient?.name : message.senderName}
+                            </span>
                             <span className="text-[9px] text-muted-foreground">
                               {message.createdAt ? format(new Date(message.createdAt), 'MMM d, h:mm a') : ''}
                             </span>

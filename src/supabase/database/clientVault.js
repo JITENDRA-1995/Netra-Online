@@ -57,7 +57,7 @@ export const fetchClientDashboardSummary = async (clientId) => {
   if (projectIds.length > 0) {
     const { data: logs, error: logError } = await supabase
       .from('project_activity_logs')
-      .select('*, projects(name)')
+      .select('*, projects(name, clients(name))')
       .in('project_id', projectIds)
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
@@ -82,7 +82,7 @@ export const fetchClientDashboardSummary = async (clientId) => {
           id: log.id,
           description: log.action,
           createdAt: log.created_at,
-          projectTitle: log.projects?.name || 'Project Update',
+          projectTitle: log.projects?.clients?.name || log.projects?.name || 'Project Update',
           type
         };
       });

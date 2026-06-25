@@ -1243,6 +1243,7 @@ function App() {
     }
   }, [theme]);
   const [isIgnitionModalOpen, setIsIgnitionModalOpen] = useState(false);
+  const [isNotificationsMinimized, setIsNotificationsMinimized] = useState(false);
   const [ignitionQty, setIgnitionQty] = useState("");
   const [ignitionRate, setIgnitionRate] = useState("");
   const [ignitionQuote, setIgnitionQuote] = useState("");
@@ -1433,6 +1434,21 @@ function App() {
   const [activeClientPopups, setActiveClientPopups] = useState([]);
   const [activePopupIndex, setActivePopupIndex] = useState(0);
   const [isPopupHovered, setIsPopupHovered] = useState(false);
+  const [globalAssets, setGlobalAssets] = useState([]);
+
+  const refreshGlobalAssets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('client_assets')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!error && data) {
+        setGlobalAssets(data);
+      }
+    } catch (err) {
+      console.warn("Real-time global assets refresh failed:", err);
+    }
+  };
   const popupContainerRef = useRef(null);
   const scrollTimeoutRef = useRef(null);
   const isScrollCooldownRef = useRef(false);
@@ -1482,6 +1498,46 @@ function App() {
       }
     });
 
+    if (globalAssets && Array.isArray(globalAssets)) {
+      globalAssets.forEach(asset => {
+        if (asset.uploaded_by === 'CLIENT') {
+          const clientObj = clients.find(c => Number(c.id) === Number(asset.client_id));
+          const clientName = clientObj?.name || 'Client';
+          notifs.push({
+            id: `global-asset-${asset.id}`,
+            project_id: null,
+            client_id: asset.client_id,
+            type: 'new_global_asset',
+            title: `New Asset from ${clientName}`,
+            message: `Global Vault - File: ${asset.name}`,
+            created_at: asset.created_at,
+            is_read: readClientNotifs.includes(`global-asset-${asset.id}`),
+            raw_date: new Date(asset.created_at || Date.now()).getTime()
+          });
+        }
+
+        if (asset.comments && Array.isArray(asset.comments)) {
+          asset.comments.forEach((comment, idx) => {
+            if (comment.author === 'CLIENT') {
+              const clientObj = clients.find(c => Number(c.id) === Number(asset.client_id));
+              const clientName = clientObj?.name || 'Client';
+              notifs.push({
+                id: `global-asset-comment-${asset.id}-${idx}`,
+                project_id: null,
+                client_id: asset.client_id,
+                type: 'global_asset_comment',
+                title: `New Comment from ${clientName}`,
+                message: `Global Vault - "${comment.text}"`,
+                created_at: comment.created_at,
+                is_read: readClientNotifs.includes(`global-asset-comment-${asset.id}-${idx}`),
+                raw_date: new Date(comment.created_at || Date.now()).getTime()
+              });
+            }
+          });
+        }
+      });
+    }
+
     if (clients && Array.isArray(clients)) {
       clients.forEach(client => {
         if (client.pending_profile_update) {
@@ -1501,7 +1557,7 @@ function App() {
     }
 
     return notifs.sort((a, b) => b.raw_date - a.raw_date);
-  }, [ignitionQueue, clients, readClientNotifs]);
+  }, [ignitionQueue, clients, readClientNotifs, globalAssets]);
 
   const markClientNotifAsRead = (ids) => {
     const idArray = Array.isArray(ids) ? ids : [ids];
@@ -1551,13 +1607,27 @@ function App() {
   useEffect(() => {
     if (currentClient && clients.length > 0) {
       const match = clients.find(c => c.id === currentClient.id);
-      if (match && match.status === 'Suspended') {
-        localStorage.removeItem('netra_client_session');
-        localStorage.removeItem('netra_saved_client_key');
-        localStorage.removeItem('netra_saved_client_pass');
-        setCurrentClient(null);
-        setIsClientVaultActive(false);
-        setLoginError("ACCESS DENIED: This account has been suspended by the administrator.");
+      if (match) {
+        if (match.status === 'Suspended') {
+          localStorage.removeItem('netra_client_session');
+          localStorage.removeItem('netra_saved_client_key');
+          localStorage.removeItem('netra_saved_client_pass');
+          setCurrentClient(null);
+          setIsClientVaultActive(false);
+          setLoginError("ACCESS DENIED: This account has been suspended by the administrator.");
+        } else {
+          const hasChanges = 
+            match.name !== currentClient.name ||
+            match.email !== currentClient.email ||
+            match.phone !== currentClient.phone ||
+            match.address !== currentClient.address ||
+            match.status !== currentClient.status ||
+            JSON.stringify(match.pending_profile_update) !== JSON.stringify(currentClient.pending_profile_update);
+            
+          if (hasChanges) {
+            setCurrentClient(match);
+          }
+        }
       }
     }
   }, [clients, currentClient]);
@@ -1723,6 +1793,7 @@ function App() {
         await refreshProjects();
         await refreshInvoices();
         await refreshMicroJobs();
+        await refreshGlobalAssets();
         setIsDataLoaded(true);
       } catch (error) {
         console.error("Failed to load data from Supabase:", error);
@@ -1896,6 +1967,15 @@ function App() {
       })
       .subscribe();
 
+    // 5c. Subscribe to client_assets table changes globally for Global Asset Vault uploads and comments
+    const clientAssetsChannel = supabase
+      .channel('client-assets-global-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'client_assets' }, async () => {
+        await refreshGlobalAssets();
+        triggerBellPulse();
+      })
+      .subscribe();
+
     return () => {
       if (supabase.removeChannel) {
         supabase.removeChannel(projectsChannel);
@@ -1905,6 +1985,7 @@ function App() {
         supabase.removeChannel(microJobsChannel);
         supabase.removeChannel(chatsGlobalChannel);
         supabase.removeChannel(mediaGlobalChannel);
+        supabase.removeChannel(clientAssetsChannel);
       }
     };
   }, []);
@@ -1984,12 +2065,17 @@ function App() {
 
     // Populate activeClientPopups with all unread notifications
     setActiveClientPopups(prev => {
+      let isNewAdded = false;
       const next = [...prev];
       unread.forEach(n => {
         if (!next.some(x => x.id === n.id)) {
           next.push(n);
+          isNewAdded = true;
         }
       });
+      if (isNewAdded) {
+        setIsNotificationsMinimized(false);
+      }
       const isUnchanged = next.length === prev.length && next.every((item, idx) => item.id === prev[idx].id);
       return isUnchanged ? prev : next;
     });
@@ -2062,19 +2148,31 @@ function App() {
 
   const getPopupThemeColor = (type) => {
     switch (type) {
-      case 'communication': return '#00E5FF';
-      case 'new_asset': return '#10b981';
-      case 'Profile Update': return '#8b5cf6';
-      default: return '#f59e0b';
+      case 'communication':
+      case 'global_asset_comment':
+        return '#00E5FF';
+      case 'new_asset':
+      case 'new_global_asset':
+        return '#10b981';
+      case 'Profile Update':
+        return '#8b5cf6';
+      default:
+        return '#f59e0b';
     }
   };
 
   const getPopupIcon = (type) => {
     switch (type) {
-      case 'communication': return '💬';
-      case 'new_asset': return '📁';
-      case 'Profile Update': return '👤';
-      default: return '🔔';
+      case 'communication':
+      case 'global_asset_comment':
+        return '💬';
+      case 'new_asset':
+      case 'new_global_asset':
+        return '📁';
+      case 'Profile Update':
+        return '👤';
+      default:
+        return '🔔';
     }
   };
 
@@ -2083,6 +2181,8 @@ function App() {
       case 'communication': return 'New Message';
       case 'new_asset': return 'New Asset';
       case 'Profile Update': return 'Profile Update';
+      case 'new_global_asset': return 'Global Asset';
+      case 'global_asset_comment': return 'Asset Comment';
       default: return 'Client Portal';
     }
   };
@@ -2112,6 +2212,13 @@ function App() {
       const client_id = project?.client_id || project?.client?.id || notif.client_id;
       if (client_id) {
         setAutoOpenVaultClientId(client_id);
+        setActiveAdminModule("CLIENTS");
+        setIsAdminGridActive(true);
+        pushPageToHistory('admin', { activeAdminModule: 'CLIENTS', isAdminGridActive: true });
+      }
+    } else if (notif.type === 'new_global_asset' || notif.type === 'global_asset_comment') {
+      if (notif.client_id) {
+        setAutoOpenVaultClientId(notif.client_id);
         setActiveAdminModule("CLIENTS");
         setIsAdminGridActive(true);
         pushPageToHistory('admin', { activeAdminModule: 'CLIENTS', isAdminGridActive: true });
@@ -6154,10 +6261,55 @@ function App() {
                               <span>{alertStripMessages.join("   •   ") + "   •   "}</span>
                             </div>
                           </div>
+                          <AnimatePresence>
+                            {isNotificationsMinimized && unreadClientNotifs.length > 0 && (
+                              <motion.button
+                                key="minimized-bubble"
+                                initial={{ scale: 0, opacity: 0, y: 10 }}
+                                animate={{ 
+                                  scale: [1, 1.03, 1],
+                                  boxShadow: [
+                                    '0 0 10px rgba(0, 229, 255, 0.15)',
+                                    '0 0 20px rgba(0, 229, 255, 0.3)',
+                                    '0 0 10px rgba(0, 229, 255, 0.15)'
+                                  ],
+                                  y: 0,
+                                  opacity: 1
+                                }}
+                                exit={{ scale: 0, opacity: 0, y: 10 }}
+                                transition={{
+                                  scale: { repeat: Infinity, duration: 2, ease: "easeInOut" },
+                                  boxShadow: { repeat: Infinity, duration: 2, ease: "easeInOut" },
+                                  type: "spring", 
+                                  stiffness: 300, 
+                                  damping: 15
+                                }}
+                                whileHover={{ scale: 1.05, y: -2 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => setIsNotificationsMinimized(false)}
+                                className="flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg bg-cyan-500/15 border border-cyan-500/40 hover:bg-cyan-500/30 hover:border-cyan-400 text-cyan-400 text-[10px] font-black uppercase tracking-wider cursor-pointer shadow-lg transition-colors shrink-0 ml-auto z-10 relative overflow-hidden group"
+                                title={`Restore ${unreadClientNotifs.length} minimized notifications`}
+                                style={{
+                                  textShadow: '0 0 8px rgba(0, 229, 255, 0.4)'
+                                }}
+                              >
+                                <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] pointer-events-none" />
+                                <span className="relative flex h-2 w-2 mr-1">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                                </span>
+                                <span>MINIMIZED ({unreadClientNotifs.length})</span>
+                                <span className="animate-bounce">💬</span>
+                              </motion.button>
+                            )}
+                          </AnimatePresence>
                           <style>{`
                             @keyframes adminMarquee {
                               0% { transform: translate3d(0, 0, 0); }
                               100% { transform: translate3d(-50%, 0, 0); }
+                            }
+                            @keyframes shimmer {
+                              100% { transform: translateX(100%); }
                             }
                             .admin-marquee-scroll {
                               animation: adminMarquee 35s linear infinite;
@@ -6168,6 +6320,48 @@ function App() {
                           `}</style>
                         </div>
                       )}
+
+                      <AnimatePresence>
+                        {alertStripMessages.length === 0 && isNotificationsMinimized && unreadClientNotifs.length > 0 && (
+                          <div className="w-full flex justify-end mb-6">
+                            <motion.button 
+                              key="standalone-minimized"
+                              initial={{ scale: 0, opacity: 0, y: 15 }}
+                              animate={{ 
+                                scale: [1, 1.02, 1],
+                                boxShadow: [
+                                  '0 0 10px rgba(0, 229, 255, 0.12)',
+                                  '0 0 18px rgba(0, 229, 255, 0.25)',
+                                  '0 0 10px rgba(0, 229, 255, 0.12)'
+                                ],
+                                y: 0,
+                                opacity: 1
+                              }}
+                              exit={{ scale: 0, opacity: 0, y: 15 }}
+                              transition={{
+                                scale: { repeat: Infinity, duration: 2, ease: "easeInOut" },
+                                boxShadow: { repeat: Infinity, duration: 2, ease: "easeInOut" },
+                                type: "spring",
+                                stiffness: 300,
+                                damping: 15
+                              }}
+                              whileHover={{ scale: 1.05, y: -2 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => setIsNotificationsMinimized(false)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-card border border-cyan-500/20 hover:border-cyan-500/40 text-cyan-400 hover:text-cyan-300 shadow-lg transition-colors cursor-pointer relative overflow-hidden group"
+                              title={`Restore ${unreadClientNotifs.length} minimized notifications`}
+                            >
+                              <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] pointer-events-none" />
+                              <span className="relative flex h-2.5 w-2.5 mr-1">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
+                              </span>
+                              <span className="text-[10px] font-black tracking-wider uppercase">Minimized Messages ({unreadClientNotifs.length})</span>
+                              <span className="animate-bounce">💬</span>
+                            </motion.button>
+                          </div>
+                        )}
+                      </AnimatePresence>
 
                       <div className="active-module-header">
                         <h2 className="module-title">{activeAdminModule}</h2>
@@ -7444,104 +7638,117 @@ function App() {
               </AnimatePresence>
 
               {/* Real-time Client Portal Notification Popup Stack */}
-              <div 
-                ref={popupContainerRef}
-                className="client-portal-popup-container"
-                onMouseEnter={() => setIsPopupHovered(true)}
-                onMouseLeave={() => setIsPopupHovered(false)}
-                style={{ pointerEvents: groupedClientPopups.length > 0 ? 'auto' : 'none' }}
-              >
-                <AnimatePresence>
-                  {groupedClientPopups.map((popup, idx) => {
-                    const offset = idx - activePopupIndex;
-                    const offsetSpacing = isPopupHovered ? 24 : 10;
-                    const isScrolledPast = offset < 0;
+              <AnimatePresence>
+                {isCommandCenterActive && isAdminGridActive && !isNotificationsMinimized && groupedClientPopups.length > 0 && (
+                  <motion.div 
+                    ref={popupContainerRef}
+                    key="popup-stack-container"
+                    initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ 
+                      opacity: 0, 
+                      scale: 0.8, 
+                      y: -50,
+                      transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] }
+                    }}
+                    className="client-portal-popup-container"
+                    onMouseEnter={() => setIsPopupHovered(true)}
+                    onMouseLeave={() => setIsPopupHovered(false)}
+                    style={{ pointerEvents: groupedClientPopups.length > 0 ? 'auto' : 'none' }}
+                  >
+                    <AnimatePresence>
+                      {groupedClientPopups.map((popup, idx) => {
+                        const offset = idx - activePopupIndex;
+                        const offsetSpacing = isPopupHovered ? 24 : 10;
+                        const isScrolledPast = offset < 0;
 
-                    return (
-                      <motion.div
-                        key={popup.id}
-                        className="client-portal-popup"
-                        layout
-                        initial={{ opacity: 0, y: -40, scale: 0.95 }}
-                        animate={{
-                          opacity: isScrolledPast ? 0 : Math.max(0, 1 - offset * 0.35),
-                          y: isScrolledPast ? -120 : offset * offsetSpacing,
-                          scale: isScrolledPast ? 0.95 : Math.max(0.8, 1 - offset * 0.04),
-                          zIndex: groupedClientPopups.length - offset,
-                        }}
-                        exit={{ opacity: 0, scale: 0.9, y: -40, transition: { duration: 0.2 } }}
-                        transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                        style={{
-                          '--glow-color': getPopupThemeColor(popup.type),
-                          pointerEvents: offset === 0 ? 'auto' : 'none',
-                        }}
-                      >
-                        <div className="popup-glow"></div>
-                        <div className="popup-body">
-                          <div 
-                            className="popup-icon-wrapper" 
-                            style={{ 
-                              color: getPopupThemeColor(popup.type),
-                              background: `${getPopupThemeColor(popup.type)}15`,
-                              borderColor: `${getPopupThemeColor(popup.type)}30`
+                        return (
+                          <motion.div
+                            key={popup.id}
+                            className="client-portal-popup"
+                            layout
+                            initial={{ opacity: 0, y: -40, scale: 0.95 }}
+                            animate={{
+                              opacity: isScrolledPast ? 0 : Math.max(0, 1 - offset * 0.35),
+                              y: isScrolledPast ? -120 : offset * offsetSpacing,
+                              scale: isScrolledPast ? 0.95 : Math.max(0.8, 1 - offset * 0.04),
+                              zIndex: groupedClientPopups.length - offset,
+                            }}
+                            exit={{ opacity: 0, scale: 0.9, y: -40, transition: { duration: 0.2 } }}
+                            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                            style={{
+                              '--glow-color': getPopupThemeColor(popup.type),
+                              pointerEvents: offset === 0 ? 'auto' : 'none',
                             }}
                           >
-                            <span className="popup-icon">{getPopupIcon(popup.type)}</span>
-                          </div>
-                          <div className="popup-text">
-                            <div className="popup-header-row">
-                              <span 
-                                className="popup-badge" 
+                            <div className="popup-glow"></div>
+                            <div className="popup-body">
+                              <div 
+                                className="popup-icon-wrapper" 
                                 style={{ 
                                   color: getPopupThemeColor(popup.type),
-                                  background: `${getPopupThemeColor(popup.type)}15`
+                                  background: `${getPopupThemeColor(popup.type)}15`,
+                                  borderColor: `${getPopupThemeColor(popup.type)}30`
                                 }}
                               >
-                                {getPopupBadgeLabel(popup.type)}
-                              </span>
-                              <span className="popup-time">{formatNotificationTime(popup.raw_date)}</span>
+                                <span className="popup-icon">{getPopupIcon(popup.type)}</span>
+                              </div>
+                              <div className="popup-text">
+                                <div className="popup-header-row">
+                                  <span 
+                                    className="popup-badge" 
+                                    style={{ 
+                                      color: getPopupThemeColor(popup.type),
+                                      background: `${getPopupThemeColor(popup.type)}15`
+                                    }}
+                                  >
+                                    {getPopupBadgeLabel(popup.type)}
+                                  </span>
+                                  <span className="popup-time">{formatNotificationTime(popup.raw_date)}</span>
+                                </div>
+                                <h4 className="popup-title">{popup.title}</h4>
+                                <p className="popup-message">{popup.message}</p>
+                              </div>
                             </div>
-                            <h4 className="popup-title">{popup.title}</h4>
-                            <p className="popup-message">{popup.message}</p>
-                          </div>
-                        </div>
-                        <div className="popup-footer">
-                          {groupedClientPopups.length > 1 ? (
-                            <span className="popup-stack-helper">
-                              Stack: {activePopupIndex + 1} of {groupedClientPopups.length} <span className="scroll-hint">(scroll to cycle)</span>
-                            </span>
-                          ) : (
-                            <span className="popup-stack-helper-single">✨ Client Update</span>
-                          )}
-                          <div className="popup-footer-actions">
-                            <button className="popup-btn ack-btn" onClick={() => handleAckNotification(popup.ids)}>
-                              ACKNOWLEDGE {popup.count > 1 ? `(${popup.count})` : ''}
-                            </button>
-                            <button className="popup-btn view-btn" onClick={() => handleViewNotification(popup)}>
-                              VIEW Details
-                            </button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </AnimatePresence>
+                            <div className="popup-footer">
+                              {groupedClientPopups.length > 1 ? (
+                                <span className="popup-stack-helper">
+                                  Stack: {activePopupIndex + 1} of {groupedClientPopups.length} <span className="scroll-hint">(scroll to cycle)</span>
+                                </span>
+                              ) : (
+                                <span className="popup-stack-helper-single">✨ Client Update</span>
+                              )}
+                              <div className="popup-footer-actions">
+                                <button className="popup-btn ack-btn" onClick={() => setIsNotificationsMinimized(true)}>
+                                  MINIMIZE
+                                </button>
+                                <button className="popup-btn view-btn" onClick={() => handleViewNotification(popup)}>
+                                  VIEW Details
+                                </button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
 
-                {/* Vertical Pagination Indicators */}
-                {groupedClientPopups.length > 1 && (
-                  <div className="stack-indicators">
-                    {groupedClientPopups.map((popup, idx) => (
-                      <button
-                        key={popup.id}
-                        className={`stack-indicator-dot ${idx === activePopupIndex ? 'active' : ''}`}
-                        onClick={() => setActivePopupIndex(idx)}
-                        title={`Go to group ${idx + 1}`}
-                        style={{ '--glow-color': getPopupThemeColor(popup.type) }}
-                      />
-                    ))}
-                  </div>
+                    {/* Vertical Pagination Indicators */}
+                    {groupedClientPopups.length > 1 && (
+                      <div className="stack-indicators">
+                        {groupedClientPopups.map((popup, idx) => (
+                          <button
+                            key={popup.id}
+                            className={`stack-indicator-dot ${idx === activePopupIndex ? 'active' : ''}`}
+                            onClick={() => setActivePopupIndex(idx)}
+                            title={`Go to group ${idx + 1}`}
+                            style={{ '--glow-color': getPopupThemeColor(popup.type) }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </motion.div>
                 )}
-              </div>
+              </AnimatePresence>
             </div>
           </section>
 
@@ -7555,6 +7762,8 @@ function App() {
                 onLogout={handleLogout}
                 theme={theme}
                 setTheme={setTheme}
+                setSelectedProjectId={setSelectedClientProjectId}
+                setSelectedInvoiceId={setSelectedClientInvoiceId}
               >
                 {activeClientTab === 'DASHBOARD' && (
                   <ClientDashboard
@@ -7890,9 +8099,15 @@ function App() {
                               onClick={(e) => {
                                   e.stopPropagation();
                                   markFlameAsRead(f.id);
+                                  setProjectsSearchQuery(getProjectClientName(f));
+                                  setSelectedProjectTab(f.id);
+                                  setActiveAdminModule("PROJECTS");
+                                  setIsAdminGridActive(true);
+                                  setIsNotificationOpen(false);
+                                  pushPageToHistory('admin', { activeAdminModule: 'PROJECTS', isAdminGridActive: true });
                               }}
                             >
-                              DISMISS
+                              VIEW
                             </button>
                           </div>
                         ))}
