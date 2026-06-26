@@ -6734,6 +6734,15 @@ input[type="number"] {
   transform: translateY(-2px);
 }
 
+.invoice-actions-panel .action-btn:disabled,
+.invoice-actions-panel .action-btn:disabled:hover {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 /* Responsiveness helper for actions panel */
 @media (max-width: 1200px) {
   .invoice-actions-panel {

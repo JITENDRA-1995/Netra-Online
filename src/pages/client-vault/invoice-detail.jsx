@@ -311,7 +311,9 @@ export function ClientInvoiceDetail({ invoiceId, onTabChange }) {
             </thead>
             <tbody>
               {allItems.map((item, idx) => {
-                const discountPercent = subtotal > 0 ? Math.round((discount / subtotal) * 100) : 0;
+                const discountPercent = item.discount !== undefined
+                  ? (item.quantity * item.unitPrice > 0 ? Math.round((item.discount / (item.quantity * item.unitPrice)) * 100) : 0)
+                  : (subtotal > 0 ? Math.round((discount / subtotal) * 100) : 0);
                 return (
                   <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
                     <td style={{ padding: '15px 0' }}>

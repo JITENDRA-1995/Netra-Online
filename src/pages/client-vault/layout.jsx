@@ -27,7 +27,7 @@ import {
   Bell
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
-import { WhatsNewBulb } from "../../components/WhatsNewBulb";
+
 import { supabase } from "../../supabase/client";
 import { fetchClientProjects } from "../../supabase/database/clientVault";
 import { AnimatePresence, motion } from "framer-motion";
@@ -104,7 +104,7 @@ function ClientVaultLayoutContent({
     setNotifications(prev => prev.filter(x => x.id !== notif.id));
 
     // 2. Perform navigation based on notification type
-    if (notif.type === 'final_invoice') {
+    if (notif.type === 'final_invoice' || notif.type === 'micro_job_invoice') {
       // Navigate to the specific invoice
       if (setSelectedInvoiceId && notif.invoice_id) {
         setSelectedInvoiceId(notif.invoice_id);
@@ -238,23 +238,56 @@ function ClientVaultLayoutContent({
       })
       .subscribe();
 
-    // 4. Invoices subscription (for invoice updates)
+    // 4. Invoices subscription (for both regular and micro-job/CMS invoices)
     const invoicesChannel = supabase
       .channel(`client-portal-invoices-${currentClient.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, async (payload) => {
-        if (payload.new && String(payload.new.client_id) === String(currentClient.id)) {
-          if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && payload.new.status !== payload.old?.status)) {
-            const newNotif = {
-              id: `invoice-${payload.new.id}-${Date.now()}`,
-              invoice_id: payload.new.id,
-              type: 'final_invoice',
-              title: '🧾 New Invoice Details',
-              message: `Invoice #${payload.new.invoice_number || 'draft'} for ₹${payload.new.amount || payload.new.total} is ${payload.new.status || 'generated'}.`,
-              timestamp: new Date()
-            };
-            setNotifications(prev => [newNotif, ...prev]);
-            setIsMinimized(false);
-          }
+        if (!payload.new) return;
+
+        // Match by client_id (regular/project invoices) OR client_link (CMS/micro-job invoices)
+        const isForClient =
+          (payload.new.client_id && String(payload.new.client_id) === String(currentClient.id)) ||
+          (payload.new.client_link && String(payload.new.client_link) === String(currentClient.id));
+
+        if (!isForClient) return;
+
+        const isNewOrStatusChanged =
+          payload.eventType === 'INSERT' ||
+          (payload.eventType === 'UPDATE' && payload.new.payment_status !== payload.old?.payment_status);
+
+        if (!isNewOrStatusChanged) return;
+
+        // Detect micro-job / CMS invoice
+        const isMicroJobInvoice =
+          (Array.isArray(payload.new.micro_job_ids) && payload.new.micro_job_ids.length > 0) ||
+          (typeof payload.new.micro_job_ids === 'string' && payload.new.micro_job_ids !== '[]' && payload.new.micro_job_ids !== 'null') ||
+          (payload.new.invoice_no && String(payload.new.invoice_no).startsWith('CMS'));
+
+        if (isMicroJobInvoice) {
+          const grandTotal = payload.new.grand_total || payload.new.total || payload.new.amount || '—';
+          const invNo = payload.new.invoice_no || payload.new.invoice_number || 'CMS';
+          const payStatus = payload.new.payment_status || 'Pending';
+          const newNotif = {
+            id: `microjob-invoice-${payload.new.id}-${Date.now()}`,
+            invoice_id: payload.new.id,
+            type: 'micro_job_invoice',
+            title: '🔧 Micro-Job Invoice Generated',
+            message: `Invoice #${invNo} totalling ₹${grandTotal} has been issued (${payStatus}).`,
+            timestamp: new Date()
+          };
+          setNotifications(prev => [newNotif, ...prev]);
+          setIsMinimized(false);
+        } else {
+          const newNotif = {
+            id: `invoice-${payload.new.id}-${Date.now()}`,
+            invoice_id: payload.new.id,
+            type: 'final_invoice',
+            title: '🧾 New Invoice Details',
+            message: `Invoice #${payload.new.invoice_number || payload.new.invoice_no || 'draft'} for ₹${payload.new.amount || payload.new.total} is ${payload.new.payment_status || payload.new.status || 'generated'}.`,
+            timestamp: new Date()
+          };
+          setNotifications(prev => [newNotif, ...prev]);
+          setIsMinimized(false);
         }
       })
       .subscribe();
@@ -275,6 +308,7 @@ function ClientVaultLayoutContent({
       case 'communication': return '#3b82f6'; // Blue
       case 'project_completed': return '#eab308'; // Amber
       case 'final_invoice': return '#f43f5e'; // Rose
+      case 'micro_job_invoice': return '#f97316'; // Orange
       default: return '#64748b'; // Slate
     }
   };
@@ -287,6 +321,7 @@ function ClientVaultLayoutContent({
       case 'communication': return '💬';
       case 'project_completed': return '🎉';
       case 'final_invoice': return '🧾';
+      case 'micro_job_invoice': return '🔧';
       default: return '🔔';
     }
   };
@@ -397,9 +432,7 @@ function ClientVaultLayoutContent({
             <span className="text-[11px] font-black tracking-widest text-foreground uppercase" style={{ letterSpacing: '0.1em' }}>NETRA GRAPHICS</span>
           </div>
         </header>
-        <div className="absolute top-3 right-6 z-50 md:top-4">
-          <WhatsNewBulb isClientPortal={true} />
-        </div>
+
         <div className="flex-1 overflow-y-auto p-6 lg:p-10 max-w-6xl mx-auto w-full">
           {children}
         </div>

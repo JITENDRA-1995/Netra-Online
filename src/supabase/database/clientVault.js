@@ -26,17 +26,25 @@ export const fetchClientDashboardSummary = async (clientId) => {
 
   // 3. Fetch Invoices and calculate pending invoices
   let pendingInvoices = 0;
+  let invQuery = supabase
+    .from('invoices')
+    .select('*, projects(payment_status)');
+  
   if (projectIds.length > 0) {
-    const { data: invoices, error: invError } = await supabase
-      .from('invoices')
-      .select('*, projects(payment_status)')
-      .in('project_id', projectIds);
+    invQuery = invQuery.or(`project_id.in.(${projectIds.join(',')}),client_link.eq.${clientId}`);
+  } else {
+    invQuery = invQuery.eq('client_link', clientId);
+  }
 
-    if (!invError && invoices) {
-      pendingInvoices = invoices.filter(inv => 
-        (inv.projects?.payment_status || '').toLowerCase() !== 'paid'
-      ).length;
-    }
+  const { data: invoices, error: invError } = await invQuery;
+
+  if (!invError && invoices) {
+    pendingInvoices = invoices.filter(inv => {
+      const paymentStatusLower = (inv.payment_status || '').toLowerCase();
+      const projPaymentStatusLower = (inv.projects?.payment_status || '').toLowerCase();
+      return paymentStatusLower !== 'paid' && paymentStatusLower !== 'settled' && 
+             projPaymentStatusLower !== 'paid' && projPaymentStatusLower !== 'settled';
+    }).length;
   }
 
   // 4. Calculate total messages sent/received in project chats
@@ -89,6 +97,36 @@ export const fetchClientDashboardSummary = async (clientId) => {
     }
   }
 
+  // 6. Synthesize recent activity for micro-job / CMS invoices (Option A)
+  //    These invoices have no project_id so they never appear in project_activity_logs.
+  //    We read them directly from the invoices table via client_link.
+  const { data: cmsInvoices, error: cmsError } = await supabase
+    .from('invoices')
+    .select('id, invoice_no, grand_total, payment_status, created_at, updated_at')
+    .eq('client_link', clientId)
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  if (!cmsError && cmsInvoices && cmsInvoices.length > 0) {
+    const cmsActivity = cmsInvoices.map(inv => {
+      const status = (inv.payment_status || 'Pending');
+      const total = inv.grand_total || '—';
+      const invNo = inv.invoice_no || 'CMS';
+      return {
+        id: `cms-inv-${inv.id}`,
+        description: `Micro-Job Invoice #${invNo} for ₹${total} — ${status}`,
+        createdAt: inv.created_at,
+        projectTitle: 'Micro-Job Invoice',
+        type: 'invoice'
+      };
+    });
+
+    // Merge with project activity logs, sort by date desc, keep top 10
+    recentActivity = [...recentActivity, ...cmsActivity]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 10);
+  }
+
   return {
     activeProjects,
     completedProjects,
@@ -97,6 +135,7 @@ export const fetchClientDashboardSummary = async (clientId) => {
     recentActivity
   };
 };
+
 
 /**
  * Fetch all projects belonging to a client
@@ -232,7 +271,7 @@ export const fetchClientProjectDetail = async (projectId) => {
     deadline: project.deadline,
     progressPercent: project.progress || (project.stage * 25),
     category: project.category || 'design',
-    isPaid: (project.payment_status || '').toLowerCase() === 'paid',
+    isPaid: (project.payment_status || '').toLowerCase() === 'paid' || (project.payment_status || '').toLowerCase() === 'settled',
     paymentStatus: project.payment_status || 'unpaid',
     milestones
   };
@@ -259,7 +298,7 @@ export const fetchClientProjectMedia = async (projectId) => {
 
   if (error) throw error;
 
-  const canDownload = (project?.payment_status || '').toLowerCase() === 'paid';
+  const canDownload = (project?.payment_status || '').toLowerCase() === 'paid' || (project?.payment_status || '').toLowerCase() === 'settled';
 
   return (media || []).map(m => {
     const isImage = ['image', 'jpg', 'jpeg', 'png', 'webp', 'gif'].includes((m.file_type || '').toLowerCase()) || 
@@ -489,16 +528,18 @@ export const fetchClientInvoices = async (clientId) => {
     .eq('client_id', clientId);
 
   if (pError) throw pError;
-  if (!projects || projects.length === 0) return [];
+  const projectIds = (projects || []).map(p => p.id);
+  const projectMap = new Map((projects || []).map(p => [p.id, p]));
 
-  const projectIds = projects.map(p => p.id);
-  const projectMap = new Map(projects.map(p => [p.id, p]));
+  // 2. Fetch invoices belonging to those projects OR directly linked to the client
+  let query = supabase.from('invoices').select('*');
+  if (projectIds.length > 0) {
+    query = query.or(`project_id.in.(${projectIds.join(',')}),client_link.eq.${clientId}`);
+  } else {
+    query = query.eq('client_link', clientId);
+  }
 
-  // 2. Fetch invoices belonging to those projects from database
-  const { data: invoices, error: invError } = await supabase
-    .from('invoices')
-    .select('*')
-    .in('project_id', projectIds)
+  const { data: invoices, error: invError } = await query
     .order('created_at', { ascending: false })
     .order('invoice_no', { ascending: false });
 
@@ -510,15 +551,22 @@ export const fetchClientInvoices = async (clientId) => {
   if (invoices && invoices.length > 0) {
     invoices.forEach(inv => {
       const proj = projectMap.get(inv.project_id);
-      const status = (proj?.payment_status || '').toLowerCase() === 'paid' ? 'paid' : 'sent';
+      const paymentStatusLower = (inv.payment_status || '').toLowerCase();
+      const projPaymentStatusLower = (proj?.payment_status || '').toLowerCase();
+      const status = (paymentStatusLower === 'paid' || paymentStatusLower === 'settled' || 
+                      projPaymentStatusLower === 'paid' || projPaymentStatusLower === 'settled') ? 'paid' : 'sent';
+      
+      const subtotal = proj ? parseFloat(proj.quote) : parseFloat(inv.grand_total);
+      const discount = proj ? parseFloat(proj.discount || 0) : 0;
+      const amount = subtotal - discount;
       
       resultInvoices.push({
         id: inv.id,
         invoiceNumber: inv.invoice_no,
         projectTitle: inv.project_service || proj?.name || 'Design Services',
-        amount: parseFloat(inv.grand_total),
+        amount,
         status,
-        projectStatus: proj?.status || 'Active',
+        projectStatus: proj?.status || 'Completed',
         createdAt: inv.issue_date || inv.created_at,
         dueDate: inv.issue_date ? new Date(new Date(inv.issue_date).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : null,
         paidAt: status === 'paid' ? inv.created_at : null,
@@ -545,7 +593,8 @@ export const fetchClientInvoices = async (clientId) => {
       const createdDate = new Date(proj.created_at || Date.now());
       const dateStr = createdDate.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '');
       const virtualInvoiceNo = virtualInvoiceMap.get(proj.id) || `NG/${dateStr}/${String(proj.id).padStart(4, '0')}`;
-      const status = (proj.payment_status || '').toLowerCase() === 'paid' ? 'paid' : 'sent';
+      const projPaymentStatusLower = (proj.payment_status || '').toLowerCase();
+      const status = (projPaymentStatusLower === 'paid' || projPaymentStatusLower === 'settled') ? 'paid' : 'sent';
 
       resultInvoices.push({
         id: `virtual-${proj.id}`,
@@ -607,7 +656,8 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
     const discount = parseFloat(proj.discount || 0);
     const grandTotal = subtotal - discount;
     
-    const status = (proj.payment_status || '').toLowerCase() === 'paid' ? 'paid' : 'sent';
+    const projPaymentStatusLower = (proj.payment_status || '').toLowerCase();
+    const status = (projPaymentStatusLower === 'paid' || projPaymentStatusLower === 'settled') ? 'paid' : 'sent';
     
     let qty = 1;
     let rate = subtotal;
@@ -710,36 +760,91 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
 
   if (error) throw error;
 
-  const status = (inv.projects?.payment_status || '').toLowerCase() === 'paid' ? 'paid' : 'sent';
-  const amount = parseFloat(inv.grand_total);
-  const discount = parseFloat(inv.projects?.discount || 0);
-  const subtotal = parseFloat(inv.projects?.quote || amount + discount);
+  let lineItems = [];
+  let fetchedMicroJobs = false;
 
-  // Line items: map from project description if JSON_METADATA is used, otherwise default
-  let qty = 1;
-  let rate = subtotal;
-  let descText = inv.project_service || inv.projects?.service || inv.projects?.name || 'Design Services';
-
-  if (inv.projects?.description?.startsWith("JSON_METADATA:")) {
+  if (inv.micro_job_ids && inv.micro_job_ids.length > 0) {
     try {
-      const parsed = JSON.parse(inv.projects.description.substring(14));
-      qty = parsed.qty || 1;
-      rate = parsed.rate || (subtotal / qty);
-      descText = inv.project_service || inv.projects?.service || parsed.description || inv.projects?.name || 'Design Services';
-    } catch (e) {
-      console.error("Error parsing invoice item JSON_METADATA:", e);
+      const { data: jobs, error: jobsError } = await supabase
+        .from('micro_jobs_ledger')
+        .select('*')
+        .in('job_id', inv.micro_job_ids);
+      
+      if (!jobsError && jobs && jobs.length > 0) {
+        jobs.sort((a, b) => new Date(a.date_logged).getTime() - new Date(b.date_logged).getTime());
+
+        lineItems = jobs.map((job, idx) => {
+          let taskName = job.task_name;
+          let qty = 1;
+          let rate = parseFloat(job.amount);
+          let discount = 0;
+
+          if (taskName && taskName.startsWith("JSON_METADATA:")) {
+            try {
+              const parsed = JSON.parse(taskName.substring(14));
+              taskName = parsed.taskName || '';
+              qty = parsed.qty !== undefined ? parsed.qty : 1;
+              rate = parsed.rate !== undefined ? parsed.rate : (parseFloat(job.amount) / qty);
+              discount = parsed.discount !== undefined ? parsed.discount : 0;
+            } catch (e) {
+              console.error("Failed to parse JSON_METADATA in client micro job:", e);
+            }
+          }
+          
+          return {
+            id: idx + 1,
+            description: taskName,
+            quantity: qty,
+            unitPrice: rate,
+            discount: discount,
+            total: (qty * rate) - discount
+          };
+        });
+        fetchedMicroJobs = true;
+      }
+    } catch (jobsErr) {
+      console.error("Error fetching micro jobs for client invoice detail:", jobsErr);
     }
   }
 
-  const lineItems = [
-    {
-      id: 1,
-      description: descText,
-      quantity: qty,
-      unitPrice: rate,
-      total: subtotal - discount
+  const payStatus = (inv.payment_status || inv.projects?.payment_status || '').toLowerCase();
+  const status = (payStatus === 'paid' || payStatus === 'settled') ? 'paid' : 'sent';
+  const amount = parseFloat(inv.grand_total);
+  
+  let discount, subtotal;
+  if (fetchedMicroJobs) {
+    discount = lineItems.reduce((sum, item) => sum + (item.discount || 0), 0);
+    subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+  } else {
+    discount = parseFloat(inv.projects?.discount || 0);
+    subtotal = parseFloat(inv.projects?.quote || amount + discount);
+
+    let qty = 1;
+    let rate = subtotal;
+    let descText = inv.project_service || inv.projects?.service || inv.projects?.name || 'Design Services';
+
+    if (inv.projects?.description?.startsWith("JSON_METADATA:")) {
+      try {
+        const parsed = JSON.parse(inv.projects.description.substring(14));
+        qty = parsed.qty || 1;
+        rate = parsed.rate || (subtotal / qty);
+        descText = inv.project_service || inv.projects?.service || parsed.description || inv.projects?.name || 'Design Services';
+      } catch (e) {
+        console.error("Error parsing invoice item JSON_METADATA:", e);
+      }
     }
-  ];
+
+    lineItems = [
+      {
+        id: 1,
+        description: descText,
+        quantity: qty,
+        unitPrice: rate,
+        discount: discount,
+        total: subtotal - discount
+      }
+    ];
+  }
 
   // Fetch global settings for bankingDetails and adminProfile
   let bankingDetails = {
@@ -773,14 +878,14 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
     console.error("Error fetching system settings for client invoice details:", e);
   }
 
-  const discountVal = parseFloat(inv.projects?.discount || 0);
-  const subtotalVal = parseFloat(inv.projects?.quote || amount + discountVal);
+  const discountVal = discount;
+  const subtotalVal = subtotal;
 
   return {
     id: inv.id,
     invoiceNumber: inv.invoice_no,
     status,
-    projectStatus: inv.projects?.status || 'Active',
+    projectStatus: (inv.micro_job_ids && inv.micro_job_ids.length > 0) ? 'Completed' : (inv.projects?.status || 'Active'),
     advanceAmount: inv.projects?.advance_amount || 0,
     discount: discountVal,
     subtotal: subtotalVal,

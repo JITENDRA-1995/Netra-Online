@@ -4,7 +4,8 @@ import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Progress } from "../../components/ui/progress";
 import { Skeleton } from "../../components/ui/skeleton";
-import { FolderOpen, Clock } from "lucide-react";
+import { FolderOpen, Clock, MessageSquare } from "lucide-react";
+
 import { format } from "date-fns";
 
 export function ClientProjects({ currentClient, onTabChange, setSelectedProjectId }) {
@@ -93,13 +94,22 @@ export function ClientProjects({ currentClient, onTabChange, setSelectedProjectI
                       </div>
                     )}
                     
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-xs text-muted-foreground font-medium">
-                        <span>Progress</span>
-                        <span>{project.progressPercent}%</span>
+                    {(project.service || '').toLowerCase().includes('general support') ? (
+                      <div className="flex items-center gap-2 pt-1">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-muted/50 text-muted-foreground border border-border/50 opacity-60 select-none">
+                          <MessageSquare className="h-3 w-3" />
+                          Chat only — no project tracking
+                        </span>
                       </div>
-                      <Progress value={project.progressPercent} className="h-1.5" />
-                    </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs text-muted-foreground font-medium">
+                          <span>Progress</span>
+                          <span>{project.progressPercent}%</span>
+                        </div>
+                        <Progress value={project.progressPercent} className="h-1.5" />
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

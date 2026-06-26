@@ -228,7 +228,7 @@ export default function Financials({
         if (inv) {
           const oldClientName = inv.clientName;
           const liveClientName = clients.find(c => String(c.id) === String(inv.clientLink))?.name || inv.clientName;
-          if (oldClientName && liveClientName && oldClientName !== liveClientName) {
+          if (desc && oldClientName && liveClientName && oldClientName !== liveClientName) {
             desc = desc.replace(oldClientName, liveClientName);
           }
         }
@@ -244,7 +244,7 @@ export default function Financials({
               )
             : null;
           const liveClientName = liveClient?.name || currentProj.client?.name || currentProj.clientName || currentProj.name;
-          if (oldClientName && liveClientName && oldClientName !== liveClientName) {
+          if (desc && oldClientName && liveClientName && oldClientName !== liveClientName) {
             desc = desc.replace(oldClientName, liveClientName);
           }
         }
@@ -379,8 +379,8 @@ export default function Financials({
       if (incSearch) {
         const query = incSearch.toLowerCase();
         const matchesQuery =
-          entry.desc.toLowerCase().includes(query) ||
-          entry.category.toLowerCase().includes(query) ||
+          (entry.desc || "").toLowerCase().includes(query) ||
+          (entry.category || "").toLowerCase().includes(query) ||
           (entry.mode && entry.mode.toLowerCase().includes(query));
         if (!matchesQuery) return false;
       }
@@ -388,12 +388,12 @@ export default function Financials({
       // 2. Client dropdown filter (client name in entry.desc)
       if (incClient !== "all") {
         const clientQuery = incClient.toLowerCase();
-        if (!entry.desc.toLowerCase().includes(clientQuery)) return false;
+        if (!(entry.desc || "").toLowerCase().includes(clientQuery)) return false;
       }
 
       // 3. Category dropdown filter
       if (incCategory !== "all") {
-        if (entry.category.toLowerCase() !== incCategory.toLowerCase()) return false;
+        if ((entry.category || "").toLowerCase() !== incCategory.toLowerCase()) return false;
       }
 
       // 4. Date range filter
@@ -449,8 +449,8 @@ export default function Financials({
       if (expSearch) {
         const query = expSearch.toLowerCase();
         const matchesQuery =
-          entry.desc.toLowerCase().includes(query) ||
-          entry.category.toLowerCase().includes(query) ||
+          (entry.desc || "").toLowerCase().includes(query) ||
+          (entry.category || "").toLowerCase().includes(query) ||
           (entry.mode && entry.mode.toLowerCase().includes(query));
         if (!matchesQuery) return false;
       }
@@ -458,12 +458,12 @@ export default function Financials({
       // 2. Client dropdown filter (client name in entry.desc)
       if (expClient !== "all") {
         const clientQuery = expClient.toLowerCase();
-        if (!entry.desc.toLowerCase().includes(clientQuery)) return false;
+        if (!(entry.desc || "").toLowerCase().includes(clientQuery)) return false;
       }
 
       // 3. Category dropdown filter
       if (expCategory !== "all") {
-        if (entry.category.toLowerCase() !== expCategory.toLowerCase()) return false;
+        if ((entry.category || "").toLowerCase() !== expCategory.toLowerCase()) return false;
       }
 
       // 4. Date range filter

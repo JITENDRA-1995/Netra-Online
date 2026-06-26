@@ -162,7 +162,7 @@ export default function InvoicesPage({
         return item;
       }));
 
-      const isMicroJobInvoice = (inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && inv.invoiceNo.startsWith('CMS'));
+      const isMicroJobInvoice = (inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && /^CMS/i.test(inv.invoiceNo));
 
       const cashbookEntry = {
         id: Date.now(),
@@ -537,7 +537,7 @@ export default function InvoicesPage({
       if (!matchesSearch) return false;
 
       // 2. Tab filter (Saved vs Draft vs Custom vs Micro-Job)
-      const isMicroJobInvoice = (inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && inv.invoiceNo.startsWith('CMS'));
+      const isMicroJobInvoice = (inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && /^CMS/i.test(inv.invoiceNo));
       const hasProject = !!(inv.rawProject && inv.rawProject.id);
       const isStandalone = hasProject && inv.rawProject.isStandalone;
       const isCustom = !isMicroJobInvoice && (!hasProject || isStandalone || inv.invoiceNo.includes('/C'));
@@ -652,7 +652,7 @@ export default function InvoicesPage({
         console.warn("Supabase delete failed, falling back to local memory:", dbErr);
       }
 
-      if (deleteStrategy === "revert_ledger" && inv.microJobIds && inv.microJobIds.length > 0) {
+      if (inv.microJobIds && inv.microJobIds.length > 0) {
         try {
           await revertJobsToLedger(inv.microJobIds);
         } catch (revertErr) {
@@ -701,11 +701,17 @@ export default function InvoicesPage({
           entry.invoiceNo !== inv.invoiceNo &&
           !(entry.desc && entry.desc.includes(inv.invoiceNo))
         ));
-        toast({ title: "Invoice & Log Entry Purged", description: "Successfully removed invoice and reverted cashbook logs." });
-      } else if (deleteStrategy === "revert_ledger") {
-        toast({ title: "Invoice Deleted & Logs Reverted", description: "Invoice deleted and associated micro-jobs sent back to ledger." });
+        if (inv.microJobIds && inv.microJobIds.length > 0) {
+          toast({ title: "Invoice Purged & Jobs Reverted", description: "Invoice removed, cashbook entry reverted, and micro-jobs returned to ledger." });
+        } else {
+          toast({ title: "Invoice & Log Entry Purged", description: "Successfully removed invoice and reverted cashbook logs." });
+        }
       } else {
-        toast({ title: "Invoice Deleted", description: "Invoice removed from vault. Cashbook entries preserved." });
+        if (inv.microJobIds && inv.microJobIds.length > 0) {
+          toast({ title: "Invoice Deleted & Jobs Reverted", description: "Invoice deleted and associated micro-jobs sent back to ledger." });
+        } else {
+          toast({ title: "Invoice Deleted", description: "Invoice removed from vault. Cashbook entries preserved." });
+        }
       }
     } catch (err) {
       console.error(err);
@@ -722,30 +728,28 @@ export default function InvoicesPage({
     const ids = invs.map(i => i.id);
     const nos = invs.map(i => i.invoiceNo);
     try {
-      // Revert micro jobs if specified
-      if (deleteStrategy === "revert_ledger") {
-        const allMicroJobIds = invs.reduce((acc: any[], inv) => {
-          if (inv.microJobIds && inv.microJobIds.length > 0) {
-            return [...acc, ...inv.microJobIds];
-          }
-          return acc;
-        }, []);
+      // Revert micro jobs if present
+      const allMicroJobIds = invs.reduce((acc: any[], inv) => {
+        if (inv.microJobIds && inv.microJobIds.length > 0) {
+          return [...acc, ...inv.microJobIds];
+        }
+        return acc;
+      }, []);
 
-        if (allMicroJobIds.length > 0) {
-          try {
-            await revertJobsToLedger(allMicroJobIds);
-          } catch (revertErr) {
-            console.warn("Failed to revert micro jobs in Supabase (batch):", revertErr);
-          }
+      if (allMicroJobIds.length > 0) {
+        try {
+          await revertJobsToLedger(allMicroJobIds);
+        } catch (revertErr) {
+          console.warn("Failed to revert micro jobs in Supabase (batch):", revertErr);
+        }
 
-          if (setMicroJobs) {
-            setMicroJobs(prev => prev.map(job => {
-              if (allMicroJobIds.includes(job.jobId) || allMicroJobIds.some(id => String(id) === String(job.jobId))) {
-                return { ...job, billingStatus: "Unbilled", invoiceLink: null };
-              }
-              return job;
-            }));
-          }
+        if (setMicroJobs) {
+          setMicroJobs(prev => prev.map(job => {
+            if (allMicroJobIds.includes(job.jobId) || allMicroJobIds.some(id => String(id) === String(job.jobId))) {
+              return { ...job, billingStatus: "Unbilled", invoiceLink: null };
+            }
+            return job;
+          }));
         }
       }
 
@@ -790,11 +794,17 @@ export default function InvoicesPage({
           !nos.includes(entry.invoiceNo) &&
           !nos.some(no => entry.desc && entry.desc.includes(no))
         ));
-        toast({ title: "Batch Invoices & Logs Purged", description: `Successfully removed ${invs.length} invoices and reverted cashbook logs.` });
-      } else if (deleteStrategy === "revert_ledger") {
-        toast({ title: "Batch Invoices Deleted & Logs Reverted", description: `Deleted ${invs.length} invoices and associated micro-jobs sent back to ledger.` });
+        if (allMicroJobIds.length > 0) {
+          toast({ title: "Batch Invoices Purged & Jobs Reverted", description: `Deleted ${invs.length} invoices, reverted cashbook entries, and returned micro-jobs to ledger.` });
+        } else {
+          toast({ title: "Batch Invoices & Logs Purged", description: `Successfully removed ${invs.length} invoices and reverted cashbook logs.` });
+        }
       } else {
-        toast({ title: "Batch Invoices Deleted", description: `${invs.length} invoices removed. Cashbook entries preserved.` });
+        if (allMicroJobIds.length > 0) {
+          toast({ title: "Batch Invoices Deleted & Jobs Reverted", description: `Deleted ${invs.length} invoices and associated micro-jobs returned to ledger.` });
+        } else {
+          toast({ title: "Batch Invoices Deleted", description: `${invs.length} invoices removed. Cashbook entries preserved.` });
+        }
       }
     } catch (err) {
       console.error(err);
@@ -1564,55 +1574,63 @@ export default function InvoicesPage({
                   );
                 })()}
 
-                {/* Keep / Purge strategy choice */}
-                <div className="p-4 rounded-xl border border-cyan-500/10 bg-cyan-500/[0.01] space-y-3">
-                  <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest">Deletion Strategy</div>
-                  <div className="flex flex-col gap-2">
-                    <label className="flex items-center gap-2 cursor-pointer text-[11px] text-white/80 select-none">
-                      <input
-                        type="radio"
-                        name="deleteInvoiceStrategy"
-                        value="keep"
-                        checked={deleteStrategy === 'keep'}
-                        onChange={() => setDeleteStrategy('keep')}
-                        className="accent-cyan-500"
-                      />
-                      <span>Keep/Preserve associated Cashbook entry</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer text-[11px] text-white/80 select-none">
-                      <input
-                        type="radio"
-                        name="deleteInvoiceStrategy"
-                        value="purge"
-                        checked={deleteStrategy === 'purge'}
-                        onChange={() => setDeleteStrategy('purge')}
-                        className="accent-red-500"
-                      />
-                      <span className="text-red-400 font-semibold">Purge associated Cashbook entry (Revert Cashflow)</span>
-                    </label>
-                    {(() => {
-                      const targetInvoices = invoiceToDelete ? [invoiceToDelete] : (batchInvoicesToDelete || []);
-                      const hasPendingMicroJob = targetInvoices.some(inv => 
-                        (inv.microJobIds?.length > 0 || (inv.invoiceNo && inv.invoiceNo.startsWith('CMS'))) &&
-                        (inv.paymentStatus?.toLowerCase() === 'pending' || inv.paymentStatus?.toLowerCase() === 'unpaid')
-                      );
-                      if (!hasPendingMicroJob) return null;
-                      return (
-                        <label className="flex items-center gap-2 cursor-pointer text-[11px] text-white/80 select-none">
-                          <input
-                            type="radio"
-                            name="deleteInvoiceStrategy"
-                            value="revert_ledger"
-                            checked={deleteStrategy === 'revert_ledger'}
-                            onChange={() => setDeleteStrategy('revert_ledger')}
-                            className="accent-amber-500"
-                          />
-                          <span className="text-amber-400 font-semibold">Send Back to MICRO JOB LEDGER</span>
-                        </label>
-                      );
-                    })()}
-                  </div>
-                </div>
+                {/* Keep / Purge strategy choice - only if there are linked entries */}
+                {(() => {
+                  const targetIds = invoiceToDelete ? [invoiceToDelete.id] : (batchInvoicesToDelete?.map(i => i.id) || []);
+                  const targetNos = invoiceToDelete ? [invoiceToDelete.invoiceNo] : (batchInvoicesToDelete?.map(i => i.invoiceNo) || []);
+                  const relatedEntries = cashbookEntries.filter(entry => 
+                    targetIds.includes(entry.invoiceId) || 
+                    targetNos.includes(entry.invoiceNo) ||
+                    targetNos.some(no => entry.desc && entry.desc.includes(no))
+                  );
+                  const targetInvoices = invoiceToDelete ? [invoiceToDelete] : (batchInvoicesToDelete || []);
+                  const hasMicroJobs = targetInvoices.some(inv => 
+                    (inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && /^CMS/i.test(inv.invoiceNo))
+                  );
+
+                  return (
+                    <div className="space-y-4">
+                      {relatedEntries.length > 0 && (
+                        <div className="p-4 rounded-xl border border-cyan-500/10 bg-cyan-500/[0.01] space-y-3">
+                          <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest">Deletion Strategy</div>
+                          <div className="flex flex-col gap-2">
+                            <label className="flex items-center gap-2 cursor-pointer text-[11px] text-white/80 select-none">
+                              <input
+                                type="radio"
+                                name="deleteInvoiceStrategy"
+                                value="keep"
+                                checked={deleteStrategy === 'keep'}
+                                onChange={() => setDeleteStrategy('keep')}
+                                className="accent-cyan-500"
+                              />
+                              <span>Keep/Preserve associated Cashbook entry</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer text-[11px] text-white/80 select-none">
+                              <input
+                                type="radio"
+                                name="deleteInvoiceStrategy"
+                                value="purge"
+                                checked={deleteStrategy === 'purge'}
+                                onChange={() => setDeleteStrategy('purge')}
+                                className="accent-red-500"
+                              />
+                              <span className="text-red-400 font-semibold">Purge associated Cashbook entry (Revert Cashflow)</span>
+                            </label>
+                          </div>
+                        </div>
+                      )}
+
+                      {hasMicroJobs && (
+                        <div className="p-4 rounded-xl border border-amber-500/10 bg-amber-500/[0.02] flex items-center gap-3">
+                          <span className="text-lg">ℹ️</span>
+                          <p className="text-3xs text-amber-400 font-semibold leading-relaxed">
+                            Notice: Deleting {targetInvoices.length > 1 ? "these cumulative invoices" : "this cumulative invoice"} will automatically return the associated micro-jobs back to the ledger as Unbilled.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="flex justify-between items-center pt-5 border-t border-white/5 mt-6">
@@ -2079,11 +2097,10 @@ export default function InvoicesPage({
             <tbody className="divide-y divide-white/5 text-xs">
               {filteredInvoices.length > 0 ? (
                 filteredInvoices.map(inv => {
-                  const isMicroJobInvoice = (inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && inv.invoiceNo.startsWith('CMS'));
-                  const isPaidMicroJob = isMicroJobInvoice && inv.paymentStatus?.toLowerCase() === 'paid';
+                  const isMicroJobInvoice = (inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && /^CMS/i.test(inv.invoiceNo));
                   const isPaidCustomInvoice = invoiceTab === 'CUSTOM' && inv.paymentStatus?.toLowerCase() === 'paid';
                   const isSavedInvoice = invoiceTab === 'SAVED' || inv.rawProject?.status === 'Completed';
-                  const isEditDisabled = isPaidMicroJob || isPaidCustomInvoice || isSavedInvoice;
+                  const isEditDisabled = isMicroJobInvoice || isPaidCustomInvoice || isSavedInvoice;
 
                   return (
                     <tr key={inv.id} className="hover:bg-white/[0.01] transition-colors">
@@ -2137,13 +2154,19 @@ export default function InvoicesPage({
                         )}
                       </td>
                       <td className="p-4 text-right font-bold text-foreground">
-                        ₹{invoiceTab === 'DRAFT' && inv.rawProject 
-                          ? ((parseFloat(inv.rawProject.quote) || 0) - (parseFloat(inv.rawProject.discount) || 0) - (parseFloat(inv.rawProject.advanceAmount) || 0)).toLocaleString() 
-                          : inv.grandTotal.toLocaleString()}
+                        ₹{(() => {
+                          if (invoiceTab === 'DRAFT' && inv.rawProject) {
+                            return ((parseFloat(inv.rawProject.quote) || 0) - (parseFloat(inv.rawProject.discount) || 0) - (parseFloat(inv.rawProject.advanceAmount) || 0));
+                          }
+                          if (inv.rawProject) {
+                            return ((parseFloat(inv.rawProject.quote) || 0) - (parseFloat(inv.rawProject.discount) || 0));
+                          }
+                          return inv.grandTotal;
+                        })().toLocaleString('en-IN')}
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {(inv.paymentStatus?.toLowerCase() === 'pending' || inv.paymentStatus?.toLowerCase() === 'unpaid') && ((inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && inv.invoiceNo.startsWith('CMS'))) && (
+                          {(inv.paymentStatus?.toLowerCase() === 'pending' || inv.paymentStatus?.toLowerCase() === 'unpaid') && ((inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && /^CMS/i.test(inv.invoiceNo))) && (
                             <Button
                               size="sm"
                               className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 gap-1 font-bold text-xs h-7 px-2.5 rounded-lg"
@@ -2179,30 +2202,37 @@ export default function InvoicesPage({
                                     }).filter(Boolean)
                                   : [];
 
-                                const mockProject = {
-                                  id: inv.id,
-                                  name: inv.clientName,
-                                  service: inv.projectService ? inv.projectService.replace(/^Cumulative Micro-Jobs:\s*/i, "") : "",
-                                  quote: inv.grandTotal,
-                                  discount: 0,
-                                  advanceAmount: 0,
-                                  phone: clientObj?.phone || "",
-                                  email: clientObj?.email || "",
-                                  address: clientObj?.address || "",
-                                  gst: clientObj?.gst || "",
-                                  status: 'Completed',
-                                  isStandalone: true,
-                                  items: resolvedItems.length > 0 ? resolvedItems : [{
-                                    service: inv.projectService ? inv.projectService.replace(/^Cumulative Micro-Jobs:\s*/i, "") : "",
-                                    quote: inv.grandTotal,
-                                    discount: 0,
-                                    qty: 1,
-                                    rate: inv.grandTotal
-                                  }],
-                                  invoiceNo: inv.invoiceNo,
-                                  projectId: inv.projectId,
-                                  paymentStatus: inv.paymentStatus || 'Pending'
-                                };
+                                 const totalQuote = resolvedItems.length > 0
+                                   ? resolvedItems.reduce((sum, item) => sum + item.quote, 0)
+                                   : inv.grandTotal;
+                                 const totalDiscount = resolvedItems.length > 0
+                                   ? resolvedItems.reduce((sum, item) => sum + item.discount, 0)
+                                   : 0;
+
+                                 const mockProject = {
+                                   id: inv.id,
+                                   name: inv.clientName,
+                                   service: inv.projectService ? inv.projectService.replace(/^Cumulative Micro-Jobs:\s*/i, "") : "",
+                                   quote: totalQuote,
+                                   discount: totalDiscount,
+                                   advanceAmount: 0,
+                                   phone: clientObj?.phone || "",
+                                   email: clientObj?.email || "",
+                                   address: clientObj?.address || "",
+                                   gst: clientObj?.gst || "",
+                                   status: 'Completed',
+                                   isStandalone: true,
+                                   items: resolvedItems.length > 0 ? resolvedItems : [{
+                                     service: inv.projectService ? inv.projectService.replace(/^Cumulative Micro-Jobs:\s*/i, "") : "",
+                                     quote: inv.grandTotal,
+                                     discount: 0,
+                                     qty: 1,
+                                     rate: inv.grandTotal
+                                   }],
+                                   invoiceNo: inv.invoiceNo,
+                                   projectId: inv.projectId,
+                                   paymentStatus: inv.paymentStatus || 'Pending'
+                                 };
                                 setInvoiceProject(mockProject);
                               } else {
                                 const cleanedRawProject = { ...inv.rawProject };
@@ -2231,8 +2261,8 @@ export default function InvoicesPage({
                                 : "hover:bg-amber-500/10 hover:text-amber-400"
                             }`}
                             title={
-                              isPaidMicroJob 
-                                ? "Paid Micro-Job invoices cannot be edited" 
+                              isMicroJobInvoice 
+                                ? "Cumulative micro-job invoices cannot be edited. Delete and recreate from ledger instead." 
                                 : isPaidCustomInvoice 
                                   ? "Paid Custom invoices cannot be edited" 
                                   : isSavedInvoice

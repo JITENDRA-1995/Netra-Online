@@ -8483,10 +8483,13 @@ function App() {
                     });
                     const stableInvoiceNo = existingInvoice ? existingInvoice.invoiceNo : (invoiceProject.invoiceNo || getUniqueInvoiceNumber(invoiceProject.createdAt));
 
-                    const isMicroJobInvoice = (invoiceProject.invoiceNo && invoiceProject.invoiceNo.startsWith('CMS')) || 
+                    const isMicroJobInvoice = (stableInvoiceNo && /^CMS/i.test(stableInvoiceNo)) || 
                                               (invoiceProject.projectId === 'MICRO_JOB') ||
                                               (invoiceProject.microJobIds && invoiceProject.microJobIds.length > 0) ||
-                                              (existingInvoice && existingInvoice.invoiceNo && existingInvoice.invoiceNo.startsWith('CMS'));
+                                              (existingInvoice && (
+                                                (existingInvoice.invoiceNo && /^CMS/i.test(existingInvoice.invoiceNo)) ||
+                                                (existingInvoice.microJobIds && existingInvoice.microJobIds.length > 0)
+                                              ));
 
                     const isPendingMicroJob = isMicroJobInvoice && 
                       (invoiceProject.paymentStatus?.toLowerCase() === 'pending' || 
@@ -8600,6 +8603,18 @@ function App() {
                               <label style={{ fontSize: '0.65rem', color: '#888', letterSpacing: '1px', display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>INVOICE DETAILS</label>
                               <p style={{ margin: 0, fontSize: '0.9rem' }}><strong>Invoice #:</strong> {stableInvoiceNo}</p>
                               <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem' }}><strong>Issue Date:</strong> {(() => {
+                                if (stableInvoiceNo) {
+                                  const match = stableInvoiceNo.match(/(?:NG\/|CMS\/|INV-)?(\d{2})(\d{2})(\d{4})/);
+                                  if (match) {
+                                    const dateObj = new Date(`${match[3]}-${match[2]}-${match[1]}`);
+                                    if (!isNaN(dateObj.getTime())) {
+                                      return dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                                    }
+                                  }
+                                }
+                                if (existingInvoice && existingInvoice.issueDate) {
+                                  return existingInvoice.issueDate;
+                                }
                                 const isCompleted = (invoiceProject.status || '').toLowerCase() === 'completed';
                                 let finalDate = invoiceProject.issueDate || invoiceProject.createdAt || Date.now();
                                 if (isCompleted) {
@@ -8892,14 +8907,27 @@ function App() {
                               const targetProjId = isStandalone ? null : (invoiceProject.projectId || invoiceProject.id);
                               const linkedProj = targetProjId ? ignitionQueue.find(p => p.id === targetProjId) : null;
                               const isCompletedProj = linkedProj && (linkedProj.status || '').toLowerCase() === 'completed';
+                              const isPaidCustomInvoice = isStandalone && !isMicroJobInvoice && (
+                                invoiceProject.paymentStatus?.toLowerCase() === 'paid' ||
+                                (existingInvoice && existingInvoice.paymentStatus?.toLowerCase() === 'paid')
+                              );
+                              const isEditDisabled = isCompletedProj || isMicroJobInvoice || isPaidCustomInvoice;
 
                               return (
                                 <button
-                                  className={`action-btn btn-edit ${isCompletedProj ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}
-                                  disabled={isCompletedProj}
-                                  title={isCompletedProj ? "Completed project invoices cannot be edited" : "Edit Details"}
+                                  className={`action-btn btn-edit ${isEditDisabled ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}
+                                  disabled={isEditDisabled}
+                                  title={
+                                    isMicroJobInvoice
+                                      ? "Cumulative micro-job invoices cannot be edited. Delete and recreate from ledger instead."
+                                      : isPaidCustomInvoice
+                                        ? "Paid Custom invoices cannot be edited"
+                                        : isCompletedProj 
+                                          ? "Completed project invoices cannot be edited" 
+                                          : "Edit Details"
+                                  }
                                   onClick={() => {
-                                    if (isCompletedProj) return;
+                                    if (isEditDisabled) return;
                                     if (!isStandalone) {
                                       setActiveAdminModule("PROJECTS");
                                       setRedirectBackToProjectEdit(targetProjId);

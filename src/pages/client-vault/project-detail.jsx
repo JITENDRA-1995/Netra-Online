@@ -125,6 +125,8 @@ export function ClientProjectDetail({
     );
   }
 
+  const isGeneralSupport = (project.service || '').toLowerCase().includes('general support');
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <style dangerouslySetInnerHTML={{__html: `
@@ -178,79 +180,99 @@ export function ClientProjectDetail({
           {/* Progress Section */}
           <Card className="border-border/50">
             <CardContent className="p-6 md:p-8 space-y-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-medium mb-1">Project Progress</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Current phase: <span className="font-medium text-foreground">
-                      {project.status.toLowerCase() === 'active' || project.status.toLowerCase() === 'ongoing' 
-                        ? getActivePhaseText() 
-                        : project.status.replace('_', ' ')}
-                    </span>
+              {isGeneralSupport ? (
+                <div className="flex flex-col items-center justify-center py-6 gap-3 opacity-40 select-none">
+                  <MessageSquare className="h-8 w-8 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground text-center">
+                    Progress tracking is not applicable for General Support &amp; Chat projects.
                   </p>
                 </div>
-                <div className="text-right">
-                  <div className="text-3xl font-serif text-primary">{project.progressPercent}%</div>
-                </div>
-              </div>
-              <Progress value={project.progressPercent} className="h-3" />
+              ) : (
+                <>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg font-medium mb-1">Project Progress</h2>
+                      <p className="text-sm text-muted-foreground">
+                        Current phase: <span className="font-medium text-foreground">
+                          {project.status.toLowerCase() === 'active' || project.status.toLowerCase() === 'ongoing' 
+                            ? getActivePhaseText() 
+                            : project.status.replace('_', ' ')}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-serif text-primary">{project.progressPercent}%</div>
+                    </div>
+                  </div>
+                  <Progress value={project.progressPercent} className="h-3" />
+                </>
+              )}
             </CardContent>
           </Card>
 
           {/* Milestones */}
           <div className="space-y-4">
-            <h2 className="text-xl font-serif font-medium">Timeline & Milestones</h2>
+            <h2 className="text-xl font-serif font-medium">Timeline &amp; Milestones</h2>
             <Card className="border-border/50">
               <CardContent className="p-6">
-                {project.milestones && project.milestones.length > 0 ? (
-                  <div className="space-y-8">
-                    {project.milestones.map((milestone, index) => (
-                      <div key={milestone.id || index} className="relative flex gap-6">
-                        {/* Timeline connector line */}
-                        {index !== project.milestones.length - 1 && (
-                          <div className="absolute left-3 top-8 bottom-[-2rem] w-px bg-border/60">
-                            {/* If this milestone is completed but the next one is not, show the traveling flame */}
-                            {milestone.isCompleted && !project.milestones[index + 1]?.isCompleted && (
-                              <div 
-                                className="absolute left-1/2 w-4 h-4 flex items-center justify-center text-xs"
-                                style={{
-                                  animation: 'flameTravel 2.5s linear infinite',
-                                  textShadow: '0 0 8px rgba(249, 115, 22, 0.8)',
-                                  zIndex: 20
-                                }}
-                              >
-                                🔥
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        
-                        <div className="relative z-10 flex-shrink-0 mt-1">
-                          {milestone.isCompleted ? (
-                            <CheckCircle2 className="h-6 w-6 text-primary bg-background rounded-full" />
-                          ) : (
-                            <Circle className="h-6 w-6 text-muted-foreground bg-background rounded-full" />
-                          )}
-                        </div>
-                        
-                        <div className={"space-y-1 pb-2 " + (milestone.isCompleted ? "opacity-100" : "opacity-70")}>
-                          <h3 className="font-medium text-lg">{milestone.title}</h3>
-                          {milestone.description && (
-                            <p className="text-sm text-muted-foreground">{milestone.description}</p>
-                          )}
-                          {milestone.isCompleted && milestone.completedAt && (
-                            <p className="text-xs text-primary font-medium mt-2">
-                              Completed on {format(new Date(milestone.completedAt), 'MMM d, yyyy')}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                {isGeneralSupport ? (
+                  <div className="flex flex-col items-center justify-center py-8 gap-3 opacity-40 select-none">
+                    <MessageSquare className="h-8 w-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground text-center">
+                      Milestone tracking is disabled for General Support &amp; Chat projects.
+                    </p>
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No milestones defined for this project.
-                  </div>
+                  project.milestones && project.milestones.length > 0 ? (
+                    <div className="space-y-8">
+                      {project.milestones.map((milestone, index) => (
+                        <div key={milestone.id || index} className="relative flex gap-6">
+                          {/* Timeline connector line */}
+                          {index !== project.milestones.length - 1 && (
+                            <div className="absolute left-3 top-8 bottom-[-2rem] w-px bg-border/60">
+                              {/* If this milestone is completed but the next one is not, show the traveling flame */}
+                              {milestone.isCompleted && !project.milestones[index + 1]?.isCompleted && (
+                                <div 
+                                  className="absolute left-1/2 w-4 h-4 flex items-center justify-center text-xs"
+                                  style={{
+                                    animation: 'flameTravel 2.5s linear infinite',
+                                    textShadow: '0 0 8px rgba(249, 115, 22, 0.8)',
+                                    zIndex: 20
+                                  }}
+                                >
+                                  🔥
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          <div className="relative z-10 flex-shrink-0 mt-1">
+                            {milestone.isCompleted ? (
+                              <CheckCircle2 className="h-6 w-6 text-primary bg-background rounded-full" />
+                            ) : (
+                              <Circle className="h-6 w-6 text-muted-foreground bg-background rounded-full" />
+                            )}
+                          </div>
+                          
+                          <div className={"space-y-1 pb-2 " + (milestone.isCompleted ? "opacity-100" : "opacity-70")}>
+                            <h3 className="font-medium text-lg">{milestone.title}</h3>
+                            {milestone.description && (
+                              <p className="text-sm text-muted-foreground">{milestone.description}</p>
+                            )}
+                            {milestone.isCompleted && milestone.completedAt && (
+                              <p className="text-xs text-primary font-medium mt-2">
+                                Completed on {format(new Date(milestone.completedAt), 'MMM d, yyyy')}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No milestones defined for this project.
+                    </div>
+                  )
                 )}
               </CardContent>
             </Card>

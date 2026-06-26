@@ -151,13 +151,22 @@ export function ClientDashboard({ currentClient, onTabChange, setSelectedProject
                           {project.status.replace('_', ' ')}
                         </Badge>
                       </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>Progress</span>
-                          <span>{project.progressPercent}%</span>
+                      {(project.service || '').toLowerCase().includes('general support') ? (
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-muted/50 text-muted-foreground border border-border/50 opacity-60 select-none">
+                            <MessageSquare className="h-3 w-3" />
+                            Chat only — no project tracking
+                          </span>
                         </div>
-                        <Progress value={project.progressPercent} className="h-2" />
-                      </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Progress</span>
+                            <span>{project.progressPercent}%</span>
+                          </div>
+                          <Progress value={project.progressPercent} className="h-2" />
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
