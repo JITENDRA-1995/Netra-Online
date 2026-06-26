@@ -115,6 +115,8 @@ interface DashboardProps {
   onOpenCreateInvoice?: () => void;
   onAddCashbookEntry?: (entry: any) => void;
   setFinancialTab?: (tab: string) => void;
+  isNotificationsMinimized?: boolean;
+  setIsNotificationsMinimized?: (b: boolean) => void;
 }
 
 export default function Dashboard({
@@ -139,6 +141,8 @@ export default function Dashboard({
   onOpenCreateInvoice,
   onAddCashbookEntry,
   setFinancialTab,
+  isNotificationsMinimized = false,
+  setIsNotificationsMinimized,
 }: DashboardProps) {
   const [quickEntryType, setQuickEntryType] = useState<'INCOME' | 'EXPENSE' | null>(null);
   const [revenueGranularity, setRevenueGranularity] = useState<'day' | 'month' | 'year'>('day');
@@ -1490,9 +1494,26 @@ export default function Dashboard({
             Studio Intelligence Dashboard
           </p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/5">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-          <span className="text-xs text-cyan-400 font-medium tracking-wider">LIVE</span>
+        <div className="flex items-center gap-3">
+          {isNotificationsMinimized && clientPortalNotifs.filter(n => !n.is_read).length > 0 && (
+            <button 
+              onClick={() => setIsNotificationsMinimized?.(false)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/5 cursor-pointer hover:bg-cyan-500/10 hover:border-cyan-400/50 transition-colors"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+              </span>
+              <span className="text-xs text-cyan-400 font-medium tracking-wider uppercase">
+                MINIMIZED ({clientPortalNotifs.filter(n => !n.is_read).length})
+              </span>
+              <span className="text-xs">💬</span>
+            </button>
+          )}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan-500/20 bg-cyan-500/5">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            <span className="text-xs text-cyan-400 font-medium tracking-wider">LIVE</span>
+          </div>
         </div>
       </motion.div>
 

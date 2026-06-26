@@ -8105,13 +8105,10 @@ input[type="number"] {
 .client-portal-popup-container {
   position: fixed;
   top: 24px;
-  left: 0;
-  right: 0;
-  margin-left: auto;
-  margin-right: auto;
+  left: 50%;
   width: 440px;
-  max-width: 90vw;
-  height: 180px;
+  max-width: 95vw;
+  height: 200px;
   z-index: 999999;
 }
 
@@ -8304,6 +8301,9 @@ input[type="number"] {
 }
 
 @media (max-width: 640px) {
+  .client-portal-popup-container {
+    height: 210px;
+  }
   .stack-indicators {
     right: 0;
     left: 0;

@@ -279,7 +279,9 @@ export function ClientInvoiceDetail({ invoiceId, onTabChange }) {
               {invoice.client?.address || "Gujarat, India"}
             </p>
             {invoice.client?.phone && <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#555' }}>📞 {invoice.client.phone}</p>}
-            {invoice.client?.email && <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#555' }}>📧 {invoice.client.email}</p>}
+            {invoice.client?.email && !invoice.client.email.endsWith('@netra.graphics') && (
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#555' }}>📧 {invoice.client.email}</p>
+            )}
           </div>
           <div style={{ textAlign: 'right' }}>
             <label style={{ fontSize: '0.65rem', color: '#888', letterSpacing: '1px', display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>INVOICE DETAILS</label>

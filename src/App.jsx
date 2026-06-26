@@ -1450,6 +1450,8 @@ function App() {
     }
   };
   const popupContainerRef = useRef(null);
+  const touchStartXRef = useRef(0);
+  const touchStartYRef = useRef(0);
   const scrollTimeoutRef = useRef(null);
   const isScrollCooldownRef = useRef(false);
   const isRefreshingProjectsRef = useRef(false);
@@ -2085,6 +2087,40 @@ function App() {
     return groupNotifications(activeClientPopups);
   }, [activeClientPopups]);
 
+  const handleTouchStart = (e) => {
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (groupedClientPopups.length <= 1) return;
+    const diffX = e.changedTouches[0].clientX - touchStartXRef.current;
+    const diffY = e.changedTouches[0].clientY - touchStartYRef.current;
+
+    // Detect swipe (threshold of 40px)
+    if (Math.abs(diffX) > Math.abs(diffY)) {
+      if (Math.abs(diffX) > 40) {
+        if (diffX < 0) {
+          // Swipe left: next card
+          setActivePopupIndex((prev) => (prev < groupedClientPopups.length - 1 ? prev + 1 : prev));
+        } else {
+          // Swipe right: previous card
+          setActivePopupIndex((prev) => (prev > 0 ? prev - 1 : prev));
+        }
+      }
+    } else {
+      if (Math.abs(diffY) > 40) {
+        if (diffY < 0) {
+          // Swipe up: next card
+          setActivePopupIndex((prev) => (prev < groupedClientPopups.length - 1 ? prev + 1 : prev));
+        } else {
+          // Swipe down: previous card
+          setActivePopupIndex((prev) => (prev > 0 ? prev - 1 : prev));
+        }
+      }
+    }
+  };
+
   // Bounds-check activePopupIndex when groupedClientPopups changes
   useEffect(() => {
     if (groupedClientPopups.length === 0) {
@@ -2143,8 +2179,16 @@ function App() {
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
+      isScrollCooldownRef.current = false;
     };
-  }, [groupedClientPopups.length]);
+  }, [
+    groupedClientPopups.length,
+    isCommandCenterActive,
+    isAdminGridActive,
+    isNotificationsMinimized,
+    hasUrgentAlert,
+    isWarningDismissed
+  ]);
 
   const getPopupThemeColor = (type) => {
     switch (type) {
@@ -6261,48 +6305,7 @@ function App() {
                               <span>{alertStripMessages.join("   •   ") + "   •   "}</span>
                             </div>
                           </div>
-                          <AnimatePresence>
-                            {isNotificationsMinimized && unreadClientNotifs.length > 0 && (
-                              <motion.button
-                                key="minimized-bubble"
-                                initial={{ scale: 0, opacity: 0, y: 10 }}
-                                animate={{ 
-                                  scale: [1, 1.03, 1],
-                                  boxShadow: [
-                                    '0 0 10px rgba(0, 229, 255, 0.15)',
-                                    '0 0 20px rgba(0, 229, 255, 0.3)',
-                                    '0 0 10px rgba(0, 229, 255, 0.15)'
-                                  ],
-                                  y: 0,
-                                  opacity: 1
-                                }}
-                                exit={{ scale: 0, opacity: 0, y: 10 }}
-                                transition={{
-                                  scale: { repeat: Infinity, duration: 2, ease: "easeInOut" },
-                                  boxShadow: { repeat: Infinity, duration: 2, ease: "easeInOut" },
-                                  type: "spring", 
-                                  stiffness: 300, 
-                                  damping: 15
-                                }}
-                                whileHover={{ scale: 1.05, y: -2 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => setIsNotificationsMinimized(false)}
-                                className="flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg bg-cyan-500/15 border border-cyan-500/40 hover:bg-cyan-500/30 hover:border-cyan-400 text-cyan-400 text-[10px] font-black uppercase tracking-wider cursor-pointer shadow-lg transition-colors shrink-0 ml-auto z-10 relative overflow-hidden group"
-                                title={`Restore ${unreadClientNotifs.length} minimized notifications`}
-                                style={{
-                                  textShadow: '0 0 8px rgba(0, 229, 255, 0.4)'
-                                }}
-                              >
-                                <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] pointer-events-none" />
-                                <span className="relative flex h-2 w-2 mr-1">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
-                                </span>
-                                <span>MINIMIZED ({unreadClientNotifs.length})</span>
-                                <span className="animate-bounce">💬</span>
-                              </motion.button>
-                            )}
-                          </AnimatePresence>
+
                           <style>{`
                             @keyframes adminMarquee {
                               0% { transform: translate3d(0, 0, 0); }
@@ -6321,47 +6324,7 @@ function App() {
                         </div>
                       )}
 
-                      <AnimatePresence>
-                        {alertStripMessages.length === 0 && isNotificationsMinimized && unreadClientNotifs.length > 0 && (
-                          <div className="w-full flex justify-end mb-6">
-                            <motion.button 
-                              key="standalone-minimized"
-                              initial={{ scale: 0, opacity: 0, y: 15 }}
-                              animate={{ 
-                                scale: [1, 1.02, 1],
-                                boxShadow: [
-                                  '0 0 10px rgba(0, 229, 255, 0.12)',
-                                  '0 0 18px rgba(0, 229, 255, 0.25)',
-                                  '0 0 10px rgba(0, 229, 255, 0.12)'
-                                ],
-                                y: 0,
-                                opacity: 1
-                              }}
-                              exit={{ scale: 0, opacity: 0, y: 15 }}
-                              transition={{
-                                scale: { repeat: Infinity, duration: 2, ease: "easeInOut" },
-                                boxShadow: { repeat: Infinity, duration: 2, ease: "easeInOut" },
-                                type: "spring",
-                                stiffness: 300,
-                                damping: 15
-                              }}
-                              whileHover={{ scale: 1.05, y: -2 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => setIsNotificationsMinimized(false)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-card border border-cyan-500/20 hover:border-cyan-500/40 text-cyan-400 hover:text-cyan-300 shadow-lg transition-colors cursor-pointer relative overflow-hidden group"
-                              title={`Restore ${unreadClientNotifs.length} minimized notifications`}
-                            >
-                              <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] pointer-events-none" />
-                              <span className="relative flex h-2.5 w-2.5 mr-1">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
-                              </span>
-                              <span className="text-[10px] font-black tracking-wider uppercase">Minimized Messages ({unreadClientNotifs.length})</span>
-                              <span className="animate-bounce">💬</span>
-                            </motion.button>
-                          </div>
-                        )}
-                      </AnimatePresence>
+
 
                       <div className="active-module-header">
                         <h2 className="module-title">{activeAdminModule}</h2>
@@ -6451,6 +6414,8 @@ function App() {
                               setCashbookEntries(prev => [entry, ...prev]);
                             }}
                             setFinancialTab={setFinancialTab}
+                            isNotificationsMinimized={isNotificationsMinimized}
+                            setIsNotificationsMinimized={setIsNotificationsMinimized}
                           />
                         )}
 
@@ -6586,6 +6551,8 @@ function App() {
                             setMonthlyTarget={setMonthlyTarget}
                             financialTab={financialTab}
                             setFinancialTab={setFinancialTab}
+                            isNotificationsMinimized={isNotificationsMinimized}
+                            setIsNotificationsMinimized={setIsNotificationsMinimized}
                             financialMetrics={financialMetrics}
                             cashbookMetrics={cashbookMetrics}
                             highlightedCashbookId={highlightedCashbookId}
@@ -7639,21 +7606,24 @@ function App() {
 
               {/* Real-time Client Portal Notification Popup Stack */}
               <AnimatePresence>
-                {isCommandCenterActive && isAdminGridActive && !isNotificationsMinimized && groupedClientPopups.length > 0 && (
+                {isCommandCenterActive && isAdminGridActive && !isNotificationsMinimized && groupedClientPopups.length > 0 && !(hasUrgentAlert && !isWarningDismissed) && (
                   <motion.div 
                     ref={popupContainerRef}
                     key="popup-stack-container"
-                    initial={{ opacity: 0, scale: 0.9, y: 30 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    initial={{ opacity: 0, scale: 0.9, x: "-50%", y: -30 }}
+                    animate={{ opacity: 1, scale: 1, x: "-50%", y: 0 }}
                     exit={{ 
                       opacity: 0, 
                       scale: 0.8, 
-                      y: -50,
+                      x: "-50%",
+                      y: -30,
                       transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] }
                     }}
                     className="client-portal-popup-container"
                     onMouseEnter={() => setIsPopupHovered(true)}
                     onMouseLeave={() => setIsPopupHovered(false)}
+                    onTouchStart={handleTouchStart}
+                    onTouchEnd={handleTouchEnd}
                     style={{ pointerEvents: groupedClientPopups.length > 0 ? 'auto' : 'none' }}
                   >
                     <AnimatePresence>
@@ -7749,6 +7719,7 @@ function App() {
                   </motion.div>
                 )}
               </AnimatePresence>
+
             </div>
           </section>
 
@@ -8616,10 +8587,11 @@ function App() {
                                 const clientObj = (targetClientId ? clients.find(c => c.id === targetClientId) : null) || clients.find(c => c.name.trim().toLowerCase() === invoiceProject.name.trim().toLowerCase()) || invoiceProject.client;
                                 const phone = invoiceProject.phone || clientObj?.phone;
                                 const email = invoiceProject.email || clientObj?.email;
+                                const isSystemEmail = email && email.endsWith('@netra.graphics');
                                 return (
                                   <>
                                     {phone && <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#555' }}>📞 {phone}</p>}
-                                    {email && <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#555' }}>📧 {email}</p>}
+                                    {email && !isSystemEmail && <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#555' }}>📧 {email}</p>}
                                   </>
                                 );
                               })()}
