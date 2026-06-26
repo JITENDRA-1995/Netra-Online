@@ -1482,7 +1482,7 @@ export default function Dashboard({
       className="space-y-8 animate-fade-in"
     >
       {/* Header */}
-      <motion.div variants={itemVariants} className="flex justify-between items-start">
+      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div>
           <h1
             className="text-4xl font-black tracking-tight bg-gradient-to-r from-cyan-400 to-violet-400 bg-clip-text text-transparent"
