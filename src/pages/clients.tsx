@@ -38,6 +38,7 @@ interface ClientsProps {
   autoOpenReviewClientId?: number | null;
   autoOpenVaultClientId?: number | null;
   onCloseAutoOpen?: (type: 'bridge' | 'review' | 'vault') => void;
+  markClientNotifAsRead?: (ids: string | string[]) => void;
 }
 
 const INDUSTRY_COLORS = ["#00d4ff", "#8b5cf6", "#10b981", "#f59e0b", "#ec4899", "#3b82f6", "#f97316"];
@@ -63,7 +64,8 @@ export default function Clients({
   autoOpenBridgeProjectId = null,
   autoOpenReviewClientId = null,
   autoOpenVaultClientId = null,
-  onCloseAutoOpen
+  onCloseAutoOpen,
+  markClientNotifAsRead
 }: ClientsProps) {
   const [search, setSearch] = useState(initialSearch);
 
@@ -128,6 +130,52 @@ export default function Clients({
       }
     }
   }, [autoOpenVaultClientId, clients]);
+
+  // Automatically mark notifications as read when their corresponding panels are opened
+  useEffect(() => {
+    if (!markClientNotifAsRead || !clientPortalNotifs || clientPortalNotifs.length === 0) return;
+
+    if (isBridgeModalOpen && selectedBridgeProject) {
+      const unreadChats = clientPortalNotifs.filter(n => 
+        !n.is_read && 
+        n.type === 'communication' && 
+        String(n.project_id) === String(selectedBridgeProject.id)
+      );
+      if (unreadChats.length > 0) {
+        markClientNotifAsRead(unreadChats.map(n => n.id));
+      }
+    }
+  }, [isBridgeModalOpen, selectedBridgeProject, clientPortalNotifs, markClientNotifAsRead]);
+
+  useEffect(() => {
+    if (!markClientNotifAsRead || !clientPortalNotifs || clientPortalNotifs.length === 0) return;
+
+    if (isReviewModalOpen && reviewClient) {
+      const unreadReview = clientPortalNotifs.filter(n => 
+        !n.is_read && 
+        n.type === 'Profile Update' && 
+        String(n.client_id) === String(reviewClient.id)
+      );
+      if (unreadReview.length > 0) {
+        markClientNotifAsRead(unreadReview.map(n => n.id));
+      }
+    }
+  }, [isReviewModalOpen, reviewClient, clientPortalNotifs, markClientNotifAsRead]);
+
+  useEffect(() => {
+    if (!markClientNotifAsRead || !clientPortalNotifs || clientPortalNotifs.length === 0) return;
+
+    if (isVaultModalOpen && vaultClient) {
+      const unreadVault = clientPortalNotifs.filter(n => 
+        !n.is_read && 
+        (n.type === 'new_asset' || n.type === 'new_global_asset' || n.type === 'global_asset_comment') && 
+        String(n.client_id) === String(vaultClient.id)
+      );
+      if (unreadVault.length > 0) {
+        markClientNotifAsRead(unreadVault.map(n => n.id));
+      }
+    }
+  }, [isVaultModalOpen, vaultClient, clientPortalNotifs, markClientNotifAsRead]);
 
   // Handle Review Approvals & Rejections
   const handleApprove = async () => {

@@ -4381,9 +4381,16 @@ function App() {
           }
           const exists = (proj.collaborationStream || []).some(msg => msg.id === newMsg.id);
           if (exists) return proj;
+          const formattedMsg = {
+            id: newMsg.id,
+            sender: newMsg.sender,
+            text: newMsg.message,
+            time: new Date(newMsg.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+            raw_date: new Date(newMsg.created_at).getTime()
+          };
           return {
             ...proj,
-            collaborationStream: [...(proj.collaborationStream || []), newMsg]
+            collaborationStream: [...(proj.collaborationStream || []), formattedMsg]
           };
         }
         return proj;
@@ -6575,6 +6582,7 @@ function App() {
                             clients={clients}
                             ignitionQueue={ignitionQueue}
                             clientPortalNotifs={clientPortalNotifs}
+                            markClientNotifAsRead={markClientNotifAsRead}
                             onOpenCreateClient={() => { setSelectedClient(null); setClientModalPasscode(Math.random().toString(36).substring(2, 8).toUpperCase()); setIsClientModalOpen(true); }}
                             onOpenEditClient={(client) => { setSelectedClient(client); setClientModalPasscode(client.accessKey || client.access_key || ""); setIsClientModalOpen(true); }}
                             onDeleteClient={deleteClient}
