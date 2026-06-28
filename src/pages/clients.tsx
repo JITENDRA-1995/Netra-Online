@@ -704,25 +704,36 @@ export default function Clients({
                           onClick={async (e) => {
                             e.stopPropagation();
                             try {
-                              // Generate secure random 64-char token
-                              const generateSecureToken = () => {
-                                const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-                                const array = new Uint32Array(64);
-                                window.crypto.getRandomValues(array);
-                                let result = "";
-                                for (let i = 0; i < array.length; i++) {
-                                  result += chars[array[i] % chars.length];
-                                }
-                                return result;
-                              };
+                              let token = client.magic_token || (client as any).magicToken;
+                              let expiryIso = client.token_expiry || (client as any).tokenExpiry;
+                              const now = new Date();
+                              const isTokenValid = token && expiryIso && new Date(expiryIso) > now;
 
-                              const token = generateSecureToken();
-                              const expiryDate = new Date();
-                              expiryDate.setDate(expiryDate.getDate() + 30);
-                              const expiryIso = expiryDate.toISOString();
+                              if (!isTokenValid) {
+                                // Generate secure random 64-char token
+                                const generateSecureToken = () => {
+                                  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+                                  const array = new Uint32Array(64);
+                                  window.crypto.getRandomValues(array);
+                                  let result = "";
+                                  for (let i = 0; i < array.length; i++) {
+                                    result += chars[array[i] % chars.length];
+                                  }
+                                  return result;
+                                };
 
-                              // Safely update client's magic token in Supabase database
-                              await updateClientMagicToken(client.id, token, expiryIso);
+                                token = generateSecureToken();
+                                const expiryDate = new Date();
+                                expiryDate.setDate(expiryDate.getDate() + 30);
+                                expiryIso = expiryDate.toISOString();
+
+                                // Safely update client's magic token in Supabase database
+                                await updateClientMagicToken(client.id, token, expiryIso);
+
+                                // Update client object locally so subsequent shares in this session reuse it
+                                client.magic_token = token;
+                                client.token_expiry = expiryIso;
+                              }
 
                               // Clean phone number: remove non-digits, and leading 0
                               let cleanPhone = client.phone.replace(/\D/g, "");

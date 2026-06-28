@@ -63,7 +63,7 @@ export function WhatsNewBulb({ isClientPortal = false }) {
                       <CheckCircle2 className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
                       <div>
                         <h4 className="text-sm font-bold text-white">{feature.title}</h4>
-                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{feature.description}</p>
+                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed whitespace-pre-line">{feature.description}</p>
                       </div>
                     </li>
                   ))}

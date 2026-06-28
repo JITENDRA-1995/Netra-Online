@@ -1,0 +1,7 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/(autologin|login|client-vault|admin)(.*)", "destination": "/index.html" },
+    { "source": "/((?!assets/|api/).*)", "destination": "/index.html" }
+  ]
+}

@@ -36,7 +36,11 @@ try {
       if (currentJob) {
         jobs.push(currentJob);
       }
-      const title = line.replace(/^###\s*(?:✅|❌|🔧|✨)?\s*/, '').trim();
+      const title = line
+        .replace(/^###\s*(?:✅|❌|🔧|✨)?\s*/, '')
+        .replace(/\*\*/g, '')
+        .replace(/`/g, '')
+        .trim();
       currentJob = {
         title,
         description: []
@@ -44,13 +48,22 @@ try {
     } else if (line.startsWith('- ') || line.startsWith('* ')) {
       // It's a bullet point description
       if (currentJob) {
-        currentJob.description.push(line.replace(/^[-*]\s*/, '').trim());
+        const cleaned = line
+          .replace(/^[-*]\s*/, '')
+          .replace(/\*\*/g, '')
+          .replace(/`/g, '')
+          .trim();
+        currentJob.description.push(cleaned);
       }
     } else {
       // It's normal text or sub-bullet, append to the description
       if (currentJob && currentJob.description.length > 0) {
         const lastIdx = currentJob.description.length - 1;
-        currentJob.description[lastIdx] += ' ' + line;
+        const cleaned = line
+          .replace(/\*\*/g, '')
+          .replace(/`/g, '')
+          .trim();
+        currentJob.description[lastIdx] += ' ' + cleaned;
       }
     }
   }
@@ -68,7 +81,7 @@ try {
     summary,
     features: jobs.map(j => ({
       title: j.title,
-      description: j.description.join(' ')
+      description: j.description.map(d => `• ${d}`).join('\n')
     }))
   };
 
