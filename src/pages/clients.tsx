@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "../supabase/client";
 import { ClientAssetVault } from "../components/ClientAssetVault";
 import { igniteProject } from "../supabase/database/projects";
-import { approveClientProfileUpdate, rejectClientProfileUpdate } from "../supabase/database/clients";
+import { approveClientProfileUpdate, rejectClientProfileUpdate, updateClientMagicToken } from "../supabase/database/clients";
 
 interface Client {
   id: number;
@@ -21,6 +21,8 @@ interface Client {
   accessKey?: string;
   access_key?: string;
   pending_profile_update?: { name?: string; phone?: string; address?: string; } | null;
+  magic_token?: string | null;
+  token_expiry?: string | null;
 }
 
 interface ClientsProps {
@@ -651,21 +653,50 @@ export default function Clients({
                           size="icon"
                           variant="ghost"
                           title="Share on WhatsApp"
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            // Clean phone number: remove non-digits, and leading 0
-                            let cleanPhone = client.phone.replace(/\D/g, "");
-                            if (cleanPhone.startsWith("0")) {
-                              cleanPhone = cleanPhone.substring(1);
+                            try {
+                              // Generate secure random 64-char token
+                              const generateSecureToken = () => {
+                                const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+                                const array = new Uint32Array(64);
+                                window.crypto.getRandomValues(array);
+                                let result = "";
+                                for (let i = 0; i < array.length; i++) {
+                                  result += chars[array[i] % chars.length];
+                                }
+                                return result;
+                              };
+
+                              const token = generateSecureToken();
+                              const expiryDate = new Date();
+                              expiryDate.setDate(expiryDate.getDate() + 30);
+                              const expiryIso = expiryDate.toISOString();
+
+                              // Safely update client's magic token in Supabase database
+                              await updateClientMagicToken(client.id, token, expiryIso);
+
+                              // Clean phone number: remove non-digits, and leading 0
+                              let cleanPhone = client.phone.replace(/\D/g, "");
+                              if (cleanPhone.startsWith("0")) {
+                                cleanPhone = cleanPhone.substring(1);
+                              }
+                              // Prepend 91 if it's 10 digits
+                              if (cleanPhone.length === 10) {
+                                cleanPhone = "91" + cleanPhone;
+                              }
+                              const keyText = client.accessKey || client.access_key || "";
+                              
+                              // Create the personalized auto-login URL
+                              const autoLoginUrl = `https://netragraphics.com/autologin?token=${token}`;
+                              const message = `Hi ${client.name}, your Netra Graphics portal is active! Access it instantly here: ${autoLoginUrl}\n\n(Backup Login details - Email: ${client.email} | Passcode: ${keyText})`;
+                              
+                              const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+                              window.open(whatsappUrl, "_blank");
+                            } catch (err: any) {
+                              console.error("Failed to generate and save magic login token:", err);
+                              alert("Failed to generate secure magic login link. Please try again.");
                             }
-                            // Prepend 91 if it's 10 digits
-                            if (cleanPhone.length === 10) {
-                              cleanPhone = "91" + cleanPhone;
-                            }
-                            const keyText = client.accessKey || client.access_key || "";
-                            const message = `Hi ${client.name}, your Netra Graphics portal is active! Access it here: ${window.location.origin} using your Email: ${client.email} and Passcode: ${keyText}`;
-                            const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-                            window.open(whatsappUrl, "_blank");
                           }}
                           className="w-6 h-6 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-all"
                         >

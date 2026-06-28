@@ -112,3 +112,37 @@ export const rejectClientProfileUpdate = async (clientId) => {
   if (error) throw error;
   return data;
 };
+
+/**
+ * Update client's magic token and expiry
+ */
+export const updateClientMagicToken = async (clientId, token, expiry) => {
+  const { data, error } = await supabase
+    .from('clients')
+    .update({
+      magic_token: token,
+      token_expiry: expiry
+    })
+    .eq('id', clientId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+/**
+ * Verify client magic token by matching it and checking if it has not expired
+ */
+export const verifyMagicToken = async (token) => {
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('clients')
+    .select('*')
+    .eq('magic_token', token)
+    .gt('token_expiry', now)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data; // Returns client details if valid and not expired, null otherwise
+};

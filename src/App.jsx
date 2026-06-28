@@ -48,7 +48,7 @@ import { supabase } from './supabase/client';
 import { getISTDateString } from './lib/utils';
 import {
   getInquiries, createInquiry, updateInquiry, deleteInquiry,
-  getClients, createClientProfile, verifyClientVaultKey, updateClientProfile,
+  getClients, createClientProfile, verifyClientVaultKey, updateClientProfile, verifyMagicToken,
   getProjects, igniteProject, updateProjectState, toggleMilestone, addProjectActivityLog, sendChatMessage, subscribeToChats, uploadMediaVaultAsset, subscribeToAllChats, subscribeToAllMedia,
   getInvoices, saveInvoice, deleteInvoice, updateInvoice,
   getMicroJobs
@@ -1207,7 +1207,10 @@ function App() {
     return localStorage.getItem('netra_admin_active') === 'true';
   });
   const [isClientVaultActive, setIsClientVaultActive] = useState(() => {
-    return localStorage.getItem('netra_client_active') === 'true';
+    const localActive = localStorage.getItem('netra_client_active') === 'true';
+    if (localActive) return true;
+    const cookieMatch = document.cookie.match(/(?:^|; )netra_client_active=([^;]*)/);
+    return cookieMatch ? cookieMatch[1] === 'true' : false;
   });
   const [activeClientTab, setActiveClientTab] = useState('DASHBOARD');
   const [selectedClientProjectId, setSelectedClientProjectId] = useState(() => {
@@ -1225,6 +1228,14 @@ function App() {
         return JSON.parse(saved);
       } catch (e) {
         console.error("Failed to parse saved client session:", e);
+      }
+    }
+    const cookieMatch = document.cookie.match(/(?:^|; )netra_client_session=([^;]*)/);
+    if (cookieMatch) {
+      try {
+        return JSON.parse(decodeURIComponent(cookieMatch[1]));
+      } catch (e) {
+        console.error("Failed to parse cookie client session:", e);
       }
     }
     return null;
@@ -1796,6 +1807,93 @@ function App() {
         await refreshInvoices();
         await refreshMicroJobs();
         await refreshGlobalAssets();
+
+        // Handle initial path routing & auto-login
+        const path = window.location.pathname;
+        const searchParams = new URLSearchParams(window.location.search);
+        const token = searchParams.get('token');
+        const errorParam = searchParams.get('error');
+
+        const getCookie = (name) => {
+          const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]*)'));
+          return match ? decodeURIComponent(match[2]) : null;
+        };
+
+        if (path === '/autologin' || path.endsWith('/autologin')) {
+          if (token) {
+            try {
+              // Verify magic token in Supabase
+              const clientData = await verifyMagicToken(token);
+              if (clientData) {
+                if (clientData.status === 'Suspended') {
+                  window.history.replaceState({ page: 'login' }, '', '/login?error=suspended');
+                  setIsLoginActive(true);
+                  setLoginError("ACCESS DENIED: This account has been suspended by the administrator.");
+                } else {
+                  // Initialize session states
+                  localStorage.setItem('netra_client_active', 'true');
+                  localStorage.setItem('netra_client_session', JSON.stringify(clientData));
+                  localStorage.setItem('netra_save_login_info', 'true');
+
+                  // Configure browser session cookies to be persistent for 30 days (2592000 seconds)
+                  document.cookie = "netra_client_active=true; max-age=2592000; path=/; SameSite=Lax; Secure";
+                  document.cookie = "netra_client_session=" + encodeURIComponent(JSON.stringify(clientData)) + "; max-age=2592000; path=/; SameSite=Lax; Secure";
+
+                  setCurrentClient({
+                    ...clientData,
+                    joinedDate: clientData.joined_date || clientData.joinedDate,
+                    accessKey: clientData.access_key || clientData.accessKey
+                  });
+
+                  triggerInstantTransition(() => {
+                    clearAllPages();
+                    setIsClientVaultActive(true);
+                    window.history.replaceState({ page: 'client-vault' }, '', '/client-vault');
+                  });
+                }
+              } else {
+                // Invalid or expired token: Redirect to login with error
+                window.history.replaceState({ page: 'login' }, '', '/login?error=link_expired');
+                setIsLoginActive(true);
+                setLoginError("ACCESS DENIED: The auto-login link is invalid or has expired.");
+              }
+            } catch (err) {
+              console.error("Magic link auto-login failed:", err);
+              window.history.replaceState({ page: 'login' }, '', '/login?error=error');
+              setIsLoginActive(true);
+              setLoginError("VERIFICATION ERROR: " + (err.message || "Failed to process magic link."));
+            }
+          } else {
+            // Path is /autologin but no token is specified
+            window.history.replaceState({ page: 'login' }, '', '/login');
+            setIsLoginActive(true);
+          }
+        } else if (path === '/login' || path.endsWith('/login')) {
+          window.history.replaceState({ page: 'login' }, '', '/login');
+          setIsLoginActive(true);
+          if (errorParam === 'link_expired') {
+            setLoginError("ACCESS DENIED: The auto-login link is invalid or has expired.");
+          }
+        } else if (path === '/client-vault' || path.endsWith('/client-vault')) {
+          const isClientAuthenticated = localStorage.getItem('netra_client_active') === 'true' || getCookie('netra_client_active') === 'true';
+          if (isClientAuthenticated) {
+            window.history.replaceState({ page: 'client-vault' }, '', '/client-vault');
+            setIsClientVaultActive(true);
+          } else {
+            window.history.replaceState({ page: 'login' }, '', '/login');
+            setIsLoginActive(true);
+          }
+        } else if (path === '/admin' || path.endsWith('/admin')) {
+          const isAdminAuthenticated = localStorage.getItem('netra_admin_active') === 'true';
+          if (isAdminAuthenticated) {
+            window.history.replaceState({ page: 'admin', activeAdminModule: 'DASHBOARD', isAdminGridActive: false }, '', '/admin');
+            setIsCommandCenterActive(true);
+          } else {
+            window.history.replaceState({ page: 'login' }, '', '/login');
+            setIsLoginActive(true);
+          }
+        }
+
         setIsDataLoaded(true);
       } catch (error) {
         console.error("Failed to load data from Supabase:", error);
@@ -3605,7 +3703,10 @@ function App() {
 
     window.addEventListener('popstate', handlePopState);
     if (!window.history.state) {
-      if (localStorage.getItem('netra_admin_active') === 'true') {
+      const path = window.location.pathname;
+      if (path === '/autologin' || path.endsWith('/autologin') || path === '/login' || path.endsWith('/login') || path === '/client-vault' || path.endsWith('/client-vault') || path === '/admin' || path.endsWith('/admin')) {
+        // Let handleInitialRoute take care of parsing URL path routing
+      } else if (localStorage.getItem('netra_admin_active') === 'true') {
         window.history.replaceState({ page: 'admin', activeAdminModule: 'DASHBOARD', isAdminGridActive: false }, '');
       } else if (localStorage.getItem('netra_client_active') === 'true') {
         window.history.replaceState({ page: 'client-vault' }, '');
@@ -3748,6 +3849,11 @@ function App() {
     localStorage.removeItem('netra_active_client_tab');
     localStorage.removeItem('netra_selected_client_project_id');
     localStorage.removeItem('netra_selected_client_invoice_id');
+    
+    // Clear magic link session cookies
+    document.cookie = "netra_client_active=; max-age=0; path=/; SameSite=Lax; Secure";
+    document.cookie = "netra_client_session=; max-age=0; path=/; SameSite=Lax; Secure";
+
     setCurrentClient(null);
     setIsClientVaultActive(false);
     setIsCommandCenterActive(false);
