@@ -4384,9 +4384,9 @@ function App() {
           const formattedMsg = {
             id: newMsg.id,
             sender: newMsg.sender,
-            text: newMsg.message,
-            time: new Date(newMsg.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-            raw_date: new Date(newMsg.created_at).getTime()
+            text: newMsg.text,
+            time: newMsg.time,
+            raw_date: newMsg.raw_date
           };
           return {
             ...proj,
