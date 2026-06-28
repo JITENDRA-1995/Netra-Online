@@ -1,6 +1,17 @@
-﻿# Netra Graphics — Job List / Changelog
+# Netra Graphics — Job List / Changelog
 
 A running record of all completed fixes, improvements, and features across all development sessions.
+
+---
+
+## Session 4 — 2026-06-28 (Magic Link / Token Auto-Login)
+
+### ✅ JOB-015 — Secure Magic Link Auto-Login
+- **Files**: `src/App.jsx`, `src/pages/clients.tsx`, `src/supabase/database/clients.js`
+- Clients can now log in automatically using a secure, token-based link sent directly to them via WhatsApp.
+- Replaced the standard login URL redirect in the WhatsApp text message with `https://netragraphics.com/autologin?token=[TOKEN]`.
+- Implemented 30-day session preservation using persistent browser cookies so clients remain logged in on mobile devices.
+- Created `supabase_add_magic_link_columns.sql` to add `magic_token` and `token_expiry` columns.
 
 ---
 

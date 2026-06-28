@@ -4,6 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node generate_whatsnew.cjs",
+    "prebuild": "node generate_whatsnew.cjs",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
