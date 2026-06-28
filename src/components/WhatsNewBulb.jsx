@@ -4,14 +4,14 @@ import { Lightbulb, X, CheckCircle2 } from 'lucide-react';
 
 export function WhatsNewBulb({ isClientPortal = false }) {
   const [showBulb, setShowBulb] = useState(() => {
-    return localStorage.getItem(`netra_whatsnew_v259_${isClientPortal ? 'client' : 'admin'}`) !== 'true';
+    return localStorage.getItem(`netra_whatsnew_v260_${isClientPortal ? 'client' : 'admin'}`) !== 'true';
   });
   const [isOpen, setIsOpen] = useState(false);
 
   if (!showBulb) return null;
 
   const handleGotIt = () => {
-    localStorage.setItem(`netra_whatsnew_v259_${isClientPortal ? 'client' : 'admin'}`, 'true');
+    localStorage.setItem(`netra_whatsnew_v260_${isClientPortal ? 'client' : 'admin'}`, 'true');
     setShowBulb(false);
     setIsOpen(false);
   };
@@ -21,7 +21,7 @@ export function WhatsNewBulb({ isClientPortal = false }) {
       <button
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(true); }}
         className={`flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 border cursor-pointer active:scale-95 ${isClientPortal ? 'bg-amber-500/5 border-amber-500/10 hover:border-amber-500/25 text-amber-400 hover:bg-amber-500/15 shadow-sm' : 'bg-transparent border-transparent text-amber-400 hover:bg-white/5 mx-2'}`}
-        title="What's New in v2.5.9"
+        title="What's New in v2.6.0"
       >
         <Lightbulb className={`w-5 h-5 ${isClientPortal ? '' : 'animate-pulse'} ${isOpen ? 'fill-amber-400' : ''}`} />
       </button>
@@ -42,7 +42,7 @@ export function WhatsNewBulb({ isClientPortal = false }) {
                 </div>
                 <div>
                   <h3 className="text-xl font-black text-white tracking-widest uppercase">Idea Spark</h3>
-                  <p className="text-xs text-amber-400/80 uppercase tracking-widest mt-1">Netra OS v2.5.9 Update</p>
+                  <p className="text-xs text-amber-400/80 uppercase tracking-widest mt-1">Netra OS v2.6.0 Update</p>
                 </div>
                 <button onClick={() => setIsOpen(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-white p-2 cursor-pointer">
                   <X className="w-5 h-5" />
@@ -52,9 +52,16 @@ export function WhatsNewBulb({ isClientPortal = false }) {
               {/* Content */}
               <div className="p-6 space-y-4 overflow-y-auto flex-1">
                 <p className="text-sm text-white/80 leading-relaxed mb-4">
-                  Netra OS v2.5.9 brings major invoice reliability fixes, smarter micro-job billing, client portal notification improvements, and General Support project clarity.
+                  Netra OS v2.6.0 introduces secure token-based auto-login, persistent client sessions, invoice reliability fixes, and general UI/UX improvements.
                 </p>
                 <ul className="space-y-3">
+                  <li className="flex gap-3 items-start animate-fade-in">
+                    <CheckCircle2 className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-sm font-bold text-white">Secure Magic Link Auto-Login</h4>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Clients can now log in instantly via a secure, token-based link sent directly through WhatsApp. Session states persist for 30 days so clients don't have to keep authenticating.</p>
+                    </div>
+                  </li>
                   <li className="flex gap-3 items-start">
                     <CheckCircle2 className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
                     <div>
