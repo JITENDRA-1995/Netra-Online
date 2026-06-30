@@ -26,7 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { getISTDateString } from "@/lib/utils";
-import { deleteInvoice } from "@/supabase/database";
+import { deleteInvoice, deleteCashbookEntry } from "@/supabase/database";
 import {
   AreaChart,
   Area,
@@ -381,7 +381,7 @@ export default function Financials({
         const matchesQuery =
           (entry.desc || "").toLowerCase().includes(query) ||
           (entry.category || "").toLowerCase().includes(query) ||
-          (entry.mode && entry.mode.toLowerCase().includes(query));
+          ((entry.mode || "").toLowerCase().includes(query));
         if (!matchesQuery) return false;
       }
 
@@ -393,7 +393,7 @@ export default function Financials({
 
       // 3. Category dropdown filter
       if (incCategory !== "all") {
-        if ((entry.category || "").toLowerCase() !== incCategory.toLowerCase()) return false;
+        if ((entry.category || "").toLowerCase() !== (incCategory || "").toLowerCase()) return false;
       }
 
       // 4. Date range filter
@@ -451,7 +451,7 @@ export default function Financials({
         const matchesQuery =
           (entry.desc || "").toLowerCase().includes(query) ||
           (entry.category || "").toLowerCase().includes(query) ||
-          (entry.mode && entry.mode.toLowerCase().includes(query));
+          ((entry.mode || "").toLowerCase().includes(query));
         if (!matchesQuery) return false;
       }
 
@@ -463,7 +463,7 @@ export default function Financials({
 
       // 3. Category dropdown filter
       if (expCategory !== "all") {
-        if ((entry.category || "").toLowerCase() !== expCategory.toLowerCase()) return false;
+        if ((entry.category || "").toLowerCase() !== (expCategory || "").toLowerCase()) return false;
       }
 
       // 4. Date range filter
@@ -1641,7 +1641,6 @@ export default function Financials({
                                       }
                                       setCashbookEntries(prev => {
                                         const filtered = prev.filter(e => String(e.id) !== String(entry.id));
-                                        console.log(`Filtered: before=${prev.length}, after=${filtered.length}`);
                                         return filtered;
                                       });
                                       toast({ title: "Cashbook entry deleted" });
@@ -1747,7 +1746,6 @@ export default function Financials({
                                       }
                                       setCashbookEntries(prev => {
                                         const filtered = prev.filter(e => String(e.id) !== String(entry.id));
-                                        console.log(`Filtered: before=${prev.length}, after=${filtered.length}`);
                                         return filtered;
                                       });
                                       toast({ title: "Cashbook entry deleted" });

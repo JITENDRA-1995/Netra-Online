@@ -51,7 +51,8 @@ import {
   getClients, createClientProfile, verifyClientVaultKey, updateClientProfile, verifyMagicToken,
   getProjects, igniteProject, updateProjectState, toggleMilestone, addProjectActivityLog, sendChatMessage, subscribeToChats, uploadMediaVaultAsset, subscribeToAllChats, subscribeToAllMedia,
   getInvoices, saveInvoice, deleteInvoice, updateInvoice,
-  getMicroJobs
+  getMicroJobs,
+  getCashbookEntries, addCashbookEntry, updateCashbookEntry, deleteCashbookEntry, updateCashbookCategory
 } from './supabase/database';
 
 
@@ -1042,10 +1043,6 @@ function App() {
               setAdminProfile(parsed.profile);
               safeSetLocalStorage('netra_admin_profile', JSON.stringify(parsed.profile));
             }
-            if (parsed.cashbook) {
-              setCashbookEntries(parsed.cashbook);
-              safeSetLocalStorage('netra_cashbook', JSON.stringify(parsed.cashbook));
-            }
             if (parsed.trash && Array.isArray(parsed.trash)) {
               const now = Date.now();
               const validTrash = parsed.trash.filter(item => {
@@ -1075,6 +1072,15 @@ function App() {
       } finally {
         setIsSettingsLoaded(true);
       }
+      
+      try {
+        const dbCashbook = await getCashbookEntries();
+        if (dbCashbook && dbCashbook.length > 0) {
+          setCashbookEntries(dbCashbook);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch cashbook entries:", err);
+      }
     };
     fetchGlobalSettings();
   }, []);
@@ -1087,7 +1093,6 @@ function App() {
     localStorage.setItem('netra_vision_settings', JSON.stringify(visionSettings));
     localStorage.setItem('netra_banking_details', JSON.stringify(bankingDetails));
     localStorage.setItem('netra_admin_profile', JSON.stringify(adminProfile));
-    localStorage.setItem('netra_cashbook', JSON.stringify(cashbookEntries));
     localStorage.setItem('netra_trash', JSON.stringify(trashItems));
 
     if (isSyncingFromDbRef.current) return;
@@ -1100,7 +1105,6 @@ function App() {
             vision: visionSettings,
             banking: bankingDetails,
             profile: adminProfile,
-            cashbook: cashbookEntries,
             trash: trashItems
           })
         };
@@ -1117,7 +1121,70 @@ function App() {
 
     const timer = setTimeout(syncToDb, 1000); // 1-second debounce to avoid database spam
     return () => clearTimeout(timer);
-  }, [servicesList, visionSettings, bankingDetails, adminProfile, cashbookEntries, trashItems, isSettingsLoaded]);
+  }, [servicesList, visionSettings, bankingDetails, adminProfile, trashItems, isSettingsLoaded]);
+
+  // Smart diff sync for cashbook_entries to dedicated table
+  const previousCashbookRef = useRef([]);
+  useEffect(() => {
+    if (!isSettingsLoaded) return;
+    
+    // Always keep local storage updated immediately for fast offline load
+    localStorage.setItem('netra_cashbook', JSON.stringify(cashbookEntries));
+
+    if (isSyncingFromDbRef.current) {
+      previousCashbookRef.current = cashbookEntries;
+      return;
+    }
+
+    const diffAndSync = async () => {
+      const oldEntries = previousCashbookRef.current;
+      const newEntries = cashbookEntries;
+      
+      // First run initialization
+      if (oldEntries.length === 0 && newEntries.length > 0) {
+        previousCashbookRef.current = newEntries;
+        return;
+      }
+      
+      const newMap = new Map(newEntries.map(e => [e.id, e]));
+      const oldMap = new Map(oldEntries.map(e => [e.id, e]));
+      
+      const toUpsert = [];
+      for (const entry of newEntries) {
+        const oldEntry = oldMap.get(entry.id);
+        if (!oldEntry || JSON.stringify(oldEntry) !== JSON.stringify(entry)) {
+          toUpsert.push(entry);
+        }
+      }
+      
+      const toDelete = [];
+      for (const entry of oldEntries) {
+        if (!newMap.has(entry.id)) {
+          toDelete.push(entry.id);
+        }
+      }
+
+      if (toUpsert.length === 0 && toDelete.length === 0) return;
+
+      try {
+        if (toUpsert.length > 0) {
+          const { error } = await supabase.from('cashbook_entries').upsert(toUpsert);
+          if (error) console.error("Cashbook upsert error:", error);
+        }
+        if (toDelete.length > 0) {
+          const { error } = await supabase.from('cashbook_entries').delete().in('id', toDelete);
+          if (error) console.error("Cashbook delete error:", error);
+        }
+      } catch (err) {
+        console.error("Cashbook smart sync failed:", err);
+      }
+
+      previousCashbookRef.current = cashbookEntries;
+    };
+
+    const timer = setTimeout(diffAndSync, 1000); // 1s debounce
+    return () => clearTimeout(timer);
+  }, [cashbookEntries, isSettingsLoaded]);
 
   const toggleSound = () => {
     if (!audioRef.current) return;
@@ -1297,7 +1364,7 @@ function App() {
   const [newCatNameInput, setNewCatNameInput] = useState("");
   const [editCatTab, setEditCatTab] = useState("INCOME");
 
-  const handleRenameCategory = (oldName, newName, type) => {
+  const handleRenameCategory = async (oldName, newName, type) => {
     if (!newName.trim()) return;
     if (oldName === newName) {
       setEditingCategoryName(null);
@@ -1319,7 +1386,7 @@ function App() {
     setEditingCategoryName(null);
   };
 
-  const handleDeleteCategory = (catName, type) => {
+  const handleDeleteCategory = async (catName, type) => {
     if (window.confirm(`Are you sure you want to delete the category "${catName}"? All matching cashbook entries will be reassigned to "Other".`)) {
       setCashbookEntries(prev => prev.map(entry => {
         if (entry.type === type && entry.category === catName) {
@@ -1925,13 +1992,30 @@ function App() {
       })
       .subscribe();
 
-    // 2b. Subscribe to micro_jobs_ledger table changes
     const microJobsChannel = supabase
       .channel('microjobs-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'micro_jobs_ledger' }, async () => {
-        // Refresh microjobs and invoices (to update totals/billed status)
         await refreshMicroJobs();
         await refreshInvoices();
+      })
+      .subscribe();
+
+    const cashbookChannel = supabase
+      .channel('cashbook-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cashbook_entries' }, (payload) => {
+        setCashbookEntries(prev => {
+          if (payload.eventType === 'INSERT') {
+            if (!prev.find(e => e.id === payload.new.id)) {
+              return [payload.new, ...prev].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            }
+            return prev;
+          } else if (payload.eventType === 'UPDATE') {
+            return prev.map(e => e.id === payload.new.id ? payload.new : e);
+          } else if (payload.eventType === 'DELETE') {
+            return prev.filter(e => e.id !== payload.old.id);
+          }
+          return prev;
+        });
       })
       .subscribe();
 
@@ -1944,35 +2028,30 @@ function App() {
             const parsed = JSON.parse(payload.new.address);
             isSyncingFromDbRef.current = true;
 
-            if (parsed.services && JSON.stringify(parsed.services) !== localStorage.getItem('netra_services')) {
-              setServicesList(parsed.services);
+            if (parsed.services) {
+              setServicesList(prev => JSON.stringify(prev) !== JSON.stringify(parsed.services) ? parsed.services : prev);
             }
             if (parsed.vision) {
               const cleanedVision = parsed.vision.map(item => ({
                 ...item,
                 photos: (item.photos || []).filter(p => p.url && !p.url.includes("unsplash.com"))
               }));
-              if (JSON.stringify(cleanedVision) !== localStorage.getItem('netra_vision_settings')) {
-                setVisionSettings(cleanedVision);
-              }
+              setVisionSettings(prev => JSON.stringify(prev) !== JSON.stringify(cleanedVision) ? cleanedVision : prev);
             }
-            if (parsed.banking && JSON.stringify(parsed.banking) !== localStorage.getItem('netra_banking_details')) {
-              setBankingDetails(parsed.banking);
+            if (parsed.banking) {
+              setBankingDetails(prev => JSON.stringify(prev) !== JSON.stringify(parsed.banking) ? parsed.banking : prev);
             }
-            if (parsed.profile && JSON.stringify(parsed.profile) !== localStorage.getItem('netra_admin_profile')) {
-              setAdminProfile(parsed.profile);
+            if (parsed.profile) {
+              setAdminProfile(prev => JSON.stringify(prev) !== JSON.stringify(parsed.profile) ? parsed.profile : prev);
             }
-            if (parsed.cashbook && JSON.stringify(parsed.cashbook) !== localStorage.getItem('netra_cashbook')) {
-              setCashbookEntries(parsed.cashbook);
-            }
-            if (parsed.trash && Array.isArray(parsed.trash) && JSON.stringify(parsed.trash) !== localStorage.getItem('netra_trash')) {
+            if (parsed.trash && Array.isArray(parsed.trash)) {
               const now = Date.now();
               const validTrash = parsed.trash.filter(item => {
                 if (!item || !item.deletedAt) return false;
                 const expiry = new Date(item.deletedAt).getTime() + 24 * 60 * 60 * 1000;
                 return expiry > now;
               });
-              setTrashItems(validTrash);
+              setTrashItems(prev => JSON.stringify(prev) !== JSON.stringify(validTrash) ? validTrash : prev);
             }
           } catch (parseErr) {
             console.error("Failed to parse realtime settings:", parseErr);
@@ -2086,6 +2165,7 @@ function App() {
         supabase.removeChannel(chatsGlobalChannel);
         supabase.removeChannel(mediaGlobalChannel);
         supabase.removeChannel(clientAssetsChannel);
+        supabase.removeChannel(cashbookChannel);
       }
     };
   }, []);
@@ -3168,13 +3248,13 @@ function App() {
 
       // A. Advance payment verification
       if (advance > 0 && !isCancelled) {
-        const advanceEntryIndex = newEntries.findIndex(entry => entry.projectId === p.id && (entry.isAdvance || entry.desc.toLowerCase().startsWith('advance:') || entry.desc.toLowerCase().startsWith('advance payment:')));
-        const isAdvanceInTrash = (trashItems || []).some(item => item.type === 'cashbook' && item.data && item.data.projectId === p.id && (item.data.isAdvance || (item.data.desc && (item.data.desc.toLowerCase().startsWith('advance:') || item.data.desc.toLowerCase().startsWith('advance payment:')))));
+        const advanceEntryIndex = newEntries.findIndex(entry => entry.projectId === p.id && (entry.isAdvance || (entry.desc || "").toLowerCase().startsWith('advance:') || (entry.desc || "").toLowerCase().startsWith('advance payment:')));
+        const isAdvanceInTrash = (trashItems || []).some(item => item.type === 'cashbook' && item.data && item.data.projectId === p.id && (item.data.isAdvance || (item.data.desc && ((item.data.desc || "").toLowerCase().startsWith('advance:') || (item.data.desc || "").toLowerCase().startsWith('advance payment:')))));
         const trueAdvanceDate = p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
 
         if (advanceEntryIndex === -1 && !isAdvanceInTrash) {
           newEntries.push({
-            id: Date.now() + Math.random(),
+            id: parseInt('100' + p.id),
             projectId: p.id,
             date: trueAdvanceDate,
             desc: `Advance: ${p.service} - ${p.name}`,
@@ -3192,11 +3272,11 @@ function App() {
       }
 
       // Deduplicate advance payment entries if there are multiple
-      const advanceEntries = newEntries.filter(entry => entry.projectId === p.id && (entry.isAdvance || entry.desc.toLowerCase().startsWith('advance:') || entry.desc.toLowerCase().startsWith('advance payment:')));
+      const advanceEntries = newEntries.filter(entry => entry.projectId === p.id && (entry.isAdvance || (entry.desc || "").toLowerCase().startsWith('advance:') || (entry.desc || "").toLowerCase().startsWith('advance payment:')));
       if (advanceEntries.length > 1) {
         const keepId = advanceEntries[0].id;
         newEntries = newEntries.filter(entry => {
-          const isMatch = entry.projectId === p.id && (entry.isAdvance || entry.desc.toLowerCase().startsWith('advance:') || entry.desc.toLowerCase().startsWith('advance payment:'));
+          const isMatch = entry.projectId === p.id && (entry.isAdvance || (entry.desc || "").toLowerCase().startsWith('advance:') || (entry.desc || "").toLowerCase().startsWith('advance payment:'));
           if (isMatch) {
             return entry.id === keepId;
           }
@@ -3208,15 +3288,15 @@ function App() {
       // B. Final payment verification
       if (isCompleted) {
         const isPromptOpenForProject = customPaymentPrompt && customPaymentPrompt.p.id === p.id;
-        const finalEntriesIndex = newEntries.findIndex(entry => entry.projectId === p.id && (entry.isFinal || entry.desc.toLowerCase().startsWith('payment:') || entry.desc.toLowerCase().startsWith('final payment:')));
-        const isFinalInTrash = (trashItems || []).some(item => item.type === 'cashbook' && item.data && item.data.projectId === p.id && (item.data.isFinal || (item.data.desc && (item.data.desc.toLowerCase().startsWith('payment:') || item.data.desc.toLowerCase().startsWith('final payment:')))));
+        const finalEntriesIndex = newEntries.findIndex(entry => entry.projectId === p.id && (entry.isFinal || (entry.desc || "").toLowerCase().startsWith('payment:') || (entry.desc || "").toLowerCase().startsWith('final payment:')));
+        const isFinalInTrash = (trashItems || []).some(item => item.type === 'cashbook' && item.data && item.data.projectId === p.id && (item.data.isFinal || (item.data.desc && ((item.data.desc || "").toLowerCase().startsWith('payment:') || (item.data.desc || "").toLowerCase().startsWith('final payment:')))));
         
         const completionLog = (p.activityLog || []).find(l => l.action.toLowerCase().includes('completed') || l.action.toLowerCase().includes('final payment'));
         const trueEntryDate = completionLog?.raw_date ? new Date(completionLog.raw_date).toISOString().split('T')[0] : p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
 
         if (finalEntriesIndex === -1 && remainingDue > 0 && !isPromptOpenForProject && !isFinalInTrash) {
           newEntries.push({
-            id: Date.now() + Math.random(),
+            id: parseInt('200' + p.id),
             projectId: p.id,
             date: trueEntryDate,
             desc: `Payment: ${p.service} - ${p.name}`,
@@ -3234,11 +3314,11 @@ function App() {
       }
 
       // Deduplicate final payment entries if there are multiple
-      const finalEntries = newEntries.filter(entry => entry.projectId === p.id && (entry.isFinal || entry.desc.toLowerCase().startsWith('payment:') || entry.desc.toLowerCase().startsWith('final payment:')));
+      const finalEntries = newEntries.filter(entry => entry.projectId === p.id && (entry.isFinal || (entry.desc || "").toLowerCase().startsWith('payment:') || (entry.desc || "").toLowerCase().startsWith('final payment:')));
       if (finalEntries.length > 1) {
         const keepId = finalEntries[0].id;
         newEntries = newEntries.filter(entry => {
-          const isMatch = entry.projectId === p.id && (entry.isFinal || entry.desc.toLowerCase().startsWith('payment:') || entry.desc.toLowerCase().startsWith('final payment:'));
+          const isMatch = entry.projectId === p.id && (entry.isFinal || (entry.desc || "").toLowerCase().startsWith('payment:') || (entry.desc || "").toLowerCase().startsWith('final payment:'));
           if (isMatch) {
             return entry.id === keepId;
           }
@@ -3249,9 +3329,9 @@ function App() {
 
       // C. Remove final payment if project is not completed
       if (!isCompleted) {
-        const finalEntriesExist = newEntries.filter(entry => entry.projectId === p.id && (entry.isFinal || entry.desc.toLowerCase().startsWith('payment:') || entry.desc.toLowerCase().startsWith('final payment:')));
+        const finalEntriesExist = newEntries.filter(entry => entry.projectId === p.id && (entry.isFinal || (entry.desc || "").toLowerCase().startsWith('payment:') || (entry.desc || "").toLowerCase().startsWith('final payment:')));
         if (finalEntriesExist.length > 0) {
-          newEntries = newEntries.filter(entry => !(entry.projectId === p.id && (entry.isFinal || entry.desc.toLowerCase().startsWith('payment:') || entry.desc.toLowerCase().startsWith('final payment:'))));
+          newEntries = newEntries.filter(entry => !(entry.projectId === p.id && (entry.isFinal || (entry.desc || "").toLowerCase().startsWith('payment:') || (entry.desc || "").toLowerCase().startsWith('final payment:'))));
           updated = true;
         }
       }
@@ -3349,7 +3429,7 @@ function App() {
 
       if (!hasEntry && inv.grandTotal > 0) {
         newEntries.push({
-          id: Date.now() + Math.random(),
+          id: parseInt('300' + inv.id),
           invoiceId: inv.id,
           invoiceNo: inv.invoiceNo,
           date: (() => {
@@ -4508,7 +4588,7 @@ function App() {
     setIsProjectEditModalOpen(false);
   };
 
-  const handleAddCashbookEntry = (e) => {
+  const handleAddCashbookEntry = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     let category = formData.get('category');
@@ -4884,7 +4964,7 @@ function App() {
 
 
 
-  const handleUpdateCashbookEntry = (e) => {
+  const handleUpdateCashbookEntry = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     let category = formData.get('category');
