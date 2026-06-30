@@ -648,6 +648,13 @@ function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [invoiceDefaultTab, setInvoiceDefaultTab] = useState(null);
   const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
+  const [readClientNotifs, setReadClientNotifs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('netra_read_client_notifs')) || [];
+    } catch {
+      return [];
+    }
+  });
   const [trashItems, setTrashItems] = useState(() => {
     const saved = localStorage.getItem('netra_trash');
     if (saved) {
@@ -1043,6 +1050,10 @@ function App() {
               setAdminProfile(parsed.profile);
               safeSetLocalStorage('netra_admin_profile', JSON.stringify(parsed.profile));
             }
+            if (parsed.readNotifs && Array.isArray(parsed.readNotifs)) {
+              setReadClientNotifs(parsed.readNotifs);
+              safeSetLocalStorage('netra_read_client_notifs', JSON.stringify(parsed.readNotifs));
+            }
             if (parsed.trash && Array.isArray(parsed.trash)) {
               const now = Date.now();
               const validTrash = parsed.trash.filter(item => {
@@ -1061,7 +1072,7 @@ function App() {
             name: 'System Settings',
             email: 'settings@netra.graphics',
             phone: 'SYSTEM',
-            address: JSON.stringify({ services: servicesList, vision: visionSettings, banking: bankingDetails, profile: adminProfile, cashbook: cashbookEntries, trash: [] }),
+            address: JSON.stringify({ services: servicesList, vision: visionSettings, banking: bankingDetails, profile: adminProfile, cashbook: cashbookEntries, trash: [], readNotifs: readClientNotifs }),
             status: 'Active',
             access_key: 'SYSTEM'
           };
@@ -1105,7 +1116,8 @@ function App() {
             vision: visionSettings,
             banking: bankingDetails,
             profile: adminProfile,
-            trash: trashItems
+            trash: trashItems,
+            readNotifs: readClientNotifs
           })
         };
         const { error } = await supabase
@@ -1121,7 +1133,7 @@ function App() {
 
     const timer = setTimeout(syncToDb, 1000); // 1-second debounce to avoid database spam
     return () => clearTimeout(timer);
-  }, [servicesList, visionSettings, bankingDetails, adminProfile, trashItems, isSettingsLoaded]);
+  }, [servicesList, visionSettings, bankingDetails, adminProfile, trashItems, readClientNotifs, isSettingsLoaded]);
 
   // Smart diff sync for cashbook_entries to dedicated table
   const previousCashbookRef = useRef([]);
@@ -1475,7 +1487,13 @@ function App() {
   const [showPassphrase, setShowPassphrase] = useState(false);
   const [activeAdminModule, setActiveAdminModule] = useState("DASHBOARD");
   const [remindedFlames, setRemindedFlames] = useState(() => {
-    return JSON.parse(localStorage.getItem('netra_reminded_flames') || '{}');
+    try {
+      const stored = localStorage.getItem('netra_reminded_flames');
+      return stored ? JSON.parse(stored) : {};
+    } catch (e) {
+      console.warn('Failed to parse netra_reminded_flames, resetting.', e);
+      return {};
+    }
   });
   const [showInquiryBadge, setShowInquiryBadge] = useState(false);
   const [isAdminGridActive, setIsAdminGridActive] = useState(() => {
@@ -1500,13 +1518,6 @@ function App() {
   const [projectToDelete, setProjectToDelete] = useState(null);
   const [deleteStrategy, setDeleteStrategy] = useState('purge'); // 'purge' or 'keep'
   const [editingInvoiceData, setEditingInvoiceData] = useState(null);
-  const [readClientNotifs, setReadClientNotifs] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('netra_read_client_notifs')) || [];
-    } catch {
-      return [];
-    }
-  });
 
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [activeClientPopups, setActiveClientPopups] = useState([]);
@@ -2756,6 +2767,21 @@ function App() {
     const advance = parseFloat(p.advanceAmount) || 0;
     const grandTotal = isCompleted ? (subtotal - discount) : (subtotal - discount - advance);
 
+
+    // Derive the true issue date (always the original creation/invoice date, NOT completion date)
+    const trueIssueDate = p.issueDate || (p.createdAt ? new Date(p.createdAt).toISOString() : new Date().toISOString());
+
+    // Derive the completion date from the activity log, if this project is completed
+    let completionDate = null;
+    if (isCompleted) {
+      const completionLog = (p.activityLog || p.rawProject?.activityLog || []).find(
+        l => l.action.toLowerCase().includes('completed') || l.action.toLowerCase().includes('final payment')
+      );
+      if (completionLog?.raw_date) {
+        completionDate = new Date(completionLog.raw_date).toISOString();
+      }
+    }
+
     const isBatch = p.id?.toString().startsWith('batch-') || (p.items && p.items.length > 1);
 
     let clientNamePayload = p.name;
@@ -2770,21 +2796,15 @@ function App() {
         quote: p.quote,
         discount: p.discount || 0,
         advanceAmount: p.advanceAmount || 0,
-        items: p.items || []
+        items: p.items || [],
+        completionDate: completionDate // store completion date for batch invoices
       };
       clientNamePayload = `JSON_MOCK:${JSON.stringify(mockClientPayload)}`;
     }
 
     const newInvoice = {
       invoiceNo: invNo,
-      issueDate: (() => {
-                                  const isCompleted = (p.status || '').toLowerCase() === 'completed';
-                                  if (isCompleted) {
-                                    const completionLog = (p.activityLog || p.rawProject?.activityLog || []).find(l => l.action.toLowerCase().includes('completed') || l.action.toLowerCase().includes('final payment'));
-                                    if (completionLog?.raw_date) return new Date(completionLog.raw_date).toISOString();
-                                  }
-                                  return p.issueDate || (p.createdAt ? new Date(p.createdAt).toISOString() : new Date().toISOString());
-                                })(),
+      issueDate: trueIssueDate,
       clientName: clientNamePayload,
       projectService: p.service,
       grandTotal: grandTotal,
@@ -3738,7 +3758,10 @@ function App() {
         if (state.page === 'services') {
           if (state.serviceId) {
             const rawServices = localStorage.getItem('netra_services');
-            const parsedServices = rawServices ? JSON.parse(rawServices) : services;
+            let parsedServices = services;
+            if (rawServices) {
+              try { parsedServices = JSON.parse(rawServices); } catch(e) {}
+            }
             const foundService = parsedServices.find(s => s.id === state.serviceId);
             if (foundService) {
               setSelectedService(foundService);
@@ -8797,6 +8820,7 @@ function App() {
                               <label style={{ fontSize: '0.65rem', color: '#888', letterSpacing: '1px', display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>INVOICE DETAILS</label>
                               <p style={{ margin: 0, fontSize: '0.9rem' }}><strong>Invoice #:</strong> {stableInvoiceNo}</p>
                               <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem' }}><strong>Issue Date:</strong> {(() => {
+                                // Always show the true issue date extracted from the invoice number or stored issue date
                                 if (stableInvoiceNo) {
                                   const match = stableInvoiceNo.match(/(?:NG\/|CMS\/|INV-)?(\d{2})(\d{2})(\d{4})/);
                                   if (match) {
@@ -8809,14 +8833,39 @@ function App() {
                                 if (existingInvoice && existingInvoice.issueDate) {
                                   return existingInvoice.issueDate;
                                 }
-                                const isCompleted = (invoiceProject.status || '').toLowerCase() === 'completed';
-                                let finalDate = invoiceProject.issueDate || invoiceProject.createdAt || Date.now();
-                                if (isCompleted) {
-                                  const completionLog = (invoiceProject.activityLog || invoiceProject.rawProject?.activityLog || []).find(l => l.action.toLowerCase().includes('completed') || l.action.toLowerCase().includes('final payment'));
-                                  if (completionLog?.raw_date) finalDate = completionLog.raw_date;
-                                }
-                                return new Date(finalDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                                const fallbackDate = invoiceProject.issueDate || invoiceProject.createdAt || Date.now();
+                                return new Date(fallbackDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
                               })()}</p>
+                              {/* Date of Completion — only shown on saved invoices for completed projects */}
+                              {(() => {
+                                // Only show for saved invoices (existingInvoice present)
+                                if (!existingInvoice) return null;
+                                const isCompleted = (invoiceProject.status || invoiceProject.rawProject?.status || '').toLowerCase() === 'completed';
+                                if (!isCompleted) return null;
+
+                                // Try to derive completion date from activity log (standard projects)
+                                const activityLog = invoiceProject.activityLog || invoiceProject.rawProject?.activityLog || [];
+                                const completionLog = activityLog.find(
+                                  l => l.action.toLowerCase().includes('completed') || l.action.toLowerCase().includes('final payment')
+                                );
+                                if (completionLog?.raw_date) {
+                                  return (
+                                    <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem' }}>
+                                      <strong>Date of Completion:</strong> {new Date(completionLog.raw_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    </p>
+                                  );
+                                }
+                                // Fallback: use completionDate stored in batch JSON_MOCK payload
+                                const batchCompletionDate = invoiceProject.completionDate;
+                                if (batchCompletionDate) {
+                                  return (
+                                    <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem' }}>
+                                      <strong>Date of Completion:</strong> {new Date(batchCompletionDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                    </p>
+                                  );
+                                }
+                                return null;
+                              })()}
                             </div>
                           </div>
 

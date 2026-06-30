@@ -289,6 +289,11 @@ export function ClientInvoiceDetail({ invoiceId, onTabChange }) {
             <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem' }}>
               <strong>Issue Date:</strong> {format(new Date(extractDateFromInvoiceNo(invoice.invoiceNumber, invoice.createdAt || invoice.issueDate)), 'dd-MM-yyyy')}
             </p>
+            {invoice.completionDate && (
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem' }}>
+                <strong>Date of Completion:</strong> {format(new Date(invoice.completionDate), 'dd-MM-yyyy')}
+              </p>
+            )}
           </div>
         </div>
 

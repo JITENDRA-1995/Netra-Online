@@ -752,7 +752,8 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
       *,
       projects (
         *,
-        clients (*)
+        clients (*),
+        project_activity_logs (*)
       )
     `)
     .eq('id', invoiceId)
@@ -881,6 +882,30 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
   const discountVal = discount;
   const subtotalVal = subtotal;
 
+  // Derive completion date: look in activity logs for a "completed" entry
+  let completionDate = null;
+  const projectStatus = (inv.projects?.status || '').toLowerCase();
+  if (projectStatus === 'completed') {
+    const activityLogs = inv.projects?.project_activity_logs || [];
+    const completionLog = activityLogs
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .find(l => {
+        const action = (l.action || '').toLowerCase();
+        return action.includes('completed') || action.includes('final payment');
+      });
+    if (completionLog?.created_at) {
+      completionDate = completionLog.created_at;
+    }
+  }
+
+  // For batch invoices (no linked project), the completion date was stored in the JSON_MOCK payload
+  if (!completionDate && inv.client_name?.startsWith('JSON_MOCK:')) {
+    try {
+      const batchData = JSON.parse(inv.client_name.substring(10));
+      if (batchData.completionDate) completionDate = batchData.completionDate;
+    } catch (e) { /* ignore parse errors */ }
+  }
+
   return {
     id: inv.id,
     invoiceNumber: inv.invoice_no,
@@ -895,6 +920,7 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
     projectTitle: inv.projects?.name || inv.project_service || 'Design Services',
     currency: 'INR',
     lineItems,
+    completionDate, // null for non-completed or virtual invoices
     notes: "Thank you for trusting Netra Graphics with your brand's design and digital evolution. Payments can be processed through UPI, bank details, or directly from the administrative portal invoice link.",
     client: inv.projects?.clients ? {
       name: inv.projects.clients.name,
