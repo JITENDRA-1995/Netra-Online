@@ -798,7 +798,8 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
             quantity: qty,
             unitPrice: rate,
             discount: discount,
-            total: (qty * rate) - discount
+            total: (qty * rate) - discount,
+            createdAt: job.date_logged
           };
         });
         fetchedMicroJobs = true;
@@ -842,7 +843,8 @@ export const fetchClientInvoiceDetail = async (invoiceId) => {
         quantity: qty,
         unitPrice: rate,
         discount: discount,
-        total: subtotal - discount
+        total: subtotal - discount,
+        createdAt: inv.projects?.created_at
       }
     ];
   }

@@ -170,7 +170,26 @@ export function ClientInvoiceDetail({ invoiceId, onTabChange }) {
 
   // Fixed 6 rows logic
   const rowsPerPage = 6;
-  const allItems = invoice.lineItems || [];
+  const rawItems = (invoice.lineItems || []).map((item, index) => {
+    const match = item.description?.match(/\((\d{1,2}\s+[a-zA-Z]{3}\s+\d{4})\)/);
+    let dVal = item.createdAt || item.date || invoice.createdAt || invoice.issueDate;
+    let extTs = null;
+    if (match) {
+      const parsed = new Date(match[1]);
+      if (!isNaN(parsed.getTime())) extTs = parsed.getTime();
+    }
+    const dStr = dVal ? new Date(dVal).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+    const svc = (dStr && item.description && !item.description.includes(dStr) && !match) ? `${item.description} (${dStr})` : item.description;
+    return {
+      ...item,
+      description: svc,
+      _ts: extTs !== null ? extTs : (dVal ? new Date(dVal).getTime() : 0)
+    };
+  });
+  const allItems = rawItems.sort((a, b) => {
+    if (a._ts !== b._ts) return a._ts - b._ts;
+    return (a.description || '').localeCompare(b.description || '');
+  });
   const blankRowsCount = Math.max(0, rowsPerPage - allItems.length);
 
   return (
@@ -186,7 +205,7 @@ export function ClientInvoiceDetail({ invoiceId, onTabChange }) {
           </button>
           <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <h1 className="text-2xl sm:text-3xl font-serif font-medium tracking-tight break-words">
-              {!isCompleted ? "Draft Invoice" : "Invoice"} {invoice.invoiceNumber}
+              {(invoice.status?.toLowerCase() !== 'paid') ? "Draft Invoice" : "Invoice"} {invoice.invoiceNumber}
             </h1>
             <div className="flex shrink-0">
               {getStatusBadge(invoice.status)}
@@ -262,7 +281,7 @@ export function ClientInvoiceDetail({ invoiceId, onTabChange }) {
           </div>
           <div style={{ textAlign: 'right', zIndex: 2 }}>
             <h2 style={{ margin: 0, fontSize: '2.0rem', letterSpacing: '3px', fontWeight: '900' }}>
-              {!isCompleted ? "DRAFT INVOICE" : "TAX INVOICE"}
+              {(invoice.status?.toLowerCase() !== 'paid') ? "DRAFT INVOICE" : "TAX INVOICE"}
             </h2>
             <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.9, maxWidth: '300px', marginLeft: 'auto' }}>
               {adminProfile.address}
@@ -289,11 +308,27 @@ export function ClientInvoiceDetail({ invoiceId, onTabChange }) {
             <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem' }}>
               <strong>Issue Date:</strong> {format(new Date(extractDateFromInvoiceNo(invoice.invoiceNumber, invoice.createdAt || invoice.issueDate)), 'dd-MM-yyyy')}
             </p>
-            {invoice.completionDate && (
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem' }}>
-                <strong>Date of Completion:</strong> {format(new Date(invoice.completionDate), 'dd-MM-yyyy')}
-              </p>
-            )}
+            {(() => {
+              const isPaid = invoice.status?.toLowerCase() === 'paid';
+              if (!isCompleted && !isPaid) return null;
+              
+              let compDate = invoice.completionDate;
+              if (!compDate && invoice.activityLog) {
+                const log = invoice.activityLog.find(l => l.action.toLowerCase().includes('completed') || l.action.toLowerCase().includes('final payment') || l.action.toLowerCase().includes('paid'));
+                if (log && log.raw_date) {
+                  compDate = log.raw_date;
+                }
+              }
+              
+              if (compDate) {
+                return (
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.9rem' }}>
+                    <strong>Date of Completion:</strong> {format(new Date(compDate), 'dd-MM-yyyy')}
+                  </p>
+                );
+              }
+              return null;
+            })()}
           </div>
         </div>
 
@@ -385,7 +420,7 @@ export function ClientInvoiceDetail({ invoiceId, onTabChange }) {
                 </div>
               )}
 
-              {isCompleted ? (
+              {(invoice.status?.toLowerCase() === 'paid') ? (
                 <div style={{
                   background: '#1b5e20', padding: '10px 15px', color: '#fff', borderRadius: '6px',
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px'

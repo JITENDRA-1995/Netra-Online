@@ -8715,24 +8715,45 @@ function App() {
 
                     const isStandalone = (invoiceProject.projectId === null) || invoiceProject.isStandalone || stableInvoiceNo?.includes('/C') || (invoiceProject.id && typeof invoiceProject.id === 'string' && (invoiceProject.id.startsWith('custom-') || invoiceProject.id.startsWith('local-')));
                     const isCompletedProject = (invoiceProject.status || '').toLowerCase() === 'completed';
-                    const showDraftInvoiceHeader = isMicroJobInvoice ? isPendingMicroJob : (!isStandalone && !isCompletedProject);
+                    const isPaidStatus = (existingInvoice && (existingInvoice.paymentStatus?.toLowerCase() === 'paid')) || invoiceProject.paymentStatus?.toLowerCase() === 'paid';
+                    const showDraftInvoiceHeader = isPaidStatus ? false : (isMicroJobInvoice ? isPendingMicroJob : (!isStandalone && !isCompletedProject));
 
                     // If it's a batch project, use its internal items, otherwise use single project as one item
-                    const allItems = (invoiceProject.items && invoiceProject.items.length > 0)
-                      ? invoiceProject.items.map(item => ({
-                        service: item.service,
-                        quote: item.quote,
-                        discount: item.discount || 0,
-                        qty: item.qty,
-                        rate: item.rate
-                      }))
+                    const rawItems = (invoiceProject.items && invoiceProject.items.length > 0)
+                      ? invoiceProject.items.map((item, index) => {
+                          const match = item.service?.match(/\((\d{1,2}\s+[a-zA-Z]{3}\s+\d{4})\)/);
+                          let dVal = item.createdAt || item.date || invoiceProject.createdAt;
+                          let extTs = null;
+                          if (match) {
+                            const parsed = new Date(match[1]);
+                            if (!isNaN(parsed.getTime())) extTs = parsed.getTime();
+                          }
+                          const dStr = dVal ? new Date(dVal).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+                          const svc = (dStr && !item.service.includes(dStr) && !match) ? `${item.service} (${dStr})` : item.service;
+                          return {
+                            service: svc,
+                            quote: item.quote,
+                            discount: item.discount || 0,
+                            qty: item.qty,
+                            rate: item.rate,
+                            _ts: extTs !== null ? extTs : (dVal ? new Date(dVal).getTime() : 0)
+                          };
+                        })
                       : [{
-                        service: invoiceProject.service,
-                        quote: invoiceProject.quote,
-                        discount: invoiceProject.discount || 0,
-                        qty: invoiceProject.qty,
-                        rate: invoiceProject.rate
-                      }];
+                          service: invoiceProject.createdAt && !invoiceProject.service.includes(new Date(invoiceProject.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })) 
+                            ? `${invoiceProject.service} (${new Date(invoiceProject.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })})` 
+                            : invoiceProject.service,
+                          quote: invoiceProject.quote,
+                          discount: invoiceProject.discount || 0,
+                          qty: invoiceProject.qty,
+                          rate: invoiceProject.rate,
+                          _ts: invoiceProject.createdAt ? new Date(invoiceProject.createdAt).getTime() : 0
+                        }];
+
+                    const allItems = rawItems.sort((a, b) => {
+                      if (a._ts !== b._ts) return a._ts - b._ts;
+                      return (a.service || '').localeCompare(b.service || '');
+                    });
 
                     const pages = [];
                     for (let i = 0; i < allItems.length; i += rowsPerPage) {
@@ -8831,9 +8852,9 @@ function App() {
                                   }
                                 }
                                 if (existingInvoice && existingInvoice.issueDate) {
-                                  return existingInvoice.issueDate;
+                                  return new Date(existingInvoice.issueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
                                 }
-                                const fallbackDate = invoiceProject.issueDate || invoiceProject.createdAt || Date.now();
+                                const fallbackDate = invoiceProject.issueDate || invoiceProject.createdAt || existingInvoice?.createdAt || Date.now();
                                 return new Date(fallbackDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
                               })()}</p>
                               {/* Date of Completion — only shown on saved invoices for completed projects */}
@@ -8841,12 +8862,13 @@ function App() {
                                 // Only show for saved invoices (existingInvoice present)
                                 if (!existingInvoice) return null;
                                 const isCompleted = (invoiceProject.status || invoiceProject.rawProject?.status || '').toLowerCase() === 'completed';
-                                if (!isCompleted) return null;
+                                const isPaidStatusLocal = (existingInvoice && (existingInvoice.paymentStatus?.toLowerCase() === 'paid')) || invoiceProject.paymentStatus?.toLowerCase() === 'paid';
+                                if (!isCompleted && !isPaidStatusLocal) return null;
 
                                 // Try to derive completion date from activity log (standard projects)
                                 const activityLog = invoiceProject.activityLog || invoiceProject.rawProject?.activityLog || [];
                                 const completionLog = activityLog.find(
-                                  l => l.action.toLowerCase().includes('completed') || l.action.toLowerCase().includes('final payment')
+                                  l => l.action.toLowerCase().includes('completed') || l.action.toLowerCase().includes('final payment') || l.action.toLowerCase().includes('paid')
                                 );
                                 if (completionLog?.raw_date) {
                                   return (

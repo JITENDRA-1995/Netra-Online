@@ -1,11 +1,11 @@
 {
-  "version": "session_4___2026_06_28__magic_link___token_auto_login_",
-  "title": "Session 4 — 2026-06-28 (Magic Link / Token Auto-Login)",
-  "summary": "Netra OS updates in Session 4.",
+  "version": "session_5___2026_07_01__invoice_fixes_",
+  "title": "Session 5 — 2026-07-01 (Invoice Synchronization & UI Updates)",
+  "summary": "Critical fixes for invoice layout and data alignment across admin and client portals.",
   "features": [
     {
-      "title": "JOB-015 — Secure Magic Link Auto-Login",
-      "description": "• Files: src/App.jsx, src/pages/clients.tsx, src/supabase/database/clients.js\n• Clients can now log in automatically using a secure, token-based link sent directly to them via WhatsApp.\n• Replaced the standard login URL redirect in the WhatsApp text message with https://netragraphics.com/autologin?token=[TOKEN].\n• Implemented 30-day session preservation using persistent browser cookies so clients remain logged in on mobile devices.\n• Created supabase_add_magic_link_columns.sql to add magic_token and token_expiry columns. ---"
+      "title": "JOB-016 — Invoice Alignment & Sorting",
+      "description": "• Added proper database time tracking to micro-jobs to retain accurate insertion dates.\n• Re-engineered the sorting algorithm using parsed string dates with a deterministic alphabetical tie-breaker ensuring precise alignment between both client and admin portals.\n• Overhauled the total presentation on Client Portal draft invoices to dynamically showcase 'Remaining Due' vs 'Grand Total' exclusively based on precise paid statuses rather than general project completion.\n• Redesigned the 'What's New' UI module to feature a cleaner, modern layout."
     }
   ]
 }
