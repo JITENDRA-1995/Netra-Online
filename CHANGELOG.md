@@ -4,6 +4,20 @@ A running record of all completed fixes, improvements, and features across all d
 
 ---
 
+## Session 5 — 2026-07-01 (Invoice Synchronization & UI Updates)
+
+### ✅ JOB-016 — Invoice Alignment & Sorting
+- **Files**: `src/App.jsx`, `src/pages/client-vault/invoice-detail.jsx`
+- Added proper database time tracking to micro-jobs to retain accurate insertion dates.
+- Re-engineered the sorting algorithm using parsed string dates with a deterministic alphabetical tie-breaker ensuring precise alignment between both client and admin portals.
+- Overhauled the total presentation on Client Portal draft invoices to dynamically showcase 'Remaining Due' vs 'Grand Total' exclusively based on precise paid statuses rather than general project completion.
+
+### ✅ JOB-017 — Whats New Redesign
+- **Files**: `src/components/WhatsNewBulb.jsx`
+- Redesigned the 'What's New' UI module to feature a cleaner, modern layout with staggered grid cards, neon glow effects, and improved typography.
+
+---
+
 ## Session 4 — 2026-06-28 (Magic Link / Token Auto-Login)
 
 ### ✅ JOB-015 — Secure Magic Link Auto-Login

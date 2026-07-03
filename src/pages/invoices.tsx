@@ -164,21 +164,24 @@ export default function InvoicesPage({
 
       const isMicroJobInvoice = (inv.microJobIds && inv.microJobIds.length > 0) || (inv.invoiceNo && /^CMS/i.test(inv.invoiceNo));
 
+      const entryAmount = Number(inv.grandTotal || inv.invoiceTotal || 0);
+
       const cashbookEntry = {
         id: Date.now(),
-        date: inv.issueDate ? getISTDateString(inv.issueDate) : getISTDateString(),
+        date: getISTDateString(),
         desc: isMicroJobInvoice
           ? `Cumulative Jobs Settlement - ${inv.clientName} (Inv #${inv.invoiceNo})`
           : `Custom Invoice Paid: ${inv.projectService} - ${inv.clientName} [${inv.invoiceNo}]`,
         category: isMicroJobInvoice ? "Micro-Jobs Revenue" : "Service",
-        amount: inv.grandTotal,
+        amount: entryAmount,
         mode: settlePaymentMode,
         type: "INCOME" as const,
         invoiceId: inv.id,
-        invoiceNo: inv.invoiceNo
+        invoiceNo: inv.invoiceNo,
+        isMicroJobInvoice: isMicroJobInvoice
       };
 
-      setCashbookEntries(prev => [cashbookEntry, ...prev]);
+      setCashbookEntries((prev: any[]) => [cashbookEntry, ...prev]);
 
       toast({
         title: "Settlement Complete",
