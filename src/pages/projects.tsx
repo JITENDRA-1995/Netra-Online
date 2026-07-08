@@ -209,7 +209,7 @@ export default function Projects({
       const r = Number(editJobRate) || 0;
       const d = Number(editJobDiscount) || 0;
       const gross = q * r;
-      setEditJobAmount(Math.max(0, gross - d));
+      setEditJobAmount(parseFloat(Math.max(0, gross - d).toFixed(2)));
     }
   }, [editJobQty, editJobRate, editJobDiscount, editJobLastCalculatedBy, isEditJobModalOpen]);
 
@@ -330,7 +330,7 @@ export default function Projects({
       const r = Number(newJobRate) || 0;
       const d = Number(newJobDiscount) || 0;
       const gross = q * r;
-      setNewJobAmount(Math.max(0, gross - d));
+      setNewJobAmount(parseFloat(Math.max(0, gross - d).toFixed(2)));
     }
   }, [newJobQty, newJobRate, newJobDiscount, newJobLastCalculatedBy, isQuickJobModalOpen]);
 
@@ -2002,9 +2002,9 @@ export default function Projects({
                           </div>
                           {(job.qty > 1 || job.discount > 0) && (
                             <div className="text-[10px] text-muted-foreground/80 mt-0.5 font-mono">
-                              {job.qty > 1 && `Qty: ${job.qty} × ₹${job.rate}`}
+                              {job.qty > 1 && `Qty: ${job.qty} × ₹${Number(job.rate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                               {job.qty > 1 && job.discount > 0 && " | "}
-                              {job.discount > 0 && `Discount: ₹${job.discount}`}
+                              {job.discount > 0 && `Discount: ₹${Number(job.discount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             </div>
                           )}
                         </td>
@@ -2519,7 +2519,7 @@ export default function Projects({
                 <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Rate (₹) per unit *</label>
                 <Input
                   type="number"
-                  step="any"
+                  step="0.01"
                   min={0}
                   value={newJobRate}
                   onChange={(e) => {
@@ -2536,7 +2536,7 @@ export default function Projects({
 
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 border border-white/10">
               <span className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold flex-1">Gross Quote (Qty × Rate)</span>
-              <span className="font-black text-sm text-foreground">₹{(Number(newJobQty) * Number(newJobRate) || 0).toLocaleString('en-IN')}</span>
+              <span className="font-black text-sm text-foreground">₹{(Number(newJobQty) * Number(newJobRate) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -2544,6 +2544,7 @@ export default function Projects({
                 <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Special Discount (₹)</label>
                 <Input
                   type="number"
+                  step="0.01"
                   min={0}
                   value={newJobDiscount}
                   onChange={(e) => {
@@ -2559,6 +2560,7 @@ export default function Projects({
                 <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Estimated Quote (₹) *</label>
                 <Input
                   type="number"
+                  step="0.01"
                   min={0}
                   value={newJobAmount}
                   onChange={(e) => {
@@ -2575,9 +2577,9 @@ export default function Projects({
 
             <div className="grid grid-cols-3 rounded-xl border border-white/10 overflow-hidden">
               {[
-                { label: 'Gross', val: `₹${(Number(newJobQty) * Number(newJobRate) || 0).toLocaleString('en-IN')}`, color: 'text-foreground' },
-                { label: 'Discount', val: `-₹${(typeof newJobDiscount === 'number' ? newJobDiscount : 0).toLocaleString('en-IN')}`, color: 'text-amber-400' },
-                { label: 'Net Payable', val: `₹${(typeof newJobAmount === 'number' ? newJobAmount : 0).toLocaleString('en-IN')}`, color: 'text-cyan-400' },
+                { label: 'Gross', val: `₹${(Number(newJobQty) * Number(newJobRate) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: 'text-foreground' },
+                { label: 'Discount', val: `-₹${(typeof newJobDiscount === 'number' ? newJobDiscount : 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: 'text-amber-400' },
+                { label: 'Net Payable', val: `₹${(typeof newJobAmount === 'number' ? newJobAmount : 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: 'text-cyan-400' },
               ].map(({ label, val, color }) => (
                 <div key={label} className="flex flex-col items-center py-2.5 bg-white/5">
                   <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">{label}</span>
@@ -2795,7 +2797,7 @@ export default function Projects({
                 <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Rate (₹) per unit *</label>
                 <Input
                   type="number"
-                  step="any"
+                  step="0.01"
                   min={0}
                   value={editJobRate}
                   onChange={(e) => {
@@ -2812,7 +2814,7 @@ export default function Projects({
 
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 border border-white/10">
               <span className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold flex-1">Gross Quote (Qty × Rate)</span>
-              <span className="font-black text-sm text-foreground">₹{(Number(editJobQty) * Number(editJobRate) || 0).toLocaleString('en-IN')}</span>
+              <span className="font-black text-sm text-foreground">₹{(Number(editJobQty) * Number(editJobRate) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -2820,6 +2822,7 @@ export default function Projects({
                 <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Special Discount (₹)</label>
                 <Input
                   type="number"
+                  step="0.01"
                   min={0}
                   value={editJobDiscount}
                   onChange={(e) => {
@@ -2835,6 +2838,7 @@ export default function Projects({
                 <label className="text-3xs uppercase tracking-widest text-muted-foreground font-semibold">Estimated Quote (₹) *</label>
                 <Input
                   type="number"
+                  step="0.01"
                   min={0}
                   value={editJobAmount}
                   onChange={(e) => {
@@ -2851,9 +2855,9 @@ export default function Projects({
 
             <div className="grid grid-cols-3 rounded-xl border border-white/10 overflow-hidden">
               {[
-                { label: 'Gross', val: `₹${(Number(editJobQty) * Number(editJobRate) || 0).toLocaleString('en-IN')}`, color: 'text-foreground' },
-                { label: 'Discount', val: `-₹${(typeof editJobDiscount === 'number' ? editJobDiscount : 0).toLocaleString('en-IN')}`, color: 'text-amber-400' },
-                { label: 'Net Payable', val: `₹${(typeof editJobAmount === 'number' ? editJobAmount : 0).toLocaleString('en-IN')}`, color: 'text-cyan-400' },
+                { label: 'Gross', val: `₹${(Number(editJobQty) * Number(editJobRate) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: 'text-foreground' },
+                { label: 'Discount', val: `-₹${(typeof editJobDiscount === 'number' ? editJobDiscount : 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: 'text-amber-400' },
+                { label: 'Net Payable', val: `₹${(typeof editJobAmount === 'number' ? editJobAmount : 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: 'text-cyan-400' },
               ].map(({ label, val, color }) => (
                 <div key={label} className="flex flex-col items-center py-2.5 bg-white/5">
                   <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold">{label}</span>
