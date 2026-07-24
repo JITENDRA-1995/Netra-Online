@@ -4,6 +4,27 @@ A running record of all completed fixes, improvements, and features across all d
 
 ---
 
+## Session 6 — 2026-07-24 (Netra OS v2.6.0 — Flyout Navigation & Vision Calibration)
+
+### ✅ JOB-018 — Custom Invoice Serial Duplication Fix
+- Fixed custom invoice serial calculation to extract max serial across all custom invoices in memory.
+- Added collision check loop to ensure every new custom invoice gets a unique sequential serial number.
+
+### ✅ JOB-019 — Direct Sidebar Flyout Submenu Navigation
+- Created ultra-fast sidebar flyout popovers with direct sub-item navigation for Projects, Inquiries, Clients, Invoice Vault, Financials, Settings, and System Alerts.
+- Added redirection token handlers so selecting submenus like Completed Projects, Saved Invoices, or Banking Setup opens the exact tab/section directly.
+
+### ✅ JOB-020 — Solid High-Contrast Cyberpunk Theme & Active Item Suppression
+- Upgraded flyout panels to 100% solid, opaque dark backgrounds with high-contrast text and crisp borders.
+- Suppressed flyout popovers when hovering over the currently active menu item.
+- Enforced single active flyout state for instant switching between menus.
+
+### ✅ JOB-021 — Unlimited Dynamic Vision Page Calibration
+- Removed 5-card limit on Vision Page Calibration.
+- Added dynamic Add New Vision Card and Remove Card actions with full database synchronization.
+
+---
+
 ## Session 5 — 2026-07-01 (Invoice Synchronization & UI Updates)
 
 ### ✅ JOB-016 — Invoice Alignment & Sorting

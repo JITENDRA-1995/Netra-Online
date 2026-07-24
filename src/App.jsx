@@ -5647,7 +5647,7 @@ function App() {
                   </a>
 
                   <div className="sidebar-version-tag">
-                    <p className="v-title">Netra OS v2.5.1</p>
+                    <p className="v-title">Netra OS v2.6.0</p>
                     <p className="v-status">Systems online.</p>
                   </div>
                 </div>
