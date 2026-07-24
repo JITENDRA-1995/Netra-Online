@@ -53,7 +53,10 @@ try {
           .replace(/\*\*/g, '')
           .replace(/`/g, '')
           .trim();
-        currentJob.description.push(cleaned);
+        // Skip file path lines (e.g., "Files: src/components/WhatsNewBulb.jsx")
+        if (!/^files?:/i.test(cleaned) && !/^file\(s\):/i.test(cleaned)) {
+          currentJob.description.push(cleaned);
+        }
       }
     } else {
       // It's normal text or sub-bullet, append to the description
@@ -63,7 +66,9 @@ try {
           .replace(/\*\*/g, '')
           .replace(/`/g, '')
           .trim();
-        currentJob.description[lastIdx] += ' ' + cleaned;
+        if (!/^files?:/i.test(cleaned) && !/^file\(s\):/i.test(cleaned)) {
+          currentJob.description[lastIdx] += ' ' + cleaned;
+        }
       }
     }
   }

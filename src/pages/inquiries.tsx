@@ -71,7 +71,18 @@ export default function Inquiries({
 
   useEffect(() => {
     if (initialSearch !== undefined) {
-      setSearch(initialSearch);
+      if (initialSearch === "__PENDING__") {
+        setFilterStatus("New Spark");
+        setSearch("");
+      } else if (initialSearch === "__CONVERTED__") {
+        setFilterStatus("Converted");
+        setSearch("");
+      } else if (initialSearch === "__ALL__") {
+        setFilterStatus("all");
+        setSearch("");
+      } else {
+        setSearch(initialSearch);
+      }
     }
   }, [initialSearch]);
   const [filterService, setFilterService] = useState("all");

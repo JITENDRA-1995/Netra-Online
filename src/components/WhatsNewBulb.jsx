@@ -77,18 +77,20 @@ export function WhatsNewBulb({ isClientPortal = false }) {
                         <div>
                           <h4 className="text-base font-bold text-white mb-2">{feature.title}</h4>
                           <div className="text-sm text-white/60 leading-relaxed whitespace-pre-line space-y-2">
-                            {feature.description.split('\n').map((line, i) => (
-                              <p key={i} className="flex items-start gap-2">
-                                {line.trim().startsWith('•') ? (
-                                  <>
-                                    <span className="text-indigo-400/50 mt-1 shrink-0">•</span>
-                                    <span>{line.replace('•', '').trim()}</span>
-                                  </>
-                                ) : (
-                                  line
-                                )}
-                              </p>
-                            ))}
+                            {feature.description.split('\n')
+                              .filter(line => !/^•?\s*files?:/i.test(line.trim()) && !/^•?\s*file\(s\):/i.test(line.trim()))
+                              .map((line, i) => (
+                                <p key={i} className="flex items-start gap-2">
+                                  {line.trim().startsWith('•') ? (
+                                    <>
+                                      <span className="text-indigo-400/50 mt-1 shrink-0">•</span>
+                                      <span>{line.replace('•', '').trim()}</span>
+                                    </>
+                                  ) : (
+                                    line
+                                  )}
+                                </p>
+                              ))}
                           </div>
                         </div>
                       </div>

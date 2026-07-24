@@ -5,11 +5,11 @@
   "features": [
     {
       "title": "JOB-016 — Invoice Alignment & Sorting",
-      "description": "• Files: src/App.jsx, src/pages/client-vault/invoice-detail.jsx\n• Added proper database time tracking to micro-jobs to retain accurate insertion dates.\n• Re-engineered the sorting algorithm using parsed string dates with a deterministic alphabetical tie-breaker ensuring precise alignment between both client and admin portals.\n• Overhauled the total presentation on Client Portal draft invoices to dynamically showcase 'Remaining Due' vs 'Grand Total' exclusively based on precise paid statuses rather than general project completion."
+      "description": "• Added proper database time tracking to micro-jobs to retain accurate insertion dates.\n• Re-engineered the sorting algorithm using parsed string dates with a deterministic alphabetical tie-breaker ensuring precise alignment between both client and admin portals.\n• Overhauled the total presentation on Client Portal draft invoices to dynamically showcase 'Remaining Due' vs 'Grand Total' exclusively based on precise paid statuses rather than general project completion."
     },
     {
       "title": "JOB-017 — Whats New Redesign",
-      "description": "• Files: src/components/WhatsNewBulb.jsx\n• Redesigned the 'What's New' UI module to feature a cleaner, modern layout with staggered grid cards, neon glow effects, and improved typography. ---"
+      "description": "• Redesigned the 'What's New' UI module to feature a cleaner, modern layout with staggered grid cards, neon glow effects, and improved typography. ---"
     }
   ]
 }

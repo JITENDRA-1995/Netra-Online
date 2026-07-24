@@ -825,11 +825,33 @@ export default function InvoicesPage({
     return `NG/${dateStr}/${serialStr}`;
   };
 
-  const getCustomInvoiceNumber = (date: Date, serial = 1) => {
+  const getCustomInvoiceNumber = (date: Date = new Date()) => {
     const d = new Date(date);
     const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '');
-    const serialStr = serial.toString().padStart(4, '0');
-    return `NG/${dateStr}/C${serialStr}`;
+    
+    // Find the highest existing serial number among custom invoices (/C prefix)
+    let maxSerial = 0;
+    (invoices || []).forEach((inv: any) => {
+      if (!inv.invoiceNo) return;
+      const match = inv.invoiceNo.match(/\/C(\d+)/i);
+      if (match && match[1]) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxSerial) {
+          maxSerial = num;
+        }
+      }
+    });
+
+    let serial = maxSerial + 1;
+    let invNo = `NG/${dateStr}/C${serial.toString().padStart(4, '0')}`;
+
+    // Guarantee uniqueness against ALL existing invoices in state/DB
+    while ((invoices || []).some((i: any) => i.invoiceNo === invNo)) {
+      serial++;
+      invNo = `NG/${dateStr}/C${serial.toString().padStart(4, '0')}`;
+    }
+
+    return invNo;
   };
 
   const handleCreateInvoice = async (e?: React.FormEvent) => {
@@ -848,10 +870,7 @@ export default function InvoicesPage({
     const discVal = parseFloat(discount) || 0;
 
     const customInvoiceId = `custom-${Date.now()}`;
-    const stableInvoiceNo = editingInvoiceNo || (() => {
-      const customInvoices = invoices.filter(inv => !inv.rawProject?.id || inv.rawProject?.isStandalone || inv.invoiceNo.includes('/C'));
-      return getCustomInvoiceNumber(new Date(), customInvoices.length + 1);
-    })();
+    const stableInvoiceNo = editingInvoiceNo || getCustomInvoiceNumber(new Date());
 
     // Mock client data inside clientName using JSON_MOCK prefix
     const mockClientPayload = {

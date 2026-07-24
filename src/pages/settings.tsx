@@ -78,6 +78,8 @@ interface SettingsProps {
   setAdminProfile: React.Dispatch<React.SetStateAction<any>>;
   trashItems?: any[];
   onRestoreItem?: (id: string) => void;
+  defaultTab?: string | null;
+  setDefaultTab?: (tab: string | null) => void;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -348,9 +350,18 @@ export default function SettingsPage({
   setBankingDetails,
   setAdminProfile,
   trashItems = [],
-  onRestoreItem
+  onRestoreItem,
+  defaultTab = null,
+  setDefaultTab
 }: SettingsProps) {
-  const [activeTab, setActiveTab] = useState("CATALOG"); // CATALOG, VISION, BANKING, PROFILE
+  const [activeTab, setActiveTab] = useState(defaultTab || "CATALOG"); // CATALOG, VISION, BANKING, PROFILE
+
+  useEffect(() => {
+    if (defaultTab) {
+      setActiveTab(defaultTab);
+      if (setDefaultTab) setDefaultTab(null);
+    }
+  }, [defaultTab, setDefaultTab]);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("ALL");
 

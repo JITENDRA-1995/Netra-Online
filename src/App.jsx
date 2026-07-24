@@ -5,7 +5,7 @@ import './Login.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
-import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ChevronLeft, X, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail, Menu, Volume2, VolumeX, Coins, Phone, MapPin, Pencil, Trash2 } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, Terminal, Sparkles, LogIn, ChevronRight, ChevronLeft, X, ShieldAlert, ArrowLeft, LayoutDashboard, Folder, Users, Inbox, FileText, Settings, LogOut, Home, Briefcase, Mail, Menu, Volume2, VolumeX, Coins, Phone, MapPin, Pencil, Trash2, PlusCircle, CheckCircle2, Wrench, Clock, UserPlus, FilePlus, BarChart3, Layers, Wallet, Landmark, Flame } from 'lucide-react';
 
 // Lazy loaded page components to optimize bundle size and load performance
 const Dashboard = React.lazy(() => import('@/pages/dashboard'));
@@ -30,6 +30,7 @@ import { ClientInvoiceDetail } from './pages/client-vault/invoice-detail';
 import { ClientProfile } from './pages/client-vault/profile';
 import { WhatsNewBulb } from './components/WhatsNewBulb';
 import { ClientCollaboration } from './pages/client-vault/collaboration';
+import { SidebarSubmenuFlyout } from './components/SidebarSubmenuFlyout';
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[400px] w-full bg-[#050508]/20 backdrop-blur-sm rounded-3xl border border-white/5">
@@ -1518,6 +1519,8 @@ function App() {
   const [projectToDelete, setProjectToDelete] = useState(null);
   const [deleteStrategy, setDeleteStrategy] = useState('purge'); // 'purge' or 'keep'
   const [editingInvoiceData, setEditingInvoiceData] = useState(null);
+  const [settingsDefaultTab, setSettingsDefaultTab] = useState(null);
+  const [activeHoveredFlyoutId, setActiveHoveredFlyoutId] = useState(null);
 
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [activeClientPopups, setActiveClientPopups] = useState([]);
@@ -5453,58 +5456,190 @@ function App() {
                   <span className="sidebar-branding-text">NETRA</span>
                 </button>
 
-                <nav className="sidebar-menu">
+                <nav className="sidebar-menu" onMouseLeave={() => setActiveHoveredFlyoutId(null)}>
                   {[
-                    { id: "DASHBOARD", label: "Dashboard", icon: LayoutDashboard },
-                    { id: "PROJECTS", label: "Projects", icon: Folder },
-                    { id: "INQUIRIES", label: "Inquiries", icon: Inbox, badge: showInquiryBadge },
-                    { id: "CLIENTS", label: "Clients", icon: Users },
-                    { id: "INVOICES", label: "Invoice Vault", icon: FileText },
-                    { id: "FINANCIALS", label: "Financials", icon: Coins },
-                    { id: "SETTINGS", label: "Settings", icon: Settings }
-                  ].map((link) => {
-                    const isActive = activeAdminModule === link.id;
-                    const Icon = link.icon;
-                    return (
-                      <a
-                        key={link.id}
-                        href="#"
-                        className={`sidebar-menu-link ${isActive ? 'active' : ''}`}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setActiveAdminModule(link.id);
-                          setIsAdminGridActive(true);
-                          setIsIgnitionModalOpen(false); // Auto-close modal on navigation
-                          setIsMobileSidebarOpen(false); // Auto-close mobile sidebar drawer
-                          if (link.id === "INQUIRIES") setShowInquiryBadge(false);
-                          setProjectsSearchQuery("");
-                          setInquiriesSearchQuery("");
-                          pushPageToHistory('admin', { activeAdminModule: link.id, isAdminGridActive: true });
-                        }}
-                        data-testid={`link-sidebar-${link.label.toLowerCase()}`}
-                      >
-                        <Icon className={`sidebar-link-icon ${isActive ? 'text-[#00E5FF]' : ''}`} />
-                        <span className="sidebar-link-label">{link.label}</span>
-                        {link.badge && (
-                          <span className="sidebar-notification-dot"></span>
-                        )}
-                      </a>
-                    );
-                  })}
+                    {
+                      id: "DASHBOARD",
+                      label: "Dashboard",
+                      icon: LayoutDashboard,
+                      submenus: []
+                    },
+                    {
+                      id: "PROJECTS",
+                      label: "Projects",
+                      icon: Folder,
+                      submenus: [
+                        { id: "create_project", label: "Start New Ignition", icon: PlusCircle, description: "Launch new project ignition" },
+                        { id: "active_missions", label: "All Active Missions", icon: Folder, description: "View active & ongoing projects" },
+                        { id: "completed_projects", label: "Completed Projects", icon: CheckCircle2, description: "Archive of finished deliverables" },
+                        { id: "micro_jobs", label: "Micro-Jobs Ledger", icon: Wrench, description: "Small design tasks & quick fixes" }
+                      ]
+                    },
+                    {
+                      id: "INQUIRIES",
+                      label: "Inquiries",
+                      icon: Inbox,
+                      badge: showInquiryBadge,
+                      submenus: [
+                        { id: "all_inquiries", label: "All Inquiries", icon: Inbox, description: "Full list of client sparks" },
+                        { id: "pending_inquiries", label: "Pending Inquiries", icon: Clock, description: "Uncalibrated new inquiries" },
+                        { id: "converted_inquiries", label: "Converted / Archived", icon: CheckCircle2, description: "Handled & converted sparks" }
+                      ]
+                    },
+                    {
+                      id: "CLIENTS",
+                      label: "Clients",
+                      icon: Users,
+                      submenus: [
+                        { id: "add_visionary", label: "Add New Visionary", icon: UserPlus, description: "Register a new client account" },
+                        { id: "all_clients", label: "All Client Accounts", icon: Users, description: "CRM client directory & history" }
+                      ]
+                    },
+                    {
+                      id: "INVOICES",
+                      label: "Invoice Vault",
+                      icon: FileText,
+                      submenus: [
+                        { id: "create_invoice", label: "Create Custom Invoice", icon: FilePlus, description: "Issue custom tax/service invoice" },
+                        { id: "saved_invoices", label: "Saved Invoices", icon: FileText, description: "Completed tax invoices" },
+                        { id: "draft_invoices", label: "Draft Invoices", icon: Clock, description: "Pending project invoices" },
+                        { id: "custom_invoices", label: "Custom Invoices", icon: FileText, description: "Standalone billing documents" },
+                        { id: "microjob_invoices", label: "Micro-Job Invoices", icon: Wrench, description: "Cumulative micro-job bills" }
+                      ]
+                    },
+                    {
+                      id: "FINANCIALS",
+                      label: "Financials",
+                      icon: Coins,
+                      submenus: [
+                        { id: "financial_overview", label: "Financial Overview", icon: BarChart3, description: "Revenue analytics & metrics" },
+                        { id: "ignition_queue", label: "Ignition Queue", icon: Layers, description: "Project milestone payments" },
+                        { id: "cashbook_entry", label: "Cashbook Entry", icon: Wallet, description: "Income & expense transaction log" }
+                      ]
+                    },
+                    {
+                      id: "SETTINGS",
+                      label: "Settings",
+                      icon: Settings,
+                      submenus: [
+                        { id: "general_settings", label: "General Settings", icon: Settings, description: "Services & pricing catalog" },
+                        { id: "banking_setup", label: "Banking & UPI Setup", icon: Landmark, description: "Payment account configuration" },
+                        { id: "profile_info", label: "Admin Profile Info", icon: User, description: "Business details & contact info" }
+                      ]
+                    }
+                  ].map((link) => (
+                    <SidebarSubmenuFlyout
+                      key={link.id}
+                      item={link}
+                      isActive={activeAdminModule === link.id}
+                      activeFlyoutId={activeHoveredFlyoutId}
+                      setActiveFlyoutId={setActiveHoveredFlyoutId}
+                      onPrimaryClick={(item) => {
+                        setActiveAdminModule(item.id);
+                        setIsAdminGridActive(true);
+                        setIsMobileSidebarOpen(false);
+                        if (item.id === "INQUIRIES") setShowInquiryBadge(false);
+                        setProjectsSearchQuery("");
+                        setInquiriesSearchQuery("");
+                        pushPageToHistory('admin', { activeAdminModule: item.id, isAdminGridActive: true });
+                      }}
+                      onSubmenuClick={(parentItem, subItem) => {
+                        setActiveAdminModule(parentItem.id);
+                        setIsAdminGridActive(true);
+                        setIsMobileSidebarOpen(false);
+                        pushPageToHistory('admin', { activeAdminModule: parentItem.id, isAdminGridActive: true });
+
+                        if (parentItem.id === "PROJECTS") {
+                          if (subItem.id === "create_project") {
+                            setPrefillData(null);
+                            setIsIgnitionModalOpen(true);
+                            setProjectsSearchQuery("");
+                          } else if (subItem.id === "active_missions") {
+                            setProjectsSearchQuery("__ACTIVE__");
+                          } else if (subItem.id === "completed_projects") {
+                            setProjectsSearchQuery("__COMPLETED__");
+                          } else if (subItem.id === "micro_jobs") {
+                            setProjectsSearchQuery("__MICRO_JOBS__");
+                          }
+                        } else if (parentItem.id === "INQUIRIES") {
+                          setShowInquiryBadge(false);
+                          setUnreadSparksCount(0);
+                          if (subItem.id === "pending_inquiries") {
+                            setInquiriesSearchQuery("__PENDING__");
+                          } else if (subItem.id === "converted_inquiries") {
+                            setInquiriesSearchQuery("__CONVERTED__");
+                          } else {
+                            setInquiriesSearchQuery("__ALL__");
+                          }
+                        } else if (parentItem.id === "CLIENTS") {
+                          if (subItem.id === "add_visionary") {
+                            setSelectedClient(null);
+                            setClientModalPasscode(Math.random().toString(36).substring(2, 8).toUpperCase());
+                            setIsClientModalOpen(true);
+                          } else {
+                            setClientsSearchQuery("");
+                          }
+                        } else if (parentItem.id === "INVOICES") {
+                          if (subItem.id === "create_invoice") {
+                            setPrefilledEditData(null);
+                            setInvoiceDefaultTab("CUSTOM");
+                            setTimeout(() => {
+                              const createBtn = document.querySelector('[data-testid="btn-create-custom-invoice"]') || document.querySelector('.btn-create-invoice');
+                              if (createBtn) createBtn.click();
+                            }, 150);
+                          } else if (subItem.id === "saved_invoices") {
+                            setInvoiceDefaultTab("SAVED");
+                          } else if (subItem.id === "draft_invoices") {
+                            setInvoiceDefaultTab("DRAFT");
+                          } else if (subItem.id === "custom_invoices") {
+                            setInvoiceDefaultTab("CUSTOM");
+                          } else if (subItem.id === "microjob_invoices") {
+                            setInvoiceDefaultTab("MICRO_JOB");
+                          }
+                        } else if (parentItem.id === "FINANCIALS") {
+                          if (subItem.id === "financial_overview") {
+                            setFinancialTab("OVERVIEW");
+                          } else if (subItem.id === "ignition_queue") {
+                            setFinancialTab("PROJECTS");
+                          } else if (subItem.id === "cashbook_entry") {
+                            setFinancialTab("CASHBOOK");
+                          }
+                        } else if (parentItem.id === "SETTINGS") {
+                          if (subItem.id === "general_settings") {
+                            setSettingsDefaultTab("CATALOG");
+                          } else if (subItem.id === "banking_setup") {
+                            setSettingsDefaultTab("BANKING");
+                          } else if (subItem.id === "profile_info") {
+                            setSettingsDefaultTab("PROFILE");
+                          }
+                        }
+                      }}
+                    />
+                  ))}
                 </nav>
 
                 <div className="sidebar-footer">
-                  <div className="sidebar-notifications-trigger" onClick={() => { setIsNotificationOpen(true); setIsMobileSidebarOpen(false); }}>
-                    <div className={`notification-bell-wrapper ${((sparks.length + flames.length) > 0 || bellPulse) ? 'has-alerts' : ''}`}>
-                      <svg className="bell-icon" viewBox="0 0 24 24" width="20" height="20">
-                        <path fill="currentColor" d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
-                      </svg>
-                      {(sparks.length + flames.length) > 0 && (
-                        <span className="bell-badge">{sparks.length + flames.length}</span>
-                      )}
-                    </div>
-                    <span className="notifications-label">SYSTEM ALERTS</span>
-                  </div>
+                  <SidebarSubmenuFlyout
+                    item={{
+                      id: "SYSTEM_ALERTS",
+                      label: "System Alerts",
+                      icon: ShieldAlert,
+                      badge: (sparks.length + flames.length) > 0,
+                      submenus: [
+                        { id: "flame_alerts", label: "Flame & Overdue Alerts", icon: Flame, description: `${flames.length} deadline warnings` },
+                        { id: "milestone_updates", label: "Milestone & Spark Updates", icon: CheckCircle2, description: `${sparks.length} new sparks pending` }
+                      ]
+                    }}
+                    isActive={false}
+                    onPrimaryClick={() => {
+                      setIsNotificationOpen(true);
+                      setIsMobileSidebarOpen(false);
+                    }}
+                    onSubmenuClick={() => {
+                      setIsNotificationOpen(true);
+                      setIsMobileSidebarOpen(false);
+                    }}
+                  />
 
                   <a href="#" className="sidebar-logout-btn" onClick={(e) => { handleLogout(e); setIsMobileSidebarOpen(false); }}>
                     <LogOut className="w-4 h-4" />
@@ -6828,6 +6963,8 @@ function App() {
                             setAdminProfile={setAdminProfile}
                             trashItems={trashItems}
                             onRestoreItem={restoreItem}
+                            defaultTab={settingsDefaultTab}
+                            setDefaultTab={setSettingsDefaultTab}
                           />
                         )}
                         </Suspense>

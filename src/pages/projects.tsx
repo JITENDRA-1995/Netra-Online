@@ -308,7 +308,23 @@ export default function Projects({
 
   useEffect(() => {
     if (initialSearch !== undefined) {
-      setSearch(initialSearch);
+      if (initialSearch === "__COMPLETED__") {
+        setActiveTab("Missions");
+        setShowCompletedTab(true);
+        setFilterStatus("completed");
+        setSearch("");
+      } else if (initialSearch === "__ACTIVE__") {
+        setActiveTab("Missions");
+        setShowCompletedTab(false);
+        setFilterStatus("all");
+        setSearch("");
+      } else if (initialSearch === "__MICRO_JOBS__") {
+        setActiveTab("MicroJobs");
+        setShowCompletedTab(false);
+        setSearch("");
+      } else {
+        setSearch(initialSearch);
+      }
     }
   }, [initialSearch]);
 
