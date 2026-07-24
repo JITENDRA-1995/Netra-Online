@@ -365,16 +365,19 @@ export default function SettingsPage({
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("ALL");
 
-  // State for Vision calibration tab
+  // State for Vision calibration tab (Dynamic unlimited service cards)
   const [localVisionSettings, setLocalVisionSettings] = useState(() => {
-    // Make sure we have exactly 5 slot objects
-    const base = visionSettings ? [...visionSettings] : [];
-    const copy = base.map(item => ({...item, photos: item.photos ? [...item.photos] : []}));
-    while (copy.length < 5) {
-      copy.push({ serviceId: 0, photos: [] });
+    if (Array.isArray(visionSettings) && visionSettings.length > 0) {
+      return visionSettings.map(item => ({...item, photos: item.photos ? [...item.photos] : []}));
     }
-    return copy.slice(0, 5);
+    return [];
   });
+
+  useEffect(() => {
+    if (Array.isArray(visionSettings)) {
+      setLocalVisionSettings(visionSettings.map(item => ({...item, photos: item.photos ? [...item.photos] : []})));
+    }
+  }, [visionSettings]);
 
   // State arrays for inline new slide inputs per slot index (0 to 4)
   const [newSlideUrls, setNewSlideUrls] = useState<string[]>(["", "", "", "", ""]);
@@ -851,6 +854,17 @@ export default function SettingsPage({
     setLocalVisionSettings(next);
   };
 
+  const handleAddVisionCard = () => {
+    setLocalVisionSettings(prev => [
+      ...prev,
+      { serviceId: 0, photos: [] }
+    ]);
+  };
+
+  const handleRemoveVisionCard = (slotIdx: number) => {
+    setLocalVisionSettings(prev => prev.filter((_, idx) => idx !== slotIdx));
+  };
+
   // States for dynamic service addition
   const [isAddServiceModalOpen, setIsAddServiceModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -1324,11 +1338,11 @@ export default function SettingsPage({
             <div>
               <h2 className="text-lg font-bold text-indigo-400 flex items-center gap-2">
                 <LayoutGrid className="w-5 h-5 text-indigo-400" />
-                Vision Page segment Calibration
+                Vision Page Segment Calibration
               </h2>
               <p className="text-xs text-muted-foreground leading-relaxed mt-2 max-w-2xl">
-                Choose exactly **up to 5 service cards** to showcase on the public VISION section. 
-                Instead of the standard cards, each category will display a stunning, auto-running slideshow of custom calibrated images.
+                Add and calibrate as many service cards as required to showcase on the public VISION section. 
+                Instead of standard cards, each category will display a stunning, auto-running slideshow of custom calibrated images.
               </p>
             </div>
             
@@ -1348,6 +1362,12 @@ export default function SettingsPage({
 
           {/* Slots Configuration */}
           <div className="space-y-6">
+            {localVisionSettings.length === 0 && (
+              <div className="text-center py-12 border border-dashed border-white/10 rounded-2xl bg-white/[0.01]">
+                <p className="text-sm font-semibold text-zinc-400">No Vision Cards Calibrated Yet</p>
+                <p className="text-xs text-zinc-500 mt-1">Click &quot;ADD NEW VISION CARD&quot; below to add your first service card.</p>
+              </div>
+            )}
             {localVisionSettings.map((slot, slotIdx) => {
               const currentService = servicesList.find(s => s.id === slot.serviceId);
               
@@ -1360,7 +1380,7 @@ export default function SettingsPage({
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/5 pb-4">
                     <div className="flex items-center gap-3">
                       <span className="w-7 h-7 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center font-mono text-xs font-bold">
-                        0{slotIdx + 1}
+                        {slotIdx + 1 < 10 ? `0${slotIdx + 1}` : slotIdx + 1}
                       </span>
                       <div>
                         <h3 className="font-bold text-foreground text-sm uppercase tracking-wider">
@@ -1372,12 +1392,12 @@ export default function SettingsPage({
                       </div>
                     </div>
 
-                    {/* Selector */}
-                    <div className="w-full md:w-80">
+                    {/* Selector & Remove Button */}
+                    <div className="w-full md:w-auto flex items-center gap-2">
                       <select
                         value={slot.serviceId}
                         onChange={(e) => handleSelectServiceForSlot(slotIdx, Number(e.target.value))}
-                        className="w-full bg-[#050508] border border-white/10 rounded-xl px-4 py-2 text-xs font-semibold text-white outline-none focus:border-indigo-400 transition-colors"
+                        className="w-full md:w-80 bg-[#050508] border border-white/10 rounded-xl px-4 py-2 text-xs font-semibold text-white outline-none focus:border-indigo-400 transition-colors"
                       >
                         <option value="0">-- SELECT SERVICE FOR THIS SLOT --</option>
                         {servicesList.map(s => (
@@ -1386,6 +1406,15 @@ export default function SettingsPage({
                           </option>
                         ))}
                       </select>
+                      <Button
+                        type="button"
+                        onClick={() => handleRemoveVisionCard(slotIdx)}
+                        className="h-9 px-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title="Remove Vision Card"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">REMOVE</span>
+                      </Button>
                     </div>
                   </div>
 
@@ -1632,6 +1661,18 @@ export default function SettingsPage({
               );
             })}
           </div>
+
+          {/* Add New Vision Card Action */}
+          <motion.div variants={itemVariants}>
+            <Button
+              type="button"
+              onClick={handleAddVisionCard}
+              className="w-full py-4 border-2 border-dashed border-indigo-500/30 hover:border-indigo-400 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-300 hover:text-indigo-200 font-extrabold text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              ADD NEW VISION CARD
+            </Button>
+          </motion.div>
 
           <motion.div variants={itemVariants} className="flex justify-end pt-4">
             <Button
